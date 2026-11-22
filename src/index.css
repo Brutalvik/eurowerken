@@ -1,0 +1,50 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+  --bg: 237 242 248;
+  --surface: 255 255 255;
+  --surface2: 245 248 252;
+  --line: 221 228 238;
+  --fg: 10 22 40;
+  --fg2: 74 96 128;
+  --fg3: 112 132 160;
+  --accent: 29 111 240;
+  --ok: 5 150 105;
+  --warn: 180 83 9;
+  --bad: 220 38 38;
+  --violet: 124 58 237;
+  --sidebar: 10 22 40;
+}
+
+.dark {
+  color-scheme: dark;
+  --bg: 7 12 24;
+  --surface: 15 24 41;
+  --surface2: 21 32 53;
+  --line: 28 45 71;
+  --fg: 237 242 255;
+  --fg2: 123 147 191;
+  --fg3: 91 115 153;
+  --accent: 79 142 247;
+  --ok: 52 211 153;
+  --warn: 251 191 36;
+  --bad: 248 113 113;
+  --violet: 167 139 250;
+  --sidebar: 9 14 28;
+}
+
+body {
+  @apply bg-bg font-sans text-fg antialiased;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-thumb {
+  background: rgb(var(--line));
+  border-radius: 3px;
+}
