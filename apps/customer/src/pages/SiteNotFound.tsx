@@ -1,6 +1,5 @@
 import { Link } from 'react-router-dom';
 import { SearchX } from 'lucide-react';
-import { MADE_BY_NOTICE } from '@eurowerken/shared';
 
 /** No published workshop site at this address (or it is not published yet). */
 export function SiteNotFound({ message }: { message?: string }) {
@@ -14,7 +13,6 @@ export function SiteNotFound({ message }: { message?: string }) {
       <Link to="/" className="text-sm font-semibold text-accent hover:underline">
         Find a workshop
       </Link>
-      <p className="mt-8 text-xs text-fg3">{MADE_BY_NOTICE}</p>
     </div>
   );
 }

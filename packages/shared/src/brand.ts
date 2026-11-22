@@ -6,6 +6,15 @@ export function hexToRgbTriplet(hex: string | null | undefined): string | null {
   return `${(n >> 16) & 255} ${(n >> 8) & 255} ${n & 255}`;
 }
 
+/** Text colour triplet (white or near-black) that reads best on the given colour triplet. */
+export function readableOn(triplet: string): string {
+  const [r, g, b] = triplet.split(' ').map((v) => Number(v) / 255) as [number, number, number];
+  const lin = (c: number) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+  const luminance = 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+  // Contrast against white vs against near-black (10 22 40).
+  return (1.05 / (luminance + 0.05)) >= ((luminance + 0.05) / 0.0127) ? '255 255 255' : '10 22 40';
+}
+
 /** Brighter version of a colour for dark backgrounds, so the accent stays readable. */
 export function lightenTriplet(triplet: string, amount = 0.25): string {
   return triplet

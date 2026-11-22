@@ -17,6 +17,7 @@
   --fg2: 74 85 104;
   --fg3: 120 132 150;
   --accent: 29 111 240;
+  --accent-fg: 255 255 255;
   --ink: 10 22 40;
   --ok: 5 150 105;
   --warn: 217 119 6;
@@ -50,6 +51,11 @@ html {
 body {
   @apply bg-bg font-sans text-fg antialiased;
   -webkit-tap-highlight-color: transparent;
+  /* Soft colour wash behind everything, so the glass panels have something to blur. */
+  background-image:
+    radial-gradient(60rem 40rem at 100% -10%, rgb(var(--accent) / 0.08), transparent 60%),
+    radial-gradient(50rem 30rem at -10% 30%, rgb(var(--accent) / 0.05), transparent 60%);
+  background-attachment: fixed;
 }
 
 /* iOS zooms into any field under 16px when it gets focus. */
@@ -73,6 +79,26 @@ body {
   }
   .eyebrow {
     @apply text-xs font-semibold uppercase tracking-[0.18em] text-accent;
+  }
+
+  /*
+   * Glass panels. Use on light or tinted backgrounds (cards, floating
+   * badges, sticky bars). .glass-dark is for dark bands and the footer.
+   */
+  .glass {
+    @apply border border-white/60 bg-surface/65 shadow-[0_8px_32px_rgb(var(--ink)/0.06)] backdrop-blur-xl backdrop-saturate-150 dark:border-white/10 dark:bg-surface/55;
+  }
+  .glass-strong {
+    @apply border border-white/70 bg-surface/80 shadow-[0_12px_40px_rgb(var(--ink)/0.10)] backdrop-blur-2xl backdrop-saturate-150 dark:border-white/10 dark:bg-surface/75;
+  }
+  .glass-dark {
+    @apply border border-white/10 bg-white/[0.06] backdrop-blur-xl;
+  }
+  .input {
+    @apply w-full rounded-xl border border-line bg-surface/80 px-3.5 py-2.5 text-sm text-fg outline-none transition placeholder:text-fg3 focus:border-accent focus:ring-2 focus:ring-accent/20 coarse:min-h-12;
+  }
+  .label {
+    @apply mb-1.5 block text-xs font-medium text-fg2;
   }
 }
 

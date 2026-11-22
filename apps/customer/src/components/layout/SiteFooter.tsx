@@ -1,7 +1,6 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { Clock, Facebook, Instagram, Mail, MapPin, Phone, Youtube } from 'lucide-react';
-import { COMPANY, endSentence } from '@eurowerken/shared';
 import { sitePath, useSite } from '@/site/SiteContext';
 import { Wordmark } from '../Wordmark';
 
@@ -113,7 +112,7 @@ export function SiteFooter() {
       <div className="border-t border-white/10">
         <div className="container-site flex flex-col gap-3 py-6 text-xs text-white/45 md:flex-row md:items-center md:justify-between">
           <p>
-            © {new Date().getFullYear()} {site.display_name}. Made with {COMPANY.product}, operated by {endSentence(COMPANY.legalName)}
+            © {new Date().getFullYear()} {site.display_name}. All rights reserved.
           </p>
           <div className="flex flex-wrap gap-x-5 gap-y-2">
             <Link to={sitePath(site, 'privacy')} className="hover:text-white">

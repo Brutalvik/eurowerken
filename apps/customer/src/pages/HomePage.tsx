@@ -92,11 +92,19 @@ function Hero() {
         </div>
 
         <div className="relative mx-auto w-full max-w-xl lg:max-w-none">
-          <div className="relative aspect-[4/3] overflow-hidden rounded-[2rem] border border-line/60 bg-surface shadow-2xl shadow-ink/10">
-            <Photo name="hero-car" alt="A European sports car in the workshop" label="Hero photo: hero-car.jpg" icon={Car} className="h-full w-full" />
+          {/* The design uses a cut-out car with no frame: add hero-car.png with a transparent background. */}
+          <div className="relative aspect-[4/3] sm:aspect-[16/11]">
+            <Photo
+              name="hero-car"
+              alt="Black Porsche Boxster convertible"
+              label="Hero photo: hero-car.png"
+              icon={Car}
+              fit="contain"
+              className="h-full w-full rounded-[2rem] drop-shadow-[0_30px_30px_rgb(var(--ink)/0.22)]"
+            />
           </div>
           {/* Floating status cards from the design; tucked inside the frame on phones. */}
-          <div className="absolute -top-5 right-3 w-52 rounded-2xl border border-line/70 bg-surface/95 p-3.5 shadow-xl backdrop-blur sm:-right-4 sm:w-60 sm:p-4">
+          <div className="glass-strong absolute -top-5 right-3 w-52 rounded-2xl p-3.5 sm:-right-4 sm:w-60 sm:p-4">
             <div className="flex items-center gap-3">
               <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-ok/15 text-ok">
                 <CheckCircle2 className="h-5 w-5" aria-hidden />
@@ -108,7 +116,7 @@ function Hero() {
             </div>
             <div className="mt-3 h-1.5 rounded-full bg-ok" aria-hidden />
           </div>
-          <div className="absolute -bottom-6 left-3 w-60 rounded-2xl border border-line/70 bg-surface/95 p-4 shadow-xl backdrop-blur sm:-left-6 sm:w-64">
+          <div className="glass-strong absolute -bottom-6 left-3 w-60 rounded-2xl p-4 sm:-left-6 sm:w-64">
             <div className="flex items-center justify-between">
               <p className="text-sm font-semibold text-fg">Diagnostic Scan</p>
               <span className="rounded-md bg-accent/10 px-2 py-0.5 text-[11px] font-semibold text-accent">Live</span>
@@ -141,7 +149,7 @@ function QuickActions() {
     navigate(`${sitePath(site, 'track')}${id ? `?id=${encodeURIComponent(id)}` : ''}`);
   }
 
-  const card = 'rounded-2xl border border-line bg-surface p-6 shadow-lg shadow-ink/5';
+  const card = 'glass-strong rounded-2xl p-6';
   return (
     <section aria-label="Quick actions" className="container-site relative z-10 -mt-12 grid gap-4 md:grid-cols-3 lg:-mt-16">
       <div className={card}>
@@ -244,9 +252,9 @@ function GaragePreview() {
   const site = useSite();
   return (
     <section className="bg-surface2/60 py-20 sm:py-24">
-      <div className="container-site grid items-center gap-12 lg:grid-cols-2 lg:gap-16">
+      <div className="container-site grid grid-cols-1 items-center gap-12 lg:grid-cols-2 lg:gap-16">
         {/* A mock of the customer dashboard. */}
-        <div className="order-2 rounded-3xl border border-line bg-surface p-5 shadow-2xl shadow-ink/10 sm:p-7 lg:order-1">
+        <div className="glass-strong order-2 min-w-0 rounded-3xl p-5 sm:p-7 lg:order-1">
           <div className="flex items-center justify-between">
             <p className="font-display text-base font-semibold text-fg">My Vehicles</p>
             <span className="flex h-8 w-8 items-center justify-center rounded-full bg-surface2 text-fg2">
@@ -274,7 +282,7 @@ function GaragePreview() {
           </div>
         </div>
 
-        <div className="order-1 lg:order-2">
+        <div className="order-1 min-w-0 lg:order-2">
           <SectionHeading
             center={false}
             eyebrow="Customer Garage"
@@ -369,7 +377,7 @@ function Testimonials() {
         </div>
         <div className="mt-12 grid gap-5 md:grid-cols-3">
           {TESTIMONIALS.map((t) => (
-            <figure key={t.name} className="flex flex-col rounded-2xl border border-white/10 bg-white/5 p-6">
+            <figure key={t.name} className="glass-dark flex flex-col rounded-2xl p-6">
               <Stars />
               <Quote className="mt-4 h-6 w-6 text-accent" aria-hidden />
               <blockquote className="mt-2 flex-1 text-sm leading-relaxed text-white/80">{t.quote}</blockquote>

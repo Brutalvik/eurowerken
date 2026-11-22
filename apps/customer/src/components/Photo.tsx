@@ -10,14 +10,17 @@ interface PhotoProps {
   icon?: LucideIcon;
   /** Label on the placeholder, shown while the real photo is missing. */
   label?: string;
+  /** cover fills the box (cropping); contain shows the whole image, for cut-outs like the hero car. */
+  fit?: 'cover' | 'contain';
 }
 
 /**
- * A photo slot. Shows public/images/<name>.jpg (or .png) when the file
+ * A photo slot. Shows public/images/<name>.png (or .jpg, .webp) when the file
  * exists, otherwise a styled placeholder so the layout never breaks.
  */
-export function Photo({ name, alt, className = '', icon: Icon = ImageIcon, label }: PhotoProps) {
-  const sources = [`/images/${name}.jpg`, `/images/${name}.png`];
+export function Photo({ name, alt, className = '', icon: Icon = ImageIcon, label, fit = 'cover' }: PhotoProps) {
+  // .png first for cut-outs with a transparent background, then .jpg, then .webp.
+  const sources = [`/images/${name}.png`, `/images/${name}.jpg`, `/images/${name}.webp`];
   const [index, setIndex] = useState(0);
 
   if (index < sources.length) {
@@ -27,7 +30,7 @@ export function Photo({ name, alt, className = '', icon: Icon = ImageIcon, label
         alt={alt}
         loading="lazy"
         onError={() => setIndex((i) => i + 1)}
-        className={`object-cover ${className}`}
+        className={`${fit === 'contain' ? 'object-contain' : 'object-cover'} ${className}`}
       />
     );
   }

@@ -28,7 +28,7 @@ npm run build                # all workspaces
 
 ## Product context
 
-- The customer site (landing, services, experts, parts shop, part details, cart and checkout, booking, repair tracking, case details, reviews, customer garage) was designed separately; it is being rebuilt here on the shared architecture, one section per round. Done: home page. The rest show a "being built" page with working links.
+- The customer site is built from the design screenshots: home, services, experts, parts shop, part details, cart and checkout, booking, repair tracking, repair case details, reviews, customer garage. All run on sample data (`apps/customer/src/data/catalog.ts`); flows that need the backend (checkout payment, booking confirmation, estimate approval, messages, reviews, garage accounts) work on the page and show a notice that they are not connected yet. Card fields at checkout are layout only and are never read.
 - Data flow: customer books online, appointment lands in the ERP, technician updates repair status, customer sees it live, parts used decrement inventory, invoice is generated, payment is recorded in sales and reports.
 - ERP brand name lives in `apps/erp/src/config/brand.ts`. Company name and legal entity live in `packages/shared/src/legal.ts` (`COMPANY`).
 
@@ -44,10 +44,13 @@ apps/erp/src/
   pages/       one file per module; auth/ (login, register, onboarding, invite, reset, setup), users/, settings/ (WebsiteCard), legal/ (Terms, Privacy)
   theme/       ThemeProvider, chartPalette (hex per mode for recharts)
 apps/customer/src/
-  site/        SiteContext: loads the published workshop_sites row for /:slug, applies the workshop's colour to --accent
-  components/  layout/ (SiteLayout, SiteHeader, SiteFooter, nav), Photo (image slot with placeholder), Wordmark
-  data/        landing.ts (sample content until these are database tables)
-  pages/       HomePage, ComingSoonPage, LegalPage, RootPage (/), SiteNotFound
+  site/        SiteContext: loads the published workshop_sites row for /:slug, applies the workshop's colour to --accent and --accent-fg
+  cart/        CartContext: cart per site in localStorage, synced across tabs
+  components/  layout/ (SiteLayout, SiteHeader, SiteFooter, nav), ui/ (PageHero, Breadcrumbs, Stars, Pill, StepCard, QuantityStepper, DemoNotice), Photo, Wordmark
+  data/        catalog.ts (parts, services, technicians, reviews, repair cases, garage: one export per future table), landing.ts
+  lib/         supabase.ts, format.ts (CAD)
+  pages/       HomePage, ServicesPage, ExpertsPage, parts/ (shop, details), CartPage, BookPage, track/ (lookup, case details),
+               ReviewsPage, GaragePage, LegalPage, RootPage (/), SiteNotFound; page-local helpers in folders next to them
 apps/customer/public/images/   drop-in photos; README lists the file names
 packages/shared/src/   site.ts, brand.ts, legal.ts
 supabase/migrations/   001 profiles, 002 registration and role_permissions, 003 workshops and invites, 004 workshop_sites
@@ -57,7 +60,8 @@ scripts/db-migrate.sh  applies unapplied migrations with psql
 ## Customer site and branding
 
 - `public.workshop_sites` (one per workshop, created with it): slug, display name, tagline, hero headline and highlighted word, intro, logo URL, brand colour, contact, hours, social links, published. Signed-out visitors read only published sites; only full Settings access in that workshop edits it.
-- The customer app sets `--accent` from the brand colour (lifted in dark mode). Use `text-accent` and friends, never the workshop's hex directly. `--ink` is the dark button and heading colour and flips in dark mode.
+- The customer app sets `--accent` from the brand colour (lifted in dark mode) and `--accent-fg` to white or near-black, whichever reads better on it. Text on `bg-accent` is `text-accent-fg`, never `text-white`. Never use the workshop's hex directly. `--ink` is the dark button and heading colour and flips in dark mode.
+- Glass: `.glass`, `.glass-strong` (cards, floating badges, sticky summaries on light areas) and `.glass-dark` (on dark bands) in `apps/customer/src/index.css`. Use lightly.
 - Light by default, with a dark toggle. Desktop menu from 1280 px (`xl`); a full-screen menu below.
 - Photos: `<Photo name="..." />` loads `public/images/<name>.jpg` or `.png` and falls back to a styled placeholder. Per-workshop uploads (Supabase Storage) come later.
 - `VITE_DEFAULT_SITE_SLUG` sends the bare address to one workshop (single-workshop deployment). Custom domains per workshop are a later step.

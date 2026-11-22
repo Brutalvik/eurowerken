@@ -16,7 +16,9 @@ export function LegalPage({ doc }: { doc: LegalDocument }) {
         </Link>
         <article className="mt-6 rounded-xl border border-line bg-surface p-5 sm:p-8">
           <h1 className="font-display text-xl font-semibold text-fg sm:text-2xl">{doc.title}</h1>
-          <p className="mt-1 text-xs text-fg3">Effective {LEGAL_EFFECTIVE_DATE}</p>
+          <p className="mt-1 text-xs text-fg3">
+            {MADE_BY_NOTICE} Effective {LEGAL_EFFECTIVE_DATE}.
+          </p>
           {LEGAL_DRAFT && (
             <p className="mt-4 rounded-lg border border-warn/30 bg-warn/10 px-3 py-2 text-xs text-warn">
               Draft under review. This text may change before it takes effect.
@@ -47,7 +49,7 @@ export function LegalPage({ doc }: { doc: LegalDocument }) {
   );
 }
 
-/** Terms and Privacy links with the operator notice. */
+/** Terms and Privacy links (the operator notice lives on the legal pages themselves). */
 export function LegalFooter({ className = '', tone = 'default' }: { className?: string; tone?: 'default' | 'sidebar' }) {
   const muted = tone === 'sidebar' ? 'text-white/40' : 'text-fg3';
   const link = tone === 'sidebar' ? 'hover:text-white' : 'hover:text-fg';
@@ -61,7 +63,6 @@ export function LegalFooter({ className = '', tone = 'default' }: { className?: 
           Privacy Policy
         </Link>
       </div>
-      <p className="mt-1">{MADE_BY_NOTICE}</p>
     </div>
   );
 }

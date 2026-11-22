@@ -1,5 +1,6 @@
 import { Outlet, useParams } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
+import { CartProvider } from '@/cart/CartContext';
 import { SiteProvider, useSiteLoader } from '@/site/SiteContext';
 import { SiteNotFound } from '@/pages/SiteNotFound';
 import { SiteFooter } from './SiteFooter';
@@ -23,6 +24,7 @@ export function SiteLayout() {
 
   return (
     <SiteProvider site={state.site}>
+      <CartProvider siteSlug={state.site.slug}>
       <div className="flex min-h-[100dvh] flex-col">
         <a
           href="#main"
@@ -36,6 +38,7 @@ export function SiteLayout() {
         </main>
         <SiteFooter />
       </div>
+      </CartProvider>
     </SiteProvider>
   );
 }

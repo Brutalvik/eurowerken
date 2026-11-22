@@ -19,13 +19,13 @@ export const LEGAL_DRAFT = true;
 
 export const LEGAL_EFFECTIVE_DATE = 'November 22, 2026';
 
-/** One-line notice for footers. */
+/** One-line notice shown at the top of the Terms and Privacy pages. */
 /** Adds a closing full stop unless the text already ends with one ("Inc." does). */
 export function endSentence(text: string): string {
   return text.endsWith('.') ? text : `${text}.`;
 }
 
-export const MADE_BY_NOTICE = endSentence(`${COMPANY.product} is operated by ${COMPANY.legalName}`);
+export const MADE_BY_NOTICE = endSentence(`${COMPANY.product} is made and operated by ${COMPANY.legalName}`);
 
 export function contactLine(): string {
   return COMPANY.contactEmail

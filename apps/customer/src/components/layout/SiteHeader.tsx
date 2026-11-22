@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, NavLink, useLocation } from 'react-router-dom';
 import { Menu, Moon, Search, ShoppingCart, Sun, User, X } from 'lucide-react';
+import { useCart } from '@/cart/CartContext';
 import { sitePath, useSite } from '@/site/SiteContext';
 import { useTheme } from '@/theme/ThemeProvider';
 import { Wordmark } from '../Wordmark';
@@ -12,6 +13,7 @@ const iconButton =
 export function SiteHeader() {
   const site = useSite();
   const { mode, toggle } = useTheme();
+  const { count } = useCart();
   const { pathname } = useLocation();
   const [open, setOpen] = useState(false);
 
@@ -57,8 +59,13 @@ export function SiteHeader() {
           <Link to={sitePath(site, 'parts')} aria-label="Search parts" className={`${iconButton} hidden sm:flex`}>
             <Search className="h-[18px] w-[18px]" />
           </Link>
-          <Link to={sitePath(site, 'cart')} aria-label="Cart" className={iconButton}>
+          <Link to={sitePath(site, 'cart')} aria-label={`Cart, ${count} item${count === 1 ? '' : 's'}`} className={`${iconButton} relative`}>
             <ShoppingCart className="h-[18px] w-[18px]" />
+            {count > 0 && (
+              <span className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-warn px-1 text-[10px] font-bold text-white">
+                {count}
+              </span>
+            )}
           </Link>
           <button
             type="button"

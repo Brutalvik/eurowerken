@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { ArrowRight, Wrench } from 'lucide-react';
-import { COMPANY, MADE_BY_NOTICE, slugify } from '@eurowerken/shared';
+import { slugify } from '@eurowerken/shared';
 
 const DEFAULT_SITE = import.meta.env.VITE_DEFAULT_SITE_SLUG as string | undefined;
 
@@ -46,7 +46,6 @@ export function RootPage() {
         </button>
       </form>
       <div className="mt-12 space-y-1 text-xs text-fg3">
-        <p>{MADE_BY_NOTICE}</p>
         <p className="flex justify-center gap-4">
           <Link to="/terms" className="hover:text-fg">
             Terms and Conditions
@@ -55,7 +54,6 @@ export function RootPage() {
             Privacy Policy
           </Link>
         </p>
-        <p className="sr-only">{COMPANY.product}</p>
       </div>
     </div>
   );

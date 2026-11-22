@@ -12,7 +12,7 @@ export function LegalPage({ doc, standalone = false }: { doc: LegalDocument; sta
     <article className="mx-auto max-w-3xl rounded-2xl border border-line bg-surface p-6 sm:p-10">
       <h1 className="font-display text-2xl font-bold text-fg sm:text-3xl">{doc.title}</h1>
       <p className="mt-1 text-xs text-fg3">
-        {COMPANY.product}, operated by {COMPANY.legalName} · Effective {LEGAL_EFFECTIVE_DATE}
+        {MADE_BY_NOTICE} Effective {LEGAL_EFFECTIVE_DATE}.
       </p>
       {LEGAL_DRAFT && (
         <p className="mt-4 rounded-lg border border-warn/30 bg-warn/10 px-3 py-2 text-xs text-warn">
@@ -51,7 +51,6 @@ export function LegalPage({ doc, standalone = false }: { doc: LegalDocument; sta
         </Link>
       </div>
       {body}
-      <p className="mt-6 text-center text-xs text-fg3">{MADE_BY_NOTICE}</p>
     </div>
   );
 }

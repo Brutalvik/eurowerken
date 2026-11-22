@@ -1,11 +1,11 @@
 # Photos for the customer site
 
-Drop your own licensed photos here with these names (JPG). Any that are
+Drop your own licensed photos here with these names (PNG, JPG or WebP). Any that are
 missing show a styled placeholder instead, so the site works without them.
 
 | File | Where it shows | Suggested size |
 |---|---|---|
-| hero-car.jpg | Home page hero, right side (transparent PNG also works: hero-car.png) | 1400 x 900 |
+| hero-car.png | Home page hero, right side. A cut-out car on a transparent background, as in the design (hero-car.jpg also works) | 1600 x 1100 or larger |
 | service-diagnostics.jpg | Services: Advanced Diagnostics | 800 x 600 |
 | service-tuning.jpg | Services: Performance Tuning | 800 x 600 |
 | service-maintenance.jpg | Services: Scheduled Maintenance | 800 x 600 |

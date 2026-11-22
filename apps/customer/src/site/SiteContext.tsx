@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
-import { hexToRgbTriplet, lightenTriplet } from '@eurowerken/shared';
+import { hexToRgbTriplet, lightenTriplet, readableOn } from '@eurowerken/shared';
 import type { WorkshopSite } from '@eurowerken/shared';
 import { supabase, supabaseConfigured } from '@/lib/supabase';
 import { useTheme } from '@/theme/ThemeProvider';
@@ -48,10 +48,17 @@ export function useSiteLoader(slug: string | undefined): SiteState {
   useEffect(() => {
     const root = document.documentElement;
     const triplet = hexToRgbTriplet(site?.accent_color);
-    if (triplet) root.style.setProperty('--accent', mode === 'dark' ? lightenTriplet(triplet, 0.3) : triplet);
-    else root.style.removeProperty('--accent');
+    if (triplet) {
+      const accent = mode === 'dark' ? lightenTriplet(triplet, 0.3) : triplet;
+      root.style.setProperty('--accent', accent);
+      root.style.setProperty('--accent-fg', readableOn(accent));
+    } else {
+      root.style.removeProperty('--accent');
+      root.style.removeProperty('--accent-fg');
+    }
     return () => {
       root.style.removeProperty('--accent');
+      root.style.removeProperty('--accent-fg');
     };
   }, [site?.accent_color, mode]);
 
