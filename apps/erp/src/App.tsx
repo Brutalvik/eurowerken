@@ -18,6 +18,8 @@ import { InvitePage } from '@/pages/auth/InvitePage';
 import { OnboardingPage } from '@/pages/auth/OnboardingPage';
 import { ResetPasswordPage } from '@/pages/auth/ResetPasswordPage';
 import { SetupRequiredPage } from '@/pages/auth/SetupRequiredPage';
+import { LegalPage } from '@/pages/legal/LegalPage';
+import { PRIVACY, TERMS } from '@eurowerken/shared';
 import { supabaseConfigured } from '@/lib/supabase';
 import type { ReactNode } from 'react';
 
@@ -26,10 +28,24 @@ function guarded(module: ModuleId, page: ReactNode) {
 }
 
 export default function App() {
-  if (!supabaseConfigured) return <SetupRequiredPage />;
+  // Legal pages are public and work even before Supabase is configured.
+  const legal = [
+    <Route key="terms" path="terms" element={<LegalPage doc={TERMS} />} />,
+    <Route key="privacy" path="privacy" element={<LegalPage doc={PRIVACY} />} />,
+  ];
+
+  if (!supabaseConfigured) {
+    return (
+      <Routes>
+        {legal}
+        <Route path="*" element={<SetupRequiredPage />} />
+      </Routes>
+    );
+  }
 
   return (
     <Routes>
+      {legal}
       <Route path="login" element={<LoginPage />} />
       <Route path="register" element={<RegisterPage />} />
       <Route path="reset-password" element={<ResetPasswordPage />} />

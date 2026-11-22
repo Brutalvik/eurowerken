@@ -1,0 +1,104 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * Customer site tokens (RGB triplets). --accent is replaced at runtime with
+ * the workshop's brand colour (SiteProvider). --ink is the dark button and
+ * heading colour; it flips to light in dark mode.
+ */
+:root {
+  color-scheme: light;
+  --bg: 246 248 251;
+  --surface: 255 255 255;
+  --surface2: 241 245 250;
+  --line: 226 232 240;
+  --fg: 10 22 40;
+  --fg2: 74 85 104;
+  --fg3: 120 132 150;
+  --accent: 29 111 240;
+  --ink: 10 22 40;
+  --ok: 5 150 105;
+  --warn: 217 119 6;
+  --bad: 220 38 38;
+  --violet: 124 58 237;
+  --sidebar: 10 22 40;
+}
+
+.dark {
+  color-scheme: dark;
+  --bg: 7 12 24;
+  --surface: 15 24 41;
+  --surface2: 21 32 53;
+  --line: 32 48 74;
+  --fg: 237 242 255;
+  --fg2: 160 176 204;
+  --fg3: 110 128 158;
+  --accent: 79 142 247;
+  --ink: 237 242 255;
+  --ok: 52 211 153;
+  --warn: 251 191 36;
+  --bad: 248 113 113;
+  --violet: 167 139 250;
+  --sidebar: 9 14 28;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  @apply bg-bg font-sans text-fg antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* iOS zooms into any field under 16px when it gets focus. */
+@media (pointer: coarse) {
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
+@layer components {
+  .btn-ink {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-ink px-5 py-3 text-sm font-semibold text-bg shadow-lg shadow-ink/10 transition hover:opacity-90 coarse:min-h-12;
+  }
+  .btn-outline {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl border border-line bg-surface px-5 py-3 text-sm font-semibold text-fg shadow-sm transition hover:bg-surface2 coarse:min-h-12;
+  }
+  .container-site {
+    @apply mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8;
+  }
+  .eyebrow {
+    @apply text-xs font-semibold uppercase tracking-[0.18em] text-accent;
+  }
+}
+
+@layer utilities {
+  .pt-safe {
+    padding-top: env(safe-area-inset-top);
+  }
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .no-scrollbar {
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

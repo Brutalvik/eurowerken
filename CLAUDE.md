@@ -1,57 +1,78 @@
-# EuroWerken ERP
+# EuroWerken
 
-Internal staff platform for an auto repair workshop (European specialist, services all makes). Separate app from the customer-facing EuroWerken site, same design language, talks to the same shared backend (not yet built).
+A platform for European auto repair workshops, made by EuroWerken and operated by 2607521 Alberta Inc. One repository (npm workspaces) with:
+
+- `apps/erp`: the staff ERP (port 5174). Branded EuroWerken.
+- `apps/customer`: the customer-facing website (port 5175). One app serves every workshop's site at `/<slug>`, in that workshop's own branding, which its Manager edits in the ERP (Settings, Customer website).
+- `packages/shared`: code both apps use: workshop site types, branding helpers, legal texts and company details, the Tailwind preset.
+- `supabase/migrations`: the shared database (Supabase: auth, Postgres, RLS). Both apps talk to it with the publishable key.
 
 ## Commands
 
 ```bash
-npm install
-cp .env.example .env.local   # then fill in the Supabase URL, publishable key, DATABASE_URL
-npm run db:migrate           # apply supabase/migrations to the database
-npm run dev        # http://localhost:5174
-npm run typecheck
-npm run build      # typecheck + production build
+npm install                  # at the repo root, installs every workspace
+cp .env.example .env.local   # at the root; both apps read it (envDir)
+npm run db:migrate           # apply new supabase/migrations to the database
+npm run dev:erp              # http://localhost:5174 (npm run dev does the same)
+npm run dev:customer         # http://localhost:5175, then open /<workshop-slug>
+npm run typecheck            # all workspaces
+npm run build                # all workspaces
 ```
 
 ## Stack
 
-- React 18, TypeScript (strict), Vite
-- Tailwind CSS v3 with CSS-variable design tokens, `dark` class strategy
-- react-router-dom v6, recharts, lucide-react
-- Supabase Auth (`@supabase/supabase-js`), email and password
-- Fonts: Poppins (display), Inter (body)
-- Path alias: `@/` maps to `src/`
+- React 18, TypeScript (strict), Vite, Tailwind CSS v3 with CSS-variable tokens (`dark` class), shared preset in `packages/shared/tailwind-preset.js`
+- react-router-dom v6, lucide-react; recharts in the ERP
+- Supabase (`@supabase/supabase-js`): email, Google
+- Fonts: Poppins (display), Inter (body). Path alias `@/` is each app's `src/`
 
 ## Product context
 
-- Customer app (already built, separate repo): landing, services, experts, parts shop, cart and checkout, booking, repair tracking, case details, reviews. React, Tailwind, shadcn/ui, MSAL.
-- This ERP and the customer app share one backend (planned: Node/Express, PostgreSQL, Prisma, Azure). Data flow: customer books online, appointment lands in the ERP, technician updates repair status, customer sees it live, parts used decrement inventory, invoice is generated, payment is recorded in sales and reports.
-- Brand name lives in `src/config/brand.ts`. Change it there only.
+- The customer site (landing, services, experts, parts shop, part details, cart and checkout, booking, repair tracking, case details, reviews, customer garage) was designed separately; it is being rebuilt here on the shared architecture, one section per round. Done: home page. The rest show a "being built" page with working links.
+- Data flow: customer books online, appointment lands in the ERP, technician updates repair status, customer sees it live, parts used decrement inventory, invoice is generated, payment is recorded in sales and reports.
+- ERP brand name lives in `apps/erp/src/config/brand.ts`. Company name and legal entity live in `packages/shared/src/legal.ts` (`COMPANY`).
 
 ## Structure
 
 ```
-src/
-  auth/        rbac.ts (role/module matrix), AuthContext (Supabase session + profile role),
-               RequireAuth (signed-in guard), RequireAccess (per-module guard)
-  components/
-    layout/    AppLayout, Sidebar, Header
-    ui/        Badge, Button, Card, DataTable, KpiCard, PillTabs, SearchInput
+apps/erp/src/
+  auth/        rbac.ts, AuthContext (Supabase session, profile, workshop), RequireAuth, RequireAccess
+  components/  layout/ (AppLayout, Sidebar, Header), ui/ (Badge, Button, Card, DataTable, KpiCard, PillTabs, SearchInput)
   config/      brand.ts
   data/        types.ts, mock.ts (static mock data, one export per future API resource)
-  lib/         format.ts (CAD currency), status.ts (status to badge tone maps), supabase.ts (client)
-  pages/       one file per module; pages/auth/ holds login, register, onboarding, invite, reset password and setup screens; pages/users/ holds Users page parts
-supabase/
-  migrations/  001 profiles and roles, 002 registration and role_permissions, 003 workshops and invites
-scripts/
-  db-migrate.sh  applies the migrations with psql
-  theme/       ThemeProvider (light/dark, persisted), chartPalette (hex values per mode for recharts)
+  lib/         format.ts (CAD), status.ts, supabase.ts, invites.ts
+  pages/       one file per module; auth/ (login, register, onboarding, invite, reset, setup), users/, settings/ (WebsiteCard), legal/ (Terms, Privacy)
+  theme/       ThemeProvider, chartPalette (hex per mode for recharts)
+apps/customer/src/
+  site/        SiteContext: loads the published workshop_sites row for /:slug, applies the workshop's colour to --accent
+  components/  layout/ (SiteLayout, SiteHeader, SiteFooter, nav), Photo (image slot with placeholder), Wordmark
+  data/        landing.ts (sample content until these are database tables)
+  pages/       HomePage, ComingSoonPage, LegalPage, RootPage (/), SiteNotFound
+apps/customer/public/images/   drop-in photos; README lists the file names
+packages/shared/src/   site.ts, brand.ts, legal.ts
+supabase/migrations/   001 profiles, 002 registration and role_permissions, 003 workshops and invites, 004 workshop_sites
+scripts/db-migrate.sh  applies unapplied migrations with psql
 ```
+
+## Customer site and branding
+
+- `public.workshop_sites` (one per workshop, created with it): slug, display name, tagline, hero headline and highlighted word, intro, logo URL, brand colour, contact, hours, social links, published. Signed-out visitors read only published sites; only full Settings access in that workshop edits it.
+- The customer app sets `--accent` from the brand colour (lifted in dark mode). Use `text-accent` and friends, never the workshop's hex directly. `--ink` is the dark button and heading colour and flips in dark mode.
+- Light by default, with a dark toggle. Desktop menu from 1280 px (`xl`); a full-screen menu below.
+- Photos: `<Photo name="..." />` loads `public/images/<name>.jpg` or `.png` and falls back to a styled placeholder. Per-workshop uploads (Supabase Storage) come later.
+- `VITE_DEFAULT_SITE_SLUG` sends the bare address to one workshop (single-workshop deployment). Custom domains per workshop are a later step.
+
+## Legal
+
+- Terms and Conditions and Privacy Policy texts are in `packages/shared/src/legal.ts`, shown at `/terms` and `/privacy` in the ERP (public, also linked from sign-in, register and the sidebar), and at `/terms`, `/privacy` and `/<slug>/terms`, `/<slug>/privacy` on the customer site (footer).
+- Every app shows "EuroWerken is operated by 2607521 Alberta Inc." (`MADE_BY_NOTICE`). Use `endSentence()` when a sentence ends with the legal name, which already ends in a full stop.
+- The texts are drafts (`LEGAL_DRAFT = true` shows a notice). Before launch: lawyer review (Alberta PIPA, PIPEDA), fill in `COMPANY.contactEmail`, set `LEGAL_DRAFT` to false.
 
 ## Conventions
 
 - Colors come from Tailwind token classes (`bg-surface`, `text-fg`, `border-line`, `text-accent`, `text-ok`, `text-bad`, `text-warn`, `text-violet`). Never hardcode hex in components. Both themes must work for every new component.
 - Recharts cannot read CSS variables reliably. Chart colors come from `chartPalette(mode)`. If you change a token in `index.css`, update `chartPalette.ts` too.
+- Customer site: tokens are the same names; also `bg-ink`/`text-ink` and the `.btn-ink`, `.btn-outline`, `.container-site`, `.eyebrow` classes in `apps/customer/src/index.css`.
 - Tables use `DataTable` with a typed `Column<T>[]`. Status-to-color mapping goes in `lib/status.ts`, not inline.
 - Permissions: use `useAuth().can(module, 'view' | 'full')` to show or hide actions. Navigation hides modules with `none` access, and `RequireAccess` blocks direct URL access.
 - The RBAC matrix in `src/auth/rbac.ts` is a UI mirror only. The backend must enforce the same rules; never rely on the client.

@@ -228,6 +228,17 @@ export function RegisterPage() {
           onChange={(e) => setConfirm(e.target.value)}
         />
         {error && <FormMessage tone="error">{error}</FormMessage>}
+        <p className="text-[11px] leading-relaxed text-fg3">
+          By creating an account you agree to the{' '}
+          <Link to="/terms" target="_blank" className="font-medium text-accent hover:underline">
+            Terms and Conditions
+          </Link>{' '}
+          and{' '}
+          <Link to="/privacy" target="_blank" className="font-medium text-accent hover:underline">
+            Privacy Policy
+          </Link>
+          .
+        </p>
         <Button type="submit" disabled={busy} className="w-full">
           {busy ? 'Creating account...' : 'Create account'}
         </Button>

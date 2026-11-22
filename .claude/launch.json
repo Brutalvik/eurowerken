@@ -4,8 +4,24 @@
     {
       "name": "eurowerken-erp",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeArgs": [
+        "--prefix",
+        ".",
+        "run",
+        "dev:erp"
+      ],
       "port": 5174
+    },
+    {
+      "name": "eurowerken-customer",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "--prefix",
+        ".",
+        "run",
+        "dev:customer"
+      ],
+      "port": 5175
     }
   ]
 }

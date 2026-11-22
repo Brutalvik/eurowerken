@@ -9,7 +9,9 @@ export default defineConfig({
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },
+  // One .env.local at the repo root serves every app.
+  envDir: fileURLToPath(new URL('../..', import.meta.url)),
   server: {
-    port: 5174,
+    port: 5175,
   },
 });

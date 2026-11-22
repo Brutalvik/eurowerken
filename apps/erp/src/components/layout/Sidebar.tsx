@@ -13,6 +13,7 @@ import {
 import type { LucideIcon } from 'lucide-react';
 import { BRAND } from '@/config/brand';
 import { useAuth, useCurrentUser } from '@/auth/AuthContext';
+import { LegalFooter } from '@/pages/legal/LegalPage';
 import { MODULE_LABELS, MODULE_ORDER } from '@/auth/rbac';
 import type { ModuleId } from '@/auth/rbac';
 
@@ -117,6 +118,7 @@ export function Sidebar({ open, onNavigate }: SidebarProps) {
           <LogOut className="h-4 w-4" aria-hidden />
         </button>
       </div>
+      <LegalFooter tone="sidebar" className="px-3 pb-3 md:max-lg:hidden" />
     </aside>
   );
 }

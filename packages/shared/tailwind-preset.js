@@ -1,11 +1,15 @@
 import plugin from 'tailwindcss/plugin';
 
+/**
+ * Shared Tailwind setup for every web app. Each app defines the colour
+ * values as CSS variables (RGB triplets) in its own index.css, so apps and
+ * workshops can theme without changing class names.
+ */
 const token = (name) => `rgb(var(--${name}) / <alpha-value>)`;
 
 /** @type {import('tailwindcss').Config} */
 export default {
   darkMode: 'class',
-  content: ['./index.html', './src/**/*.{ts,tsx}'],
   theme: {
     extend: {
       colors: {
@@ -22,6 +26,7 @@ export default {
         bad: token('bad'),
         violet: token('violet'),
         sidebar: token('sidebar'),
+        ink: token('ink'),
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],

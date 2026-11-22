@@ -2,6 +2,7 @@ import type { InputHTMLAttributes, ReactNode } from 'react';
 import { Loader2, Moon, Sun, Wrench } from 'lucide-react';
 import { BRAND } from '@/config/brand';
 import { useTheme } from '@/theme/ThemeProvider';
+import { LegalFooter } from '@/pages/legal/LegalPage';
 
 /** Centered card used by the sign-in, password reset and setup screens. */
 export function AuthShell({ title, subtitle, children }: { title: string; subtitle?: string; children: ReactNode }) {
@@ -37,6 +38,7 @@ export function AuthShell({ title, subtitle, children }: { title: string; subtit
           {subtitle && <p className="mt-1 text-xs text-fg2">{subtitle}</p>}
           <div className="mt-5">{children}</div>
         </section>
+        <LegalFooter className="mt-5" />
       </div>
     </div>
   );

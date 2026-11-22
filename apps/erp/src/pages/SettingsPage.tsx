@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Card, CardHeader } from '@/components/ui/Card';
+import { WebsiteCard } from './settings/WebsiteCard';
 
 interface FieldProps {
   id: string;
@@ -43,8 +44,10 @@ export function SettingsPage() {
   };
 
   return (
+    <div className="max-w-3xl space-y-4">
+    <WebsiteCard />
     <form
-      className="max-w-3xl space-y-4"
+      className="space-y-4"
       onSubmit={(e) => {
         e.preventDefault();
         // TODO: persist through the settings API once the backend exists.
@@ -78,5 +81,6 @@ export function SettingsPage() {
         )}
       </div>
     </form>
+    </div>
   );
 }
