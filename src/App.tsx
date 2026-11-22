@@ -14,6 +14,8 @@ import { SettingsPage } from '@/pages/SettingsPage';
 import { UsersPage } from '@/pages/UsersPage';
 import { LoginPage } from '@/pages/auth/LoginPage';
 import { RegisterPage } from '@/pages/auth/RegisterPage';
+import { InvitePage } from '@/pages/auth/InvitePage';
+import { OnboardingPage } from '@/pages/auth/OnboardingPage';
 import { ResetPasswordPage } from '@/pages/auth/ResetPasswordPage';
 import { SetupRequiredPage } from '@/pages/auth/SetupRequiredPage';
 import { supabaseConfigured } from '@/lib/supabase';
@@ -31,6 +33,15 @@ export default function App() {
       <Route path="login" element={<LoginPage />} />
       <Route path="register" element={<RegisterPage />} />
       <Route path="reset-password" element={<ResetPasswordPage />} />
+      <Route path="invite/:token" element={<InvitePage />} />
+      <Route
+        path="onboarding"
+        element={
+          <RequireAuth>
+            <OnboardingPage />
+          </RequireAuth>
+        }
+      />
       <Route
         element={
           <RequireAuth>

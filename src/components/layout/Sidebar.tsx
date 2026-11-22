@@ -56,6 +56,16 @@ export function Sidebar({ open, onNavigate }: SidebarProps) {
         </div>
       </div>
 
+      {user.workshop && (
+        <div className="border-b border-white/10 px-4 py-3">
+          <div className="text-[9px] uppercase tracking-widest text-white/50">Workshop</div>
+          <div className="mt-0.5 truncate text-xs font-semibold" title={user.workshop.name}>
+            {user.workshop.name}
+          </div>
+          <div className="font-mono text-[10px] text-white/50">No. {user.workshop.number}</div>
+        </div>
+      )}
+
       <nav aria-label="Main" className="flex-1 space-y-0.5 overflow-y-auto px-2 py-3">
         {visible.map((module) => {
           const Icon = NAV_ICONS[module];

@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import type { ReactNode } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase, supabaseConfigured } from '@/lib/supabase';
-import type { ProfileRow } from '@/lib/supabase';
+import type { ProfileRow, WorkshopRow } from '@/lib/supabase';
 import { ACCESS, MODULE_ORDER, ROLES } from './rbac';
 import type { Access, ModuleId, PermissionMatrix, Role } from './rbac';
 
@@ -12,6 +12,8 @@ export interface AuthUser {
   email: string;
   initials: string;
   avatarUrl: string | null;
+  /** The workshop this account belongs to; null until they create or join one. */
+  workshop: WorkshopRow | null;
   /** Null until a manager assigns a role. A user with no role can sign in but sees no modules. */
   role: Role | null;
   active: boolean;
@@ -32,22 +34,34 @@ interface AuthContextValue {
   profileError: string | null;
   signIn: (email: string, password: string) => Promise<string | null>;
   /** needsConfirmation is true when Supabase sent a confirmation email instead of signing the user in. */
-  signUp: (
-    fullName: string,
-    email: string,
-    password: string,
-  ) => Promise<{ error: string | null; needsConfirmation: boolean }>;
+  signUp: (input: SignUpInput) => Promise<{ error: string | null; needsConfirmation: boolean }>;
   signInWithGoogle: () => Promise<string | null>;
   signOut: () => Promise<void>;
   sendPasswordReset: (email: string) => Promise<string | null>;
   updatePassword: (password: string) => Promise<string | null>;
   reloadProfile: () => Promise<void>;
+  /** Workshop membership. Each returns an error message, or null on success. */
+  createWorkshop: (name: string) => Promise<string | null>;
+  requestJoin: (number: string) => Promise<string | null>;
+  cancelJoinRequest: () => Promise<string | null>;
+  acceptInvite: (token: string) => Promise<string | null>;
+  workshopNumberExists: (number: string) => Promise<boolean>;
   /** Role permission matrix from public.role_permissions (falls back to the defaults in rbac.ts). */
   permissions: PermissionMatrix;
   reloadPermissions: () => Promise<void>;
   accessFor: (module: ModuleId) => Access;
   /** True when the current role has at least the requested level on the module. */
   can: (module: ModuleId, level: 'view' | 'full') => boolean;
+}
+
+/** What the sign-up form collects. workshop is absent when joining through an invite link. */
+export interface SignUpInput {
+  fullName: string;
+  email: string;
+  password: string;
+  workshop?: { action: 'create'; name: string } | { action: 'join'; number: string };
+  /** Path the confirmation email returns to, for example /invite/abc. Defaults to /dashboard. */
+  returnTo?: string;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -70,7 +84,8 @@ function toAuthUser(session: Session, profile: ProfileRow | null): AuthUser {
     email,
     initials: initialsOf(name),
     avatarUrl: profile?.avatar_url ?? null,
-    role: profile?.active === false ? null : (profile?.role ?? null),
+    workshop: profile?.workshop ?? null,
+    role: profile?.active === false || !profile?.workshop ? null : (profile?.role ?? null),
     active: profile?.active ?? true,
   };
 }
@@ -124,10 +139,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const userId = session?.user.id ?? null;
+  const workshopId = profile?.workshop_id ?? null;
 
   const loadProfile = useCallback(async (id: string) => {
     setProfileLoading(true);
-    const { data, error } = await supabase.from('profiles').select('*').eq('id', id).maybeSingle();
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*, workshop:workshops(id, name, number)')
+      .eq('id', id)
+      .maybeSingle();
     if (error) {
       setProfile(null);
       setProfileError(error.message);
@@ -155,18 +175,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setPermissions(next);
   }, []);
 
-  // Profile (name and role) and the permission matrix for whoever is signed in.
-  // Only refetch when the user changes, not on token refresh.
+  // Profile (name, role, workshop) for whoever is signed in. Only refetch when the user changes, not on token refresh.
   useEffect(() => {
     if (!userId) {
       setProfile(null);
       setProfileError(null);
-      setPermissions(ACCESS);
       return;
     }
     void loadProfile(userId);
+  }, [userId, loadProfile]);
+
+  // The permission matrix belongs to the workshop, so reload it whenever the workshop changes.
+  useEffect(() => {
+    if (!workshopId) {
+      setPermissions(ACCESS);
+      return;
+    }
     void loadPermissions();
-  }, [userId, loadProfile, loadPermissions]);
+  }, [workshopId, loadPermissions]);
 
   const user = useMemo(() => (session ? toAuthUser(session, profile) : null), [session, profile]);
   const role = user?.role ?? null;
@@ -197,13 +223,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return error ? friendly(error.message) : null;
   }, []);
 
-  const signUp = useCallback(async (fullName: string, email: string, password: string) => {
+  const signUp = useCallback(async ({ fullName, email, password, workshop, returnTo }: SignUpInput) => {
+    // The database trigger reads workshop_action from this metadata to create or join the workshop.
+    const metadata: Record<string, string> = { full_name: fullName.trim() };
+    if (workshop?.action === 'create') {
+      metadata.workshop_action = 'create';
+      metadata.workshop_name = workshop.name.trim();
+    } else if (workshop?.action === 'join') {
+      metadata.workshop_action = 'join';
+      metadata.workshop_number = workshop.number.trim();
+    }
     const { data, error } = await supabase.auth.signUp({
       email: email.trim(),
       password,
       options: {
-        data: { full_name: fullName.trim() },
-        emailRedirectTo: `${window.location.origin}/dashboard`,
+        data: metadata,
+        emailRedirectTo: `${window.location.origin}${returnTo ?? '/dashboard'}`,
       },
     });
     if (error) return { error: friendly(error.message), needsConfirmation: false };
@@ -246,6 +281,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (userId) await loadProfile(userId);
   }, [userId, loadProfile]);
 
+  /** Runs a membership function, then reloads the profile so the app follows the new workshop. */
+  const membership = useCallback(
+    async (fn: string, args: Record<string, string>) => {
+      const { error } = await supabase.rpc(fn, args);
+      if (error) return friendly(error.message);
+      await reloadProfile();
+      return null;
+    },
+    [reloadProfile],
+  );
+
+  const createWorkshop = useCallback(
+    (name: string) => membership('create_workshop', { p_name: name.trim() }),
+    [membership],
+  );
+  const requestJoin = useCallback(
+    (number: string) => membership('request_join', { p_number: number.trim() }),
+    [membership],
+  );
+  const cancelJoinRequest = useCallback(() => membership('cancel_join_request', {}), [membership]);
+  const acceptInvite = useCallback((token: string) => membership('accept_invite', { p_token: token }), [membership]);
+
+  const workshopNumberExists = useCallback(async (number: string) => {
+    const { data, error } = await supabase.rpc('workshop_number_exists', { p_number: number.trim() });
+    return !error && data === true;
+  }, []);
+
   const value = useMemo<AuthContextValue>(
     () => ({
       status,
@@ -258,6 +320,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       sendPasswordReset,
       updatePassword,
       reloadProfile,
+      createWorkshop,
+      requestJoin,
+      cancelJoinRequest,
+      acceptInvite,
+      workshopNumberExists,
       permissions,
       reloadPermissions: loadPermissions,
       accessFor,
@@ -274,6 +341,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       sendPasswordReset,
       updatePassword,
       reloadProfile,
+      createWorkshop,
+      requestJoin,
+      cancelJoinRequest,
+      acceptInvite,
+      workshopNumberExists,
       permissions,
       loadPermissions,
       accessFor,

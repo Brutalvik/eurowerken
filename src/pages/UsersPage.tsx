@@ -11,6 +11,7 @@ import type { Column } from '@/components/ui/DataTable';
 import { ROLE_TONE } from '@/lib/status';
 import { supabase } from '@/lib/supabase';
 import type { ProfileRow } from '@/lib/supabase';
+import { InvitesCard } from './users/InvitesCard';
 
 const ACCESS_TONE: Record<Access, Tone> = { none: 'neutral', view: 'info', full: 'ok' };
 const ACCESS_LABEL: Record<Access, string> = { none: 'None', view: 'View', full: 'Full' };
@@ -137,6 +138,23 @@ export function UsersPage() {
 
   return (
     <div className="space-y-4">
+      {user?.workshop && (
+        <Card className="flex flex-wrap items-center justify-between gap-3 p-5">
+          <div>
+            <h2 className="font-display text-sm font-semibold text-fg">{user.workshop.name}</h2>
+            <p className="mt-0.5 text-xs text-fg2">
+              Staff can request to join with this number when they register. You approve them below.
+            </p>
+          </div>
+          <div className="text-right">
+            <div className="text-[10px] uppercase tracking-widest text-fg3">Workshop number</div>
+            <div className="font-mono text-xl font-semibold tracking-widest text-fg">{user.workshop.number}</div>
+          </div>
+        </Card>
+      )}
+
+      {canManage && <InvitesCard isManager={isManager} />}
+
       <Card className="overflow-hidden">
         <div className="p-5 pb-3">
           <CardHeader

@@ -23,6 +23,44 @@ export const supabase = createClient(url ?? 'http://localhost', anonKey ?? 'miss
   },
 });
 
+/** Row shape of public.workshops (the fields the app uses). */
+export interface WorkshopRow {
+  id: string;
+  name: string;
+  number: string;
+}
+
+/** Row shape of public.workshop_invites. */
+export interface InviteRow {
+  id: string;
+  email: string;
+  role: Role;
+  token: string;
+  created_at: string;
+  expires_at: string;
+  accepted_at: string | null;
+}
+
+/** Where a pending invite token waits while the person signs up or confirms their email. */
+export const PENDING_INVITE_KEY = 'eurowerken.pendingInvite';
+
+export function readPendingInvite(): string | null {
+  try {
+    return localStorage.getItem(PENDING_INVITE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function writePendingInvite(token: string | null): void {
+  try {
+    if (token) localStorage.setItem(PENDING_INVITE_KEY, token);
+    else localStorage.removeItem(PENDING_INVITE_KEY);
+  } catch {
+    // Storage blocked: the invite link still works if opened again after sign-in.
+  }
+}
+
 /** Row shape of public.profiles. */
 export interface ProfileRow {
   id: string;
@@ -31,6 +69,9 @@ export interface ProfileRow {
   role: Role | null;
   department: string | null;
   avatar_url: string | null;
+  workshop_id: string | null;
+  /** Embedded by the profile query in AuthContext. */
+  workshop?: WorkshopRow | null;
   active: boolean;
   created_at: string;
 }

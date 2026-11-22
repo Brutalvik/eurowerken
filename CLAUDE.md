@@ -40,9 +40,9 @@ src/
   config/      brand.ts
   data/        types.ts, mock.ts (static mock data, one export per future API resource)
   lib/         format.ts (CAD currency), status.ts (status to badge tone maps), supabase.ts (client)
-  pages/       one file per module; pages/auth/ holds login, register, reset password and setup screens
+  pages/       one file per module; pages/auth/ holds login, register, onboarding, invite, reset password and setup screens; pages/users/ holds Users page parts
 supabase/
-  migrations/  001 profiles and roles, 002 registration and role_permissions (RBAC); all re-runnable
+  migrations/  001 profiles and roles, 002 registration and role_permissions, 003 workshops and invites
 scripts/
   db-migrate.sh  applies the migrations with psql
   theme/       ThemeProvider (light/dark, persisted), chartPalette (hex values per mode for recharts)
@@ -71,15 +71,20 @@ scripts/
 | Users & Roles | full | none | none | none |
 | Settings | full | none | none | none |
 
-## Authentication and access control
+## Workshops, authentication and access control
 
-- Supabase Auth: email and password, and Google. Anyone can register at `/register` (or "Continue with Google" on `/login`). Email sign-ups must confirm their address first (Supabase "Confirm email" is on).
-- Each account has a row in `public.profiles` (created by a trigger, with name and picture from Google when available). A new account has no role: it can sign in but sees a "Waiting for approval" screen until someone with full Users & Roles access assigns a role.
-- Bootstrap: while there is no active Manager, the next account created becomes Manager. Register yourself first.
-- Permissions live in `public.role_permissions` (role x module x none/view/full), seeded with the defaults in `src/auth/rbac.ts`. AuthContext loads it after sign-in; `rbac.ts` ACCESS is only the fallback. Managers edit it on the Users & Roles page; the Manager role itself is fixed at full.
-- Database enforcement: `public.has_access(module, level)` for RLS policies. Every new table must enable RLS and use it, for example `using (public.has_access('inventory', 'view'))` for select and `'full'` for writes.
-- Profile rules (trigger + RLS): only users with Users & Roles full access change role, active, email or department; nobody changes their own role or status; only a Manager grants or removes the Manager role.
-- Migrations: `supabase/migrations/*.sql`, all re-runnable. Apply with `npm run db:migrate` (needs `DATABASE_URL` in `.env.local` and `psql`).
+- Multi-workshop (multi-tenant) on one Supabase database. `public.workshops` has a public 6-digit `number`. Each account belongs to at most one workshop (`profiles.workshop_id`). Workshops are walled off by RLS: every workshop-owned table carries `workshop_id` and its policies check `workshop_id = public.my_workshop()`.
+- Supabase Auth: email and password, and Google. Ways into a workshop:
+  - Register and create a workshop: you become its Manager (the default permission matrix is seeded for it).
+  - Register with an existing workshop number: you join with no role ("Waiting for approval") until someone with full Users & Roles access assigns one. You can cancel the request.
+  - Invite link `/invite/<token>`: made on the Users & Roles page for one email and a preset role; single use, 7 days. Joins with that role, no approval. Links are not emailed; the manager copies and sends them.
+  - Google sign-ups (and anyone not in a workshop) land on `/onboarding` to join or create. A pending invite token is kept in localStorage across sign-up, email confirmation and the Google redirect.
+- Email sign-up passes `workshop_action` (`create` or `join`) and its value in the auth metadata; the `handle_new_user` trigger applies it.
+- Membership only changes through the functions `create_workshop`, `request_join`, `cancel_join_request`, `accept_invite` (they set a transaction flag the profile trigger checks). Public functions: `invite_preview(token)` and `workshop_number_exists(number)`.
+- Permissions live in `public.role_permissions` per workshop (workshop x role x module, none/view/full), seeded from the defaults in `src/auth/rbac.ts`. AuthContext loads the user's workshop matrix; `rbac.ts` ACCESS is only the fallback. Managers edit it on the Users & Roles page; the Manager role is fixed at full.
+- Database enforcement: `public.has_access(module, level)` checks the caller's role in the caller's workshop. Every new workshop-owned table must have `workshop_id uuid not null references workshops`, enable RLS, and use both, for example `using (workshop_id = public.my_workshop() and public.has_access('inventory', 'view'))` for select and `'full'` for writes.
+- Profile rules: only users with Users & Roles full access change role, active, email or department, and only within their workshop; nobody changes their own role or status; only a Manager grants or removes the Manager role or invites a Manager.
+- Migrations: `supabase/migrations/*.sql`. `npm run db:migrate` applies the ones not yet recorded in `eurowerken_meta.migrations` (needs `DATABASE_URL` in `.env.local` and `psql`). Never re-run an old migration by hand: later ones replace its functions and policies.
 - Keys: the browser uses only the publishable key (`VITE_SUPABASE_PUBLISHABLE_KEY`). Never put the secret key (`sb_secret_...`) in the frontend or the repo. `DATABASE_URL` is read by the migration script only; Vite never exposes non-`VITE_` variables.
 - Supabase dashboard setup:
   - Authentication, URL Configuration: Site URL = app URL; Redirect URLs include `http://localhost:5174/**` and the production URL.
@@ -88,7 +93,7 @@ scripts/
 
 ## Current state
 
-Real registration and sign-in through Supabase (email and Google), with database-backed RBAC. The Users and Roles page lists real accounts (awaiting approval first), assigns roles, deactivates accounts, and lets Managers edit the permission matrix. Every other module still uses mock data: Dashboard, Inventory, Repair Orders, Sales, Invoices, Reports, Settings. Action buttons (Add part, New invoice, and so on) render but are not wired to anything.
+Real registration and sign-in through Supabase (email and Google), multiple workshops with per-workshop RBAC, join by number with approval, and invite links. The Users and Roles page shows the workshop number, creates and revokes invites, lists the team (awaiting approval first), assigns roles, deactivates accounts, and lets Managers edit the permission matrix. Every other module still uses mock data: Dashboard, Inventory, Repair Orders, Sales, Invoices, Reports, Settings. Action buttons (Add part, New invoice, and so on) render but are not wired to anything.
 
 ## Next steps
 
@@ -98,9 +103,10 @@ Real registration and sign-in through Supabase (email and Google), with database
 4. Part detail page (history, reorder) and add/edit part forms.
 5. Repair order detail page linked to customer bookings and tracking IDs.
 6. Notifications centre: low stock, overdue invoices, repair status changes.
-7. Profile page to change your own name and password; email notification to managers when someone registers.
-8. API client layer in `src/api/`, replace `data/mock.ts` imports with data fetching (TanStack Query recommended), add loading and error states.
-9. Settings persistence, tax and invoice numbering.
+7. Profile page to change your own name and password; workshop rename in Settings; email the invite link and notify managers of join requests (needs SMTP or an Edge Function).
+8. Every business table (parts, repair orders, invoices, ...) gets `workshop_id` and RLS with `has_access` when it moves off mock data.
+9. API client layer in `src/api/`, replace `data/mock.ts` imports with data fetching (TanStack Query recommended), add loading and error states.
+10. Settings persistence, tax and invoice numbering.
 
 ## Roadmap
 
