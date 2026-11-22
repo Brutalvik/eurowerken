@@ -17,6 +17,16 @@ export interface AuthUser {
   /** Null until a manager assigns a role. A user with no role can sign in but sees no modules. */
   role: Role | null;
   active: boolean;
+  /** The workshop has been suspended by the platform: its staff are locked out. */
+  suspended: boolean;
+}
+
+/** What public.my_context() returns (migration 015). */
+interface MyContext {
+  is_platform_admin: boolean;
+  acting: boolean;
+  role: string | null;
+  workshop: { id: string; name: string; number: string; status: string } | null;
 }
 
 /**
@@ -62,6 +72,15 @@ interface AuthContextValue {
   accessFor: (module: ModuleId) => Access;
   /** True when the current role has at least the requested level on the module. */
   can: (module: ModuleId, level: 'view' | 'full') => boolean;
+  /** Platform super admin (migration 015). False when that migration is not applied. */
+  isPlatformAdmin: boolean;
+  /** True while a platform admin acts as Manager of a workshop ("Open as Manager"). */
+  acting: boolean;
+  /** The workshop of the support session, while acting. */
+  actingWorkshop: WorkshopRow | null;
+  /** Starts or ends a support session, then reloads context, profile and permissions. Returns an error or null. */
+  startActing: (workshopId: string) => Promise<string | null>;
+  stopActing: () => Promise<string | null>;
 }
 
 /** What the sign-up form collects. workshop is absent when joining through an invite link. */
@@ -85,18 +104,43 @@ function initialsOf(name: string): string {
     .join('');
 }
 
-function toAuthUser(session: Session, profile: ProfileRow | null): AuthUser {
+function asRole(value: string | null): Role | null {
+  return value && (ROLES as readonly string[]).includes(value) ? (value as Role) : null;
+}
+
+/**
+ * Name and avatar always come from the profile. The workshop and role come from
+ * my_context when it loaded (it honours admin support sessions and suspensions),
+ * otherwise from the profile as before migration 015.
+ */
+function toAuthUser(session: Session, profile: ProfileRow | null, ctx: MyContext | null): AuthUser {
   const email = profile?.email ?? session.user.email ?? '';
   const name = profile?.full_name?.trim() || email.split('@')[0] || 'User';
-  return {
+  const base = {
     id: session.user.id,
     name,
     email,
     initials: initialsOf(name),
     avatarUrl: profile?.avatar_url ?? null,
+  };
+  if (ctx) {
+    const workshop = ctx.workshop
+      ? { id: ctx.workshop.id, name: ctx.workshop.name, number: ctx.workshop.number, status: ctx.workshop.status }
+      : null;
+    return {
+      ...base,
+      workshop,
+      role: workshop ? asRole(ctx.role) : null,
+      active: ctx.acting ? true : (profile?.active ?? true),
+      suspended: !ctx.acting && workshop?.status === 'suspended',
+    };
+  }
+  return {
+    ...base,
     workshop: profile?.workshop ?? null,
     role: profile?.active === false || !profile?.workshop ? null : (profile?.role ?? null),
     active: profile?.active ?? true,
+    suspended: false,
   };
 }
 
@@ -127,6 +171,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<ProfileRow | null>(null);
   const [profileError, setProfileError] = useState<string | null>(null);
+  // my_context (migration 015); null when it is not applied or failed, and the profile alone decides.
+  const [context, setContext] = useState<MyContext | null>(null);
   const [sessionChecked, setSessionChecked] = useState(!supabaseConfigured);
   const [profileLoading, setProfileLoading] = useState(false);
   const [recovery, setRecovery] = useState(false);
@@ -160,15 +206,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const userId = session?.user.id ?? null;
-  const workshopId = profile?.workshop_id ?? null;
+  const workshopId = context ? (context.workshop?.id ?? null) : (profile?.workshop_id ?? null);
 
   const loadProfile = useCallback(async (id: string) => {
     setProfileLoading(true);
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*, workshop:workshops(id, name, number)')
-      .eq('id', id)
-      .maybeSingle();
+    const [{ data, error }, ctxResult] = await Promise.all([
+      supabase.from('profiles').select('*, workshop:workshops(id, name, number)').eq('id', id).maybeSingle(),
+      supabase.rpc('my_context'),
+    ]);
     if (error) {
       setProfile(null);
       setProfileError(error.message);
@@ -176,6 +221,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setProfile(data as ProfileRow | null);
       setProfileError(null);
     }
+    // Migration 015 not applied (or the call failed): keep the profile behaviour, silently.
+    const ctx = ctxResult.error ? null : (ctxResult.data as MyContext | null);
+    setContext(ctx && typeof ctx === 'object' && 'is_platform_admin' in ctx ? ctx : null);
     setProfileLoading(false);
   }, []);
 
@@ -201,6 +249,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!userId) {
       setProfile(null);
       setProfileError(null);
+      setContext(null);
       return;
     }
     void loadProfile(userId);
@@ -222,7 +271,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [workshopId, loadPermissions]);
 
-  const user = useMemo(() => (session ? toAuthUser(session, profile) : null), [session, profile]);
+  const user = useMemo(() => (session ? toAuthUser(session, profile, context) : null), [session, profile, context]);
+  const isPlatformAdmin = context?.is_platform_admin === true;
+  const acting = isPlatformAdmin && context?.acting === true;
+  const actingWorkshop = acting ? (user?.workshop ?? null) : null;
   const role = user?.role ?? null;
 
   let status: AuthStatus;
@@ -354,6 +406,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const cancelJoinRequest = useCallback(() => membership('cancel_join_request', {}), [membership]);
   const acceptInvite = useCallback((token: string) => membership('accept_invite', { p_token: token }), [membership]);
 
+  /** Support sessions: reload context and profile, then the permission matrix for the new workshop. */
+  const sessionRpc = useCallback(
+    async (fn: 'admin_start_session' | 'admin_end_session', args: Record<string, string>) => {
+      const { error } = await supabase.rpc(fn, args);
+      if (error) return friendly(error.message);
+      await reloadProfile();
+      await loadPermissions();
+      return null;
+    },
+    [reloadProfile, loadPermissions],
+  );
+  const startActing = useCallback(
+    (id: string) => sessionRpc('admin_start_session', { p_workshop: id }),
+    [sessionRpc],
+  );
+  const stopActing = useCallback(() => sessionRpc('admin_end_session', {}), [sessionRpc]);
+
   const workshopNumberExists = useCallback(async (number: string) => {
     const { data, error } = await supabase.rpc('workshop_number_exists', { p_number: number.trim() });
     return !error && data === true;
@@ -383,6 +452,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       permissionsReady,
       accessFor,
       can,
+      isPlatformAdmin,
+      acting,
+      actingWorkshop,
+      startActing,
+      stopActing,
     }),
     [
       status,
@@ -407,6 +481,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       permissionsReady,
       accessFor,
       can,
+      isPlatformAdmin,
+      acting,
+      actingWorkshop,
+      startActing,
+      stopActing,
     ],
   );
 

@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { CalendarPlus, CalendarX, X } from 'lucide-react';
+import { X } from 'lucide-react';
+import { NotificationIcon } from './NotificationIcon';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/auth/AuthContext';
 import {
@@ -8,6 +9,8 @@ import {
   listNotifications,
   markAppointmentOpened,
   markNotificationsRead,
+  notificationAction,
+  notificationPath,
 } from '@/api/notifications';
 import type { StaffNotification } from '@/api/notifications';
 import { supabase } from '@/lib/supabase';
@@ -85,7 +88,8 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'notifications', filter: `workshop_id=eq.${workshopId}` },
         (payload) => {
-          const n = { ...(payload.new as Omit<StaffNotification, 'read'>), read: false };
+          const row = payload.new as Omit<StaffNotification, 'read'>;
+          const n = { ...row, repair_order_id: row.repair_order_id ?? null, read: false };
           if (seen.current.has(n.id)) return;
           seen.current.add(n.id);
           setNotifications((list) => [n, ...list].slice(0, 30));
@@ -123,7 +127,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     (n: StaffNotification) => {
       void markRead([n.id]);
       setToasts((t) => t.filter((x) => x.id !== n.id));
-      navigate(n.appointment_id ? `/appointments?open=${n.appointment_id}` : '/appointments');
+      navigate(notificationPath(n));
     },
     [markRead, navigate],
   );
@@ -178,16 +182,13 @@ function Toasts({
   return (
     <div className="pb-safe pointer-events-none fixed bottom-4 right-4 z-50 flex w-[min(22rem,calc(100vw-2rem))] flex-col gap-2" aria-live="polite">
       {toasts.map(({ id, notification: n }) => {
-        const Icon = n.kind === 'booking_cancelled' ? CalendarX : CalendarPlus;
         return (
           <div key={id} className="glass-strong pointer-events-auto flex items-start gap-3 rounded-xl p-3 shadow-lg" role="status">
-            <span className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${n.kind === 'booking_cancelled' ? 'bg-bad/15 text-bad' : 'bg-accent/15 text-accent'}`}>
-              <Icon className="h-4 w-4" aria-hidden />
-            </span>
+            <NotificationIcon n={n} />
             <button type="button" onClick={() => onOpen(n)} className="min-w-0 flex-1 text-left">
               <span className="block truncate text-xs font-semibold text-fg">{n.title}</span>
               {n.body && <span className="mt-0.5 block truncate text-[11px] text-fg2">{n.body}</span>}
-              <span className="mt-1 block text-[11px] font-medium text-accent">Open booking</span>
+              <span className="mt-1 block text-[11px] font-medium text-accent">{notificationAction(n)}</span>
             </button>
             <button type="button" onClick={() => onDismiss(id)} aria-label="Dismiss" className="rounded-md p-1 text-fg3 hover:text-fg coarse:p-2">
               <X className="h-3.5 w-3.5" aria-hidden />

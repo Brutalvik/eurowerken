@@ -6,14 +6,16 @@ import type { ModuleId } from '@/auth/rbac';
 import { extraPage } from '@/config/nav';
 import { useTheme } from '@/theme/ThemeProvider';
 
-export function Header({ onMenuClick }: { onMenuClick: () => void }) {
+/** safeTop: pad for the notch. Off when something above the header (the support session banner) already does. */
+export function Header({ onMenuClick, safeTop = true }: { onMenuClick: () => void; safeTop?: boolean }) {
   const { mode, toggle } = useTheme();
   const { pathname } = useLocation();
   const segment = pathname.split('/')[1] ?? '';
-  const title = MODULE_LABELS[segment as ModuleId] ?? extraPage(segment)?.label ?? 'Not found';
+  const title =
+    segment === 'admin' ? 'Platform admin' : (MODULE_LABELS[segment as ModuleId] ?? extraPage(segment)?.label ?? 'Not found');
 
   return (
-    <header className="pt-safe relative z-30 shrink-0 border-b border-white/30 bg-surface/70 shadow-[inset_0_-1px_0_rgb(var(--line)/0.6)] backdrop-blur-xl backdrop-saturate-150 dark:border-white/[0.07] dark:bg-surface/60">
+    <header className={`${safeTop ? 'pt-safe ' : ''}relative z-30 shrink-0 border-b border-white/30 bg-surface/70 shadow-[inset_0_-1px_0_rgb(var(--line)/0.6)] backdrop-blur-xl backdrop-saturate-150 dark:border-white/[0.07] dark:bg-surface/60`}>
       <div className="flex h-14 items-center gap-2 px-4 sm:gap-3 lg:px-6">
       <button
         type="button"

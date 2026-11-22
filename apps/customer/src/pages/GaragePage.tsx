@@ -6,6 +6,8 @@ import { Bell, CalendarCheck, CalendarClock, CalendarX, Car, FileText, Pencil, P
 import type { CustomerVehicleRow } from '@eurowerken/shared';
 import { cancelMyAppointment, formatZonedDateTime, listMyAppointments, useBookingSettings } from '@/api/booking';
 import type { Appointment, AppointmentStatus } from '@/api/booking';
+import { ACTIVE_STATUSES, listMyRepairs, vehicleName as repairVehicleName } from '@/api/repairs';
+import type { MyRepair } from '@/api/repairs';
 import { createVehicle, deleteVehicle, listVehicles, updateVehicle } from '@/api/vehicles';
 import type { VehicleInput } from '@/api/vehicles';
 import { useCustomerAuth } from '@/auth/CustomerAuthContext';
@@ -14,6 +16,7 @@ import { Pill } from '@/components/ui';
 import { sitePath, useSite } from '@/site/SiteContext';
 import { AccountLoadError, NotificationsCard } from '@/pages/account/AccountPage';
 import { VehicleForm } from '@/pages/garage/VehicleForm';
+import { ProgressBar, StatusPill } from '@/pages/track/repairUi';
 
 function vehicleName(v: Pick<CustomerVehicleRow, 'year' | 'make' | 'model'>): string {
   return [v.year, v.make, v.model].filter(Boolean).join(' ');
@@ -47,6 +50,8 @@ export function GaragePage() {
           <Reminders account={account} />
         </div>
       </div>
+
+      <RepairsInProgress account={account} />
 
       <MyAppointments account={account} />
 
@@ -703,5 +708,91 @@ function CancelDialog({
         </div>
       </div>
     </dialog>
+  );
+}
+
+type RepairsState = { status: 'loading' } | { status: 'error'; message: string } | { status: 'ready'; list: MyRepair[] };
+
+/** The customer's repairs at this workshop that are not finished yet, with progress and a link to each case. */
+function RepairsInProgress({ account }: { account: CustomerAccount }) {
+  const site = useSite();
+  const [state, setState] = useState<RepairsState>({ status: 'loading' });
+
+  const load = useCallback(async () => {
+    setState({ status: 'loading' });
+    const { data, error } = await listMyRepairs(account.id, site.workshop_id);
+    setState(error !== null ? { status: 'error', message: error } : { status: 'ready', list: data.filter((r) => ACTIVE_STATUSES.includes(r.status)) });
+  }, [account.id, site.workshop_id]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  // Nothing in the workshop: keep the garage tidy.
+  if (state.status === 'ready' && state.list.length === 0) return null;
+
+  return (
+    <section aria-labelledby="repairs-in-progress">
+      <h2 id="repairs-in-progress" className="font-display text-xl font-semibold text-fg">
+        Repairs in progress
+      </h2>
+
+      {state.status === 'loading' && (
+        <div aria-busy="true" className="mt-5">
+          <p className="sr-only" role="status">
+            Loading your repairs
+          </p>
+          <div aria-hidden className="glass h-28 animate-pulse rounded-2xl motion-reduce:animate-none" />
+        </div>
+      )}
+
+      {state.status === 'error' && (
+        <div role="alert" className="glass mt-5 rounded-2xl border-l-4 border-l-bad p-5">
+          <p className="font-semibold text-fg">We could not load your repairs.</p>
+          <p className="mt-1 text-sm text-fg2">{state.message}</p>
+          <button type="button" onClick={() => void load()} className="btn-outline mt-4">
+            <RotateCcw className="h-4 w-4" aria-hidden />
+            Try again
+          </button>
+        </div>
+      )}
+
+      {state.status === 'ready' && (
+        <ul className="mt-5 grid gap-4 md:grid-cols-2">
+          {state.list.map((r) => {
+            const name = repairVehicleName(r.vehicle);
+            return (
+              <li key={r.id} className="glass flex flex-col gap-4 rounded-2xl p-5">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent/10 text-accent">
+                      <Wrench className="h-5 w-5" aria-hidden />
+                    </span>
+                    <div className="min-w-0">
+                      <h3 className="break-words font-semibold text-fg">{name}</h3>
+                      <p className="text-xs text-fg3">
+                        {r.number}
+                        <span aria-hidden> · </span>
+                        <span className="font-mono">{r.tracking_code}</span>
+                      </p>
+                    </div>
+                  </div>
+                  <StatusPill status={r.status} />
+                </div>
+                <ProgressBar status={r.status} label={`Progress of ${name}`} />
+                <Link
+                  to={sitePath(site, `track/${encodeURIComponent(r.tracking_code)}`)}
+                  aria-label={`Open repair ${r.number}, ${name}`}
+                  className="btn-outline min-h-11 self-start py-2.5"
+                >
+                  <FileText className="h-4 w-4" aria-hidden />
+                  {r.status === 'awaiting_approval' ? 'Review estimate' : 'Open repair'}
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </section>
   );
 }

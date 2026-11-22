@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { Clock, ExternalLink, Facebook, Globe, Instagram, Mail, MapPin, Phone, Youtube } from 'lucide-react';
+import { useBookingSettings, weeklyHoursLines } from '@/api/booking';
 import { sitePath, useSite } from '@/site/SiteContext';
 import { Wordmark } from '../Wordmark';
 
@@ -22,6 +23,9 @@ const SERVICES = [
 
 export function SiteFooter() {
   const site = useSite();
+  // Opening hours come from the business hours (ERP: Settings, Booking), the same ones booking uses.
+  const { data: booking } = useBookingSettings();
+  const hoursLines = booking ? weeklyHoursLines(booking.hours) : [];
   const socials = [
     { url: site.instagram_url, label: 'Instagram', Icon: Instagram },
     { url: site.facebook_url, label: 'Facebook', Icon: Facebook },
@@ -97,10 +101,16 @@ export function SiteFooter() {
               </a>
             </li>
           )}
-          {site.hours && (
+          {hoursLines.length > 0 && (
             <li className="flex gap-2.5">
               <Clock className="mt-0.5 h-4 w-4 shrink-0 text-accent" aria-hidden />
-              <span className="whitespace-pre-line">{site.hours}</span>
+              <span>
+                {hoursLines.map((line) => (
+                  <span key={line} className="block">
+                    {line}
+                  </span>
+                ))}
+              </span>
             </li>
           )}
           {site.own_website_url && (
@@ -118,7 +128,7 @@ export function SiteFooter() {
               </a>
             </li>
           )}
-          {!site.address && !site.phone && !site.email && !site.hours && !site.own_website_url && (
+          {!site.address && !site.phone && !site.email && hoursLines.length === 0 && !site.own_website_url && (
             <li className="text-white/40">Contact details coming soon.</li>
           )}
         </FooterColumn>

@@ -1,197 +1,186 @@
 import { useEffect, useRef, useState } from 'react';
-import type { FormEvent, ReactNode, RefObject } from 'react';
+import type { ReactNode, RefObject } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import {
-  AlertCircle,
-  ArrowRight,
-  Camera,
-  Car,
-  CheckCircle2,
-  ClipboardList,
-  FileText,
-  Hourglass,
-  Info,
-  Loader2,
-  MessageSquare,
-  NotebookPen,
-  Search,
-} from 'lucide-react';
+import { ArrowRight, Camera, Car, ClipboardList, FileText, MessageSquare, NotebookPen, User, Wrench } from 'lucide-react';
+import { STATUS_LABEL, listMyRepairs, useTrackedRepair, vehicleName } from '@/api/repairs';
+import type { MyRepair, TrackedRepair } from '@/api/repairs';
+import { useCustomerAuth } from '@/auth/CustomerAuthContext';
 import { Photo } from '@/components/Photo';
-import { Breadcrumbs, PageHero, Pill } from '@/components/ui';
-import { findRepairCase } from '@/data/catalog';
-import type { RepairCase } from '@/data/catalog';
-import { formatMoney } from '@/lib/format';
+import { Breadcrumbs, PageHero } from '@/components/ui';
 import { sitePath, useSite } from '@/site/SiteContext';
-import { committedTotal, contactMatches, MediaGrid, RepairTimeline, StatusPill, TechnicianNotes } from './repairParts';
+import {
+  ItemsSummary,
+  LookupForm,
+  MediaGrid,
+  RepairTimeline,
+  StaleNote,
+  StatusPill,
+  TechnicianCard,
+  Totals,
+  WorkshopUpdates,
+  formatDay,
+  repairTimeZone,
+  useRepairContact,
+} from './repairUi';
 
 /**
- * Cases this browser tab has already verified with a matching contact. The
- * contact stays out of the URL (personal data); only the tracking ID is kept
- * in ?id=, so a refresh shows the same result without asking again.
+ * Repair Tracking. The tracking ID is kept in ?id=; the contact only in
+ * sessionStorage for this tab (never in the URL), so a refresh shows the same
+ * result without asking again. Signed-in customers open their own repairs
+ * without typing anything.
  */
-const VERIFIED_KEY = 'ew-track-verified';
-
-function readVerified(): string[] {
-  try {
-    const raw = sessionStorage.getItem(VERIFIED_KEY);
-    return raw ? (JSON.parse(raw) as string[]) : [];
-  } catch {
-    return [];
-  }
-}
-
-function rememberVerified(id: string) {
-  try {
-    sessionStorage.setItem(VERIFIED_KEY, JSON.stringify([...new Set([...readVerified(), id])]));
-  } catch {
-    // Storage unavailable (private mode): the result just will not survive a refresh.
-  }
-}
-
 export function TrackPage() {
   const site = useSite();
   const [params, setParams] = useSearchParams();
-  const urlId = params.get('id') ?? '';
-
-  const [trackingId, setTrackingId] = useState(urlId);
-  const [contact, setContact] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  const [errorField, setErrorField] = useState<'id' | 'contact' | 'both' | null>(null);
-  const [repair, setRepair] = useState<RepairCase | null>(() => {
-    const found = urlId ? findRepairCase(urlId) : undefined;
-    return found && readVerified().includes(found.trackingId) ? found : null;
-  });
-  const [checking, setChecking] = useState(false);
+  const urlId = (params.get('id') ?? '').trim().toUpperCase();
+  const access = useRepairContact(urlId || null);
+  const tracked = useTrackedRepair(urlId || null, access.ready ? access.contact : null);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [announce, setAnnounce] = useState('');
+  const focusResult = useRef(false);
   const resultRef = useRef<HTMLHeadingElement>(null);
-  const idRef = useRef<HTMLInputElement>(null);
-  const contactRef = useRef<HTMLInputElement>(null);
+  const lastStatus = useRef<string | null>(null);
 
-  // Follow ?id= when it changes (for example from the home page quick-track box).
   useEffect(() => {
-    setTrackingId(urlId);
-    const found = urlId ? findRepairCase(urlId) : undefined;
-    setRepair(found && readVerified().includes(found.trackingId) ? found : null);
-  }, [urlId]);
+    document.title = `Repair Tracking | ${site.display_name}`;
+  }, [site.display_name]);
 
-  function onLookup(e: FormEvent) {
-    e.preventDefault();
-    setError(null);
-    setErrorField(null);
-    if (!trackingId.trim()) {
-      setError('Enter the tracking ID from your drop-off email or text.');
-      setErrorField('id');
-      idRef.current?.focus();
+  // The stored or account contact was refused: forget it and show the form (with the message, unless it was automatic).
+  const { error } = tracked;
+  const { contact, fromAccount, reject } = access;
+  useEffect(() => {
+    if (!error || !contact) return;
+    setFormError(fromAccount ? null : error);
+    reject();
+  }, [error, contact, fromAccount, reject]);
+
+  // Focus the result after a lookup, and announce status changes that arrive later.
+  const data = tracked.data;
+  useEffect(() => {
+    if (!data) {
+      lastStatus.current = null;
       return;
     }
-    if (!contact.trim()) {
-      setError('Enter the email address or phone number you gave us at drop-off.');
-      setErrorField('contact');
-      contactRef.current?.focus();
-      return;
+    if (focusResult.current) {
+      focusResult.current = false;
+      setAnnounce(`Repair found: ${vehicleName(data.repair.vehicle)}, ${STATUS_LABEL[data.repair.status]}.`);
+      requestAnimationFrame(() => resultRef.current?.focus());
+    } else if (lastStatus.current && lastStatus.current !== data.repair.status) {
+      setAnnounce(`Status updated: ${STATUS_LABEL[data.repair.status]}.`);
     }
-    setChecking(true);
-    // A short pause so the result is announced as a fresh update.
-    window.setTimeout(() => {
-      setChecking(false);
-      const found = findRepairCase(trackingId);
-      if (!found || !contactMatches(found, contact)) {
-        setRepair(null);
-        setErrorField('both');
-        setError(
-          'We could not find a repair with that tracking ID and contact. Check the ID in your drop-off email or text, and use the same email or phone number you gave us.',
-        );
-        return;
-      }
-      rememberVerified(found.trackingId);
-      setRepair(found);
-      setParams({ id: found.trackingId }, { replace: true });
-      window.setTimeout(() => resultRef.current?.focus(), 0);
-    }, 300);
+    lastStatus.current = data.repair.status;
+  }, [data]);
+
+  function onFound(code: string, typed: string) {
+    setFormError(null);
+    focusResult.current = true;
+    if (code === urlId) access.setTyped(typed);
+    else setParams({ id: code }, { replace: false });
   }
 
-  const errorId = 'track-error';
+  const showLoading = Boolean(urlId && access.contact && tracked.loading && !data) || (Boolean(urlId) && !access.ready);
 
   return (
     <>
       <Breadcrumbs items={[{ label: 'Home', to: sitePath(site) }, { label: 'Repair Tracking' }]} />
+      <MyRepairsList activeCode={data?.repair.tracking_code ?? null} />
       <div className="container-site pt-4">
         <div className="overflow-hidden rounded-3xl">
           <PageHero
             align="center"
             title="Track Your Repair"
-            subtitle="Enter your tracking ID and contact information to see live status updates, photos and estimates for your vehicle."
+            subtitle="Enter your tracking ID and the email or phone you booked with to see live status updates, photos and estimates for your vehicle."
           >
-            <form
-              onSubmit={onLookup}
-              noValidate
-              className="glass-dark mx-auto grid max-w-3xl gap-3 rounded-2xl p-4 text-left sm:grid-cols-[1fr_1fr_auto] sm:items-end sm:p-5"
-            >
-              <div>
-                <label htmlFor="track-id" className="mb-1.5 block text-xs font-medium text-white/70">
-                  Tracking ID <span aria-hidden>*</span>
-                </label>
-                <input
-                  ref={idRef}
-                  id="track-id"
-                  value={trackingId}
-                  onChange={(e) => setTrackingId(e.target.value)}
-                  placeholder="EW-00000-000"
-                  autoComplete="off"
-                  autoCapitalize="characters"
-                  spellCheck={false}
-                  required
-                  aria-invalid={errorField === 'id' || errorField === 'both'}
-                  aria-describedby={errorField === 'id' || errorField === 'both' ? errorId : undefined}
-                  className="input"
-                />
-              </div>
-              <div>
-                <label htmlFor="track-contact" className="mb-1.5 block text-xs font-medium text-white/70">
-                  Email or Phone <span aria-hidden>*</span>
-                </label>
-                <input
-                  ref={contactRef}
-                  id="track-contact"
-                  value={contact}
-                  onChange={(e) => setContact(e.target.value)}
-                  placeholder="you@example.com"
-                  autoComplete="email"
-                  spellCheck={false}
-                  required
-                  aria-invalid={errorField === 'contact' || errorField === 'both'}
-                  aria-describedby={errorField === 'contact' || errorField === 'both' ? errorId : undefined}
-                  className="input"
-                />
-              </div>
-              <button type="submit" disabled={checking} className="btn-ink w-full bg-accent text-accent-fg shadow-accent/30 sm:w-auto">
-                {checking ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Search className="h-4 w-4" aria-hidden />}
-                Lookup
-              </button>
-              <p className="flex items-start gap-1.5 text-[11px] leading-relaxed text-white/60 sm:col-span-3">
-                <Info className="mt-px h-3.5 w-3.5 shrink-0" aria-hidden />
-                <span>
-                  Trying it out? Use tracking ID <span className="font-mono font-semibold text-white/85">EW-82734-615</span> with{' '}
-                  <span className="font-semibold text-white/85">john.doe@example.com</span>.
-                </span>
-              </p>
-            </form>
+            <LookupForm tone="hero" initialCode={urlId} initialError={formError} onFound={onFound} />
           </PageHero>
         </div>
       </div>
 
-      <div aria-live="polite" className="container-site">
-        {checking && <p className="sr-only">Looking up your repair.</p>}
-        {error && (
-          <p id={errorId} className="mx-auto mt-6 flex max-w-3xl items-start gap-2 rounded-xl border border-bad/30 bg-bad/10 px-4 py-3 text-sm text-bad">
-            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
-            {error}
-          </p>
-        )}
-        {repair && !error && <p className="sr-only">Repair found: {repair.vehicle}, status {repair.status}.</p>}
-      </div>
+      <p className="sr-only" aria-live="polite">
+        {announce}
+      </p>
 
-      {repair ? <RepairResult repair={repair} headingRef={resultRef} /> : <EmptyState />}
+      {showLoading ? (
+        <div aria-busy="true" className="container-site py-8 sm:py-10">
+          <p className="sr-only" role="status">
+            Loading your repair
+          </p>
+          <div aria-hidden className="space-y-6">
+            <div className="glass h-28 animate-pulse rounded-2xl motion-reduce:animate-none" />
+            <div className="grid gap-6 lg:grid-cols-3">
+              {[0, 1, 2].map((i) => (
+                <div key={i} className="glass h-56 animate-pulse rounded-2xl motion-reduce:animate-none" />
+              ))}
+            </div>
+          </div>
+        </div>
+      ) : data ? (
+        <RepairResult tracked={data} stale={tracked.stale} onRetry={() => void tracked.refresh()} headingRef={resultRef} />
+      ) : (
+        <EmptyState />
+      )}
     </>
+  );
+}
+
+/** Signed-in customers: their repairs at this workshop, opened without typing the contact. */
+function MyRepairsList({ activeCode }: { activeCode: string | null }) {
+  const site = useSite();
+  const { status, account } = useCustomerAuth();
+  const [list, setList] = useState<MyRepair[] | null>(null);
+  const accountId = status === 'signed-in' ? (account?.id ?? null) : null;
+
+  useEffect(() => {
+    if (!accountId) {
+      setList(null);
+      return;
+    }
+    let cancelled = false;
+    void listMyRepairs(accountId, site.workshop_id).then((res) => {
+      if (!cancelled) setList(res.error === null ? res.data : []);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [accountId, site.workshop_id]);
+
+  if (!list || list.length === 0) return null;
+  return (
+    <section aria-labelledby="my-repairs-title" className="container-site pt-4">
+      <div className="glass rounded-2xl p-4 sm:p-5">
+        <h2 id="my-repairs-title" className="flex items-center gap-2 font-display text-base font-semibold text-fg">
+          <Wrench className="h-4 w-4 text-accent" aria-hidden />
+          Your repairs
+        </h2>
+        <ul className="mt-3 divide-y divide-line">
+          {list.map((r) => {
+            const active = r.tracking_code === activeCode;
+            return (
+              <li key={r.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 py-2.5">
+                <div className="min-w-0 flex-1">
+                  <p className="break-words text-sm font-semibold text-fg">{vehicleName(r.vehicle)}</p>
+                  <p className="text-xs text-fg3">
+                    {r.number}
+                    <span aria-hidden> · </span>
+                    <span className="font-mono">{r.tracking_code}</span>
+                  </p>
+                </div>
+                <StatusPill status={r.status} />
+                <Link
+                  to={`${sitePath(site, 'track')}?id=${encodeURIComponent(r.tracking_code)}`}
+                  aria-current={active ? 'true' : undefined}
+                  aria-label={`Open ${r.number}, ${vehicleName(r.vehicle)}`}
+                  className="inline-flex min-h-11 items-center gap-1 rounded-lg px-3 text-sm font-semibold text-accent hover:bg-accent/10"
+                >
+                  {active ? 'Open now' : 'Open'}
+                  <ArrowRight className="h-3.5 w-3.5" aria-hidden />
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+    </section>
   );
 }
 
@@ -216,7 +205,7 @@ function EmptyState() {
       </div>
       <p className="mt-8 text-center text-sm text-fg2">
         No tracking ID yet?{' '}
-        <Link to={sitePath(site, 'book')} className="inline-flex items-center gap-1 font-semibold text-accent hover:underline coarse:min-h-11">
+        <Link to={sitePath(site, 'book')} className="inline-flex min-h-11 items-center gap-1 font-semibold text-accent hover:underline">
           Book a service <ArrowRight className="h-3.5 w-3.5" aria-hidden />
         </Link>
       </p>
@@ -226,8 +215,8 @@ function EmptyState() {
 
 function Card({ title, Icon, aside, children, className = '' }: { title: string; Icon: typeof Car; aside?: ReactNode; children: ReactNode; className?: string }) {
   return (
-    <section className={`glass rounded-2xl p-5 sm:p-6 ${className}`}>
-      <div className="flex items-center justify-between gap-3">
+    <section className={`glass min-w-0 rounded-2xl p-5 sm:p-6 ${className}`}>
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="flex items-center gap-2 font-display text-base font-semibold text-fg">
           <Icon className="h-4 w-4 text-accent" aria-hidden />
           {title}
@@ -239,107 +228,101 @@ function Card({ title, Icon, aside, children, className = '' }: { title: string;
   );
 }
 
-function RepairResult({ repair, headingRef }: { repair: RepairCase; headingRef: RefObject<HTMLHeadingElement> }) {
+function RepairResult({
+  tracked,
+  stale,
+  onRetry,
+  headingRef,
+}: {
+  tracked: TrackedRepair;
+  stale: boolean;
+  onRetry: () => void;
+  headingRef: RefObject<HTMLHeadingElement>;
+}) {
   const site = useSite();
-  const casePath = sitePath(site, `track/${repair.trackingId}`);
-  const total = committedTotal(repair.lineItems);
+  const { repair, items, events, media } = tracked;
+  const tz = repairTimeZone(repair);
+  const casePath = sitePath(site, `track/${encodeURIComponent(repair.tracking_code)}`);
+  const name = vehicleName(repair.vehicle);
+  const pending = items.some((i) => i.approval === 'pending');
 
   return (
     <div className="container-site space-y-6 py-8 sm:py-10">
+      {stale && <StaleNote onRetry={onRetry} />}
       <section aria-labelledby="repair-vehicle" className="glass-strong flex flex-col gap-5 rounded-2xl p-4 sm:p-5 md:flex-row md:items-center">
         <div className="flex min-w-0 flex-1 items-center gap-4">
-          <Photo name="garage-car" alt={repair.vehicle} icon={Car} className="h-16 w-24 shrink-0 rounded-xl sm:h-20 sm:w-28" />
+          <Photo name="garage-car" alt="" icon={Car} className="hidden h-16 w-24 shrink-0 rounded-xl min-[420px]:block sm:h-20 sm:w-28" />
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <h2 id="repair-vehicle" ref={headingRef} tabIndex={-1} className="font-display text-xl font-bold text-fg outline-none sm:text-2xl">
-                {repair.vehicle}
+              <h2 id="repair-vehicle" ref={headingRef} tabIndex={-1} className="break-words font-display text-xl font-bold text-fg outline-none sm:text-2xl">
+                {name}
               </h2>
               <StatusPill status={repair.status} />
             </div>
-            <p className="mt-1 text-xs text-fg3">
-              Tracking ID: <span className="font-mono font-semibold text-fg2">{repair.trackingId}</span>
-              <span aria-hidden> · </span>
-              License: <span className="font-semibold text-fg2">{repair.plate}</span>
+            <p className="mt-1 flex flex-wrap gap-x-2 text-xs text-fg3">
+              <span>
+                Tracking ID: <span className="font-mono font-semibold text-fg2">{repair.tracking_code}</span>
+              </span>
+              <span>
+                Work order: <span className="font-semibold text-fg2">{repair.number}</span>
+              </span>
+              {repair.vehicle.plate && (
+                <span>
+                  Plate: <span className="font-semibold text-fg2">{repair.vehicle.plate}</span>
+                </span>
+              )}
+              <span>Checked in {formatDay(repair.created_at, tz)}</span>
             </p>
           </div>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row">
-          <Link to={casePath} className="btn-outline py-2.5">
+          <Link to={casePath} className="btn-outline min-h-11 py-2.5">
             <FileText className="h-4 w-4" aria-hidden />
-            View Estimate
+            {pending ? 'Review estimate' : 'Open case'}
           </Link>
-          <Link to={`${casePath}#messages`} className="btn-ink bg-accent py-2.5 text-accent-fg shadow-accent/20">
+          <Link to={`${casePath}#messages`} className="btn-ink min-h-11 bg-accent py-2.5 text-accent-fg shadow-accent/20">
             <MessageSquare className="h-4 w-4" aria-hidden />
-            Message Advisor
+            Message the workshop
           </Link>
         </div>
       </section>
 
       <div className="grid gap-6 lg:grid-cols-3">
         <Card title="Repair Status" Icon={ClipboardList} className="lg:row-span-2">
-          <RepairTimeline steps={repair.timeline} progress={repair.progress} />
+          <RepairTimeline tracked={tracked} />
         </Card>
 
-        <Card title="Technician Notes" Icon={NotebookPen} aside={<span className="text-[11px] text-fg3">{repair.notes[repair.notes.length - 1]?.time}</span>}>
-          <TechnicianNotes notes={repair.notes} />
+        <Card title="Your Technician" Icon={User}>
+          <TechnicianCard technician={repair.technician} />
         </Card>
 
         <Card title="Service Summary" Icon={FileText}>
-          <ul className="space-y-2">
-            {repair.lineItems.map((item) => {
-              const pending = item.state === 'needs-approval' || item.state === 'pending';
-              return (
-                <li
-                  key={item.id}
-                  className={`flex items-center gap-3 rounded-xl border px-3 py-2.5 text-sm ${
-                    item.state === 'in-progress' ? 'border-accent/30 bg-accent/5' : 'border-line bg-surface2/50'
-                  }`}
-                >
-                  {item.state === 'completed' ? (
-                    <CheckCircle2 className="h-4 w-4 shrink-0 text-ok" aria-label="Completed" />
-                  ) : item.state === 'in-progress' ? (
-                    <Loader2 className="h-4 w-4 shrink-0 text-accent" aria-label="In progress" />
-                  ) : (
-                    <Hourglass className="h-4 w-4 shrink-0 text-warn" aria-label="Needs your approval" />
-                  )}
-                  <span className={`min-w-0 flex-1 ${pending ? 'text-fg3' : item.state === 'in-progress' ? 'font-medium text-accent' : 'text-fg'}`}>
-                    {item.title}
-                    {pending && (
-                      <Pill tone="warn" className="ml-2 align-middle">
-                        Approval
-                      </Pill>
-                    )}
-                  </span>
-                  <span className={`shrink-0 tabular-nums ${pending ? 'text-fg3' : 'font-semibold text-fg'}`}>{formatMoney(item.price)}</span>
-                </li>
-              );
-            })}
-          </ul>
-          <div className="mt-4 flex items-baseline justify-between border-t border-line pt-4">
-            <span className="text-sm text-fg2">Current Total</span>
-            <span className="font-display text-xl font-bold tabular-nums text-fg">{formatMoney(total)}</span>
-          </div>
-          {repair.lineItems.some((i) => i.state === 'needs-approval') && (
-            <p className="mt-2 text-xs text-fg3">
-              Items waiting for approval are not included.{' '}
-              <Link to={casePath} className="font-semibold text-accent hover:underline">
-                Review them
-              </Link>
-            </p>
+          <ItemsSummary items={items} />
+          <Totals items={items} />
+          {pending && (
+            <Link to={casePath} className="mt-2 inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-accent hover:underline">
+              Review and approve <ArrowRight className="h-3.5 w-3.5" aria-hidden />
+            </Link>
           )}
+        </Card>
+
+        <Card title="Technician Notes" Icon={NotebookPen} className="lg:col-span-2">
+          <WorkshopUpdates events={events} timeZone={tz} limit={3} />
         </Card>
 
         <Card
           title="Inspection Photos & Video"
           Icon={Camera}
-          className="lg:col-span-2"
+          className="lg:col-span-3"
           aside={
-            <Link to={`${casePath}#photos`} className="inline-flex items-center text-xs font-semibold text-accent hover:underline coarse:min-h-11">
-              View all ({repair.media.length})
-            </Link>
+            media.length > 0 ? (
+              <Link to={`${casePath}#photos`} className="inline-flex min-h-11 items-center text-xs font-semibold text-accent hover:underline">
+                View all ({media.length})
+              </Link>
+            ) : undefined
           }
         >
-          <MediaGrid media={repair.media} />
+          <MediaGrid media={media} limit={8} />
         </Card>
       </div>
     </div>

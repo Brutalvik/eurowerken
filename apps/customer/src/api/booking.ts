@@ -33,6 +33,9 @@ export interface WorkshopHours {
   /** "08:00:00" (Postgres time), null when closed. */
   opens: string | null;
   closes: string | null;
+  /** Optional second period the same day ("Add hours", migration 014), for example after a lunch break. */
+  opens2?: string | null;
+  closes2?: string | null;
 }
 
 export interface WorkshopClosure {
@@ -133,7 +136,7 @@ export async function fetchBookingSetup(workshopId: string): Promise<BookingSetu
       .select('time_zone, slot_minutes, bays, min_notice_hours, max_days_ahead, auto_confirm')
       .eq('workshop_id', workshopId)
       .maybeSingle(),
-    supabase.from('workshop_hours').select('weekday, closed, opens, closes').eq('workshop_id', workshopId),
+    supabase.from('workshop_hours').select('*').eq('workshop_id', workshopId),
     supabase
       .from('workshop_closures')
       .select('day, reason')
@@ -347,6 +350,28 @@ export function formatClock(time: string): string {
 }
 
 const PLURAL_DAYS = ['Sundays', 'Mondays', 'Tuesdays', 'Wednesdays', 'Thursdays', 'Fridays', 'Saturdays'];
+const SHORT_DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+/**
+ * The week as short lines for a footer, Monday first, joining consecutive days with the same hours:
+ * ["Mon to Fri: 8:00 a.m. to 6:00 p.m.", "Sat: 9:00 a.m. to 2:00 p.m.", "Sun: Closed"].
+ */
+export function weeklyHoursLines(hours: WorkshopHours[]): string[] {
+  const order = [1, 2, 3, 4, 5, 6, 0];
+  const label = (h: WorkshopHours | undefined) =>
+    !h || h.closed || !h.opens || !h.closes
+      ? 'Closed'
+      : `${formatClock(h.opens)} to ${formatClock(h.closes)}` +
+        (h.opens2 && h.closes2 ? `, ${formatClock(h.opens2)} to ${formatClock(h.closes2)}` : '');
+  const runs: { from: number; to: number; text: string }[] = [];
+  for (const wd of order) {
+    const text = label(hours.find((h) => h.weekday === wd));
+    const last = runs[runs.length - 1];
+    if (last && last.text === text) last.to = wd;
+    else runs.push({ from: wd, to: wd, text });
+  }
+  return runs.map((r) => `${SHORT_DAYS[r.from]}${r.from === r.to ? '' : ` to ${SHORT_DAYS[r.to]}`}: ${r.text}`);
+}
 
 function joinList(items: string[]): string {
   return items.length <= 1 ? (items[0] ?? '') : `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`;
@@ -364,7 +389,9 @@ export function hoursSummary(hours: WorkshopHours[]): string {
   if (open.length === 0) return 'Online booking is not open at the moment.';
   const groups = new Map<string, number[]>();
   for (const h of open) {
-    const range = `${formatClock(h.opens ?? '')} to ${formatClock(h.closes ?? '')}`;
+    const range =
+      `${formatClock(h.opens ?? '')} to ${formatClock(h.closes ?? '')}` +
+      (h.opens2 && h.closes2 ? ` and ${formatClock(h.opens2)} to ${formatClock(h.closes2)}` : '');
     groups.set(range, [...(groups.get(range) ?? []), h.weekday]);
   }
   const sorted = [...groups.entries()].sort((a, b) => b[1].length - a[1].length);

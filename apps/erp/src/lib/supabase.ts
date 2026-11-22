@@ -28,6 +28,8 @@ export interface WorkshopRow {
   id: string;
   name: string;
   number: string;
+  /** active or suspended (migration 015). Absent before that migration. */
+  status?: string;
 }
 
 /** Row shape of public.workshop_invites. */

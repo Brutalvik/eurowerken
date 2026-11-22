@@ -84,12 +84,18 @@ export interface BookingSettings {
   holiday_region: HolidayRegion;
 }
 
-/** One weekday's opening hours. weekday 0 = Sunday. Times are 'HH:MM'. */
+/**
+ * One weekday's opening hours. weekday 0 = Sunday. Times are 'HH:MM'.
+ * opens2 and closes2 are an optional second period the same day (migration
+ * 014), after the first: opens < closes <= opens2 < closes2.
+ */
 export interface WorkshopHours {
   weekday: number;
   closed: boolean;
   opens: string | null;
   closes: string | null;
+  opens2: string | null;
+  closes2: string | null;
 }
 
 export interface Closure {
@@ -168,6 +174,10 @@ function fail(err: DbError): never {
   const text = `${err.message} ${err.details ?? ''}`;
   // Raised by a database trigger (for example a booking outside opening hours): its message names the problem.
   if (err.code === 'P0001') throw new Error(err.message);
+  if (/workshop_hours_second_period_check/i.test(text)) {
+    throw new Error('The second opening period must start at or after the first one closes, and close after it opens.');
+  }
+  if (/(opens2|closes2)/i.test(text)) throw new Error('Apply database migration 014 to use split hours.');
   if (err.code === 'PGRST204' || /column .*(labour_rate|holiday_region)|(labour_rate|holiday_region).*column/i.test(text)) {
     throw new Error('The database does not have the labour rate and holiday settings yet. Apply migration 011 (npm run db:migrate).');
   }
@@ -443,12 +453,37 @@ function normalize(row: Record<string, unknown>): Appointment {
 
 // Booking settings, hours, closures ---------------------------------------------------------
 
-function fillHours(rows: { weekday: number; closed: boolean; opens: string | null; closes: string | null }[]): WorkshopHours[] {
+interface HoursRow {
+  weekday: number;
+  closed: boolean;
+  opens: string | null;
+  closes: string | null;
+  /** Missing before migration 014. */
+  opens2?: string | null;
+  closes2?: string | null;
+}
+
+/** A weekday with no hours: closed. */
+export function closedHours(weekday: number): WorkshopHours {
+  return { weekday, closed: true, opens: null, closes: null, opens2: null, closes2: null };
+}
+
+function fillHours(rows: HoursRow[]): WorkshopHours[] {
   return [0, 1, 2, 3, 4, 5, 6].map((wd) => {
     const r = rows.find((x) => x.weekday === wd);
     // A weekday with no row is not bookable (available_slots skips it), so it shows as closed.
-    if (!r) return { weekday: wd, closed: true, opens: null, closes: null };
-    return { weekday: wd, closed: r.closed, opens: shortTime(r.opens), closes: shortTime(r.closes) };
+    if (!r) return closedHours(wd);
+    const opens2 = shortTime(r.opens2 ?? null);
+    const closes2 = shortTime(r.closes2 ?? null);
+    const second = opens2 !== null && closes2 !== null;
+    return {
+      weekday: wd,
+      closed: r.closed,
+      opens: shortTime(r.opens),
+      closes: shortTime(r.closes),
+      opens2: second ? opens2 : null,
+      closes2: second ? closes2 : null,
+    };
   });
 }
 
@@ -474,7 +509,8 @@ export async function getBookingContext(workshopId: string): Promise<BookingCont
       .select('*')
       .eq('workshop_id', workshopId)
       .maybeSingle(),
-    supabase.from('workshop_hours').select('weekday, closed, opens, closes').eq('workshop_id', workshopId),
+    // '*' so a database without migration 014 (no opens2 / closes2 yet) still loads.
+    supabase.from('workshop_hours').select('*').eq('workshop_id', workshopId),
     supabase.from('workshop_closures').select('id, day, reason').eq('workshop_id', workshopId).order('day'),
   ]);
   if (s.error) fail(s.error);
@@ -484,7 +520,7 @@ export async function getBookingContext(workshopId: string): Promise<BookingCont
   return {
     settings: row ? normalizeSettings(row) : DEFAULT_SETTINGS,
     settingsSaved: Boolean(row),
-    hours: fillHours((h.data ?? []) as WorkshopHours[]),
+    hours: fillHours((h.data ?? []) as HoursRow[]),
     closures: (c.data ?? []) as Closure[],
   };
 }
@@ -586,34 +622,98 @@ export function formatClock(time: string): string {
   return `${twelve}:${pad(m)} ${h < 12 ? 'a.m.' : 'p.m.'}`;
 }
 
+function cleanTime(t: string | null): string | null {
+  return t && isTimeText(t) ? t : null;
+}
+
+function offGrid(t: string): boolean {
+  return timeToMinutes(t) % HOURS_STEP !== 0;
+}
+
+/** What is wrong with one day's hours, per period, for inline messages (null when fine or closed). */
+export function hoursRowProblems(r: WorkshopHours): { first: string | null; second: string | null } {
+  if (r.closed) return { first: null, second: null };
+  const opens = cleanTime(r.opens);
+  const closes = cleanTime(r.closes);
+  let first: string | null = null;
+  if (!opens || !closes) first = 'Choose an opening and a closing time.';
+  else if (offGrid(opens) || offGrid(closes)) first = 'Use times on the hour or half hour.';
+  else if (timeToMinutes(closes) <= timeToMinutes(opens)) first = 'Closing time must be after opening time.';
+  let second: string | null = null;
+  const hasSecond = r.opens2 !== null || r.closes2 !== null;
+  if (hasSecond) {
+    const opens2 = cleanTime(r.opens2);
+    const closes2 = cleanTime(r.closes2);
+    if (!opens2 || !closes2) second = 'Choose an opening and a closing time for the second period, or remove it.';
+    else if (offGrid(opens2) || offGrid(closes2)) second = 'Use times on the hour or half hour.';
+    else if (timeToMinutes(closes2) <= timeToMinutes(opens2)) second = 'Closing time must be after opening time.';
+    else if (closes && timeToMinutes(opens2) < timeToMinutes(closes)) second = 'The second period must start after the first one closes.';
+  }
+  return { first, second };
+}
+
 export function validateHours(rows: WorkshopHours[]): Validated<WorkshopHours[]> {
   const errors: string[] = [];
   const value = rows.map((r) => {
     const name = WEEKDAY_NAMES[r.weekday];
-    const opens = r.opens && isTimeText(r.opens) ? r.opens : null;
-    const closes = r.closes && isTimeText(r.closes) ? r.closes : null;
-    if (!r.closed) {
-      if (!opens || !closes) errors.push(`${name}: enter an opening and a closing time, or mark the day closed.`);
-      else if (timeToMinutes(opens) % HOURS_STEP !== 0 || timeToMinutes(closes) % HOURS_STEP !== 0) {
-        errors.push(`${name}: use times on the hour or half hour (for example 08:00 or 17:30).`);
-      } else if (timeToMinutes(opens) >= timeToMinutes(closes)) errors.push(`${name}: the opening time must be before the closing time.`);
-    }
-    return { weekday: r.weekday, closed: r.closed, opens, closes };
+    const p = hoursRowProblems(r);
+    if (p.first) errors.push(`${name}: ${p.first}`);
+    if (p.second) errors.push(`${name}, second period: ${p.second}`);
+    const opens2 = cleanTime(r.opens2);
+    const closes2 = cleanTime(r.closes2);
+    const second = !r.closed && opens2 !== null && closes2 !== null;
+    return {
+      weekday: r.weekday,
+      closed: r.closed,
+      opens: cleanTime(r.opens),
+      closes: cleanTime(r.closes),
+      opens2: second ? opens2 : null,
+      closes2: second ? closes2 : null,
+    };
   });
   if (value.every((r) => r.closed)) errors.push('Every day is closed, so nobody can book. Open at least one day.');
   return errors.length > 0 ? { ok: false, errors } : { ok: true, value };
 }
 
-export async function saveHours(workshopId: string, rows: WorkshopHours[]): Promise<WorkshopHours[]> {
+/** True when any day has a second opening period. */
+export function usesSplitHours(rows: WorkshopHours[]): boolean {
+  return rows.some((r) => r.opens2 !== null && r.closes2 !== null);
+}
+
+/**
+ * Saves all seven days at once. opens2 and closes2 are written only when a
+ * day uses a second period now or did before (`saved`), so a database
+ * without migration 014 can still save single-period hours.
+ */
+export async function saveHours(workshopId: string, rows: WorkshopHours[], saved: WorkshopHours[] = []): Promise<WorkshopHours[]> {
+  const withSecond = usesSplitHours(rows) || usesSplitHours(saved);
   const { data, error } = await supabase
     .from('workshop_hours')
     .upsert(
-      rows.map((r) => ({ workshop_id: workshopId, weekday: r.weekday, closed: r.closed, opens: r.opens, closes: r.closes })),
+      rows.map((r) => {
+        const base = { workshop_id: workshopId, weekday: r.weekday, closed: r.closed, opens: r.opens, closes: r.closes };
+        return withSecond ? { ...base, opens2: r.opens2, closes2: r.closes2 } : base;
+      }),
       { onConflict: 'workshop_id,weekday' },
     )
-    .select('weekday, closed, opens, closes');
+    .select('*');
   if (error) fail(error);
-  return fillHours((data ?? []) as WorkshopHours[]);
+  return fillHours((data ?? []) as HoursRow[]);
+}
+
+/** The open periods of a day in minutes since midnight, in order (none when closed). */
+export function openPeriods(h: WorkshopHours): TimeWindow[] {
+  if (h.closed || !h.opens || !h.closes) return [];
+  const out: TimeWindow[] = [{ start: timeToMinutes(h.opens), end: timeToMinutes(h.closes) }];
+  if (h.opens2 && h.closes2) out.push({ start: timeToMinutes(h.opens2), end: timeToMinutes(h.closes2) });
+  return out;
+}
+
+/** '8:00 a.m. to 12:00 p.m. and 1:00 p.m. to 6:00 p.m.', or 'Closed'. */
+export function formatHours(h: WorkshopHours): string {
+  if (h.closed || !h.opens || !h.closes) return 'Closed';
+  const first = `${formatClock(h.opens)} to ${formatClock(h.closes)}`;
+  return h.opens2 && h.closes2 ? `${first} and ${formatClock(h.opens2)} to ${formatClock(h.closes2)}` : first;
 }
 
 export async function addClosure(workshopId: string, day: string, reason: string): Promise<Closure> {
@@ -707,7 +807,7 @@ export function holidayOn(key: string, region: HolidayRegion): Holiday | null {
 }
 
 export function dayInfo(key: string, ctx: Pick<BookingContext, 'hours' | 'closures'> & { settings?: Pick<BookingSettings, 'holiday_region'> }): DayInfo {
-  const hours = ctx.hours[weekdayOf(key)] ?? { weekday: weekdayOf(key), closed: true, opens: null, closes: null };
+  const hours = ctx.hours[weekdayOf(key)] ?? closedHours(weekdayOf(key));
   const closure = ctx.closures.find((c) => c.day === key) ?? null;
   const holiday = ctx.settings ? holidayOn(key, ctx.settings.holiday_region) : null;
   return { key, hours, closure, holiday, closed: hours.closed || closure !== null };
@@ -723,20 +823,30 @@ export type StartTimes = { closed: true; reason: string } | { closed: false; tim
 
 /**
  * The start times staff may choose on a day ('HH:MM', workshop time): every
- * slot_minutes from opening, as long as the booking ends by closing. Closed
- * days and closures have none. Day keys and times are in the workshop's
- * time zone, which is how the database checks them too.
+ * slot_minutes from the opening of each period, never in the gap between
+ * two periods. The first slot must fit in its period (as the database
+ * checks) and the booking must end inside a period: in its own, or, for a
+ * long job that runs on past the break, in the next one. Closed days and closures have
+ * none. Day keys and times are in the workshop's time zone, which is how
+ * the database checks them too.
  */
 export function validStartTimes(dayKey: string, ctx: Pick<BookingContext, 'hours' | 'closures' | 'settings'>, durationMinutes: number): StartTimes {
   if (!isDayKey(dayKey)) return { closed: false, times: [] };
   const info = dayInfo(dayKey, ctx);
-  if (info.closed || !info.hours.opens || !info.hours.closes) return { closed: true, reason: closedReason(info) };
-  const opens = timeToMinutes(info.hours.opens);
-  const closes = timeToMinutes(info.hours.closes);
+  const periods = openPeriods(info.hours);
+  if (info.closed || periods.length === 0) return { closed: true, reason: closedReason(info) };
   const step = ctx.settings.slot_minutes > 0 ? ctx.settings.slot_minutes : 30;
   const length = Number.isFinite(durationMinutes) && durationMinutes > 0 ? durationMinutes : step;
+  const lastClose = periods[periods.length - 1].end;
   const times: string[] = [];
-  for (let m = opens; m + length <= closes; m += step) times.push(`${pad(Math.floor(m / 60))}:${pad(m % 60)}`);
+  periods.forEach((p, i) => {
+    const next = periods[i + 1];
+    for (let m = p.start; m + Math.min(length, step) <= p.end; m += step) {
+      const end = m + length;
+      // Ends in its own period, or runs on past the break and ends in the next one (never in the gap).
+      if (end <= p.end || (next !== undefined && end >= next.start && end <= lastClose)) times.push(`${pad(Math.floor(m / 60))}:${pad(m % 60)}`);
+    }
+  });
   return { closed: false, times };
 }
 
@@ -769,9 +879,9 @@ export interface TimeWindow {
  * booked outside opening hours.
  */
 export function timelineWindow(hours: WorkshopHours[], appts: Appointment[], tz: string): TimeWindow {
-  const open = hours.filter((h) => !h.closed && h.opens && h.closes);
-  let start = open.length ? Math.min(...open.map((h) => timeToMinutes(h.opens!))) : 8 * 60;
-  let end = open.length ? Math.max(...open.map((h) => timeToMinutes(h.closes!))) : 18 * 60;
+  const periods = hours.flatMap(openPeriods);
+  let start = periods.length ? Math.min(...periods.map((p) => p.start)) : 8 * 60;
+  let end = periods.length ? Math.max(...periods.map((p) => p.end)) : 18 * 60;
   for (const a of appts) {
     const s = minutesOfDay(a.starts_at, tz);
     start = Math.min(start, s);
@@ -784,7 +894,7 @@ export function timelineWindow(hours: WorkshopHours[], appts: Appointment[], tz:
 
 /**
  * The hours the calendar shows: from the earliest opening to the latest
- * closing among the visible days that are open (the whole week's hours when
+ * closing (of either period) among the visible days that are open (the whole week's hours when
  * none is), widened to whole hours and to fit any appointment booked outside
  * opening hours before the database refused those.
  */

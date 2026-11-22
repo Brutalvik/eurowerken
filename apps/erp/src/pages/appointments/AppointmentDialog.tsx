@@ -217,7 +217,7 @@ function Details({ appt, workshopId, ctx, site, technicians, canEdit, onChanged,
           <p className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-ok/30 bg-ok/10 px-3 py-2 text-ok">
             <span>Repair order {repairOrder.number} created</span>
             <Link
-              to={`/repair-orders?open=${encodeURIComponent(repairOrder.id)}`}
+              to={`/repair-orders/${encodeURIComponent(repairOrder.id)}`}
               className="inline-flex items-center rounded font-semibold text-accent underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent coarse:min-h-11"
             >
               Open repair order {repairOrder.number}

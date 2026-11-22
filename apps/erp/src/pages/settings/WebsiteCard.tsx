@@ -241,17 +241,7 @@ export function WebsiteCard() {
                 </Labeled>
               ))}
             </div>
-            <Labeled id="site-hours" label="Opening hours" hint="One line per entry.">
-              <textarea
-                id="site-hours"
-                rows={3}
-                maxLength={300}
-                className={inputClass}
-                placeholder={'Mon to Fri: 8:00 to 18:00\nSat: 9:00 to 14:00\nSun: Closed'}
-                value={draft.hours ?? ''}
-                onChange={(e) => set('hours', e.target.value)}
-              />
-            </Labeled>
+            <p className="text-[11px] text-fg3">Opening hours on your website come from Settings, Booking (business hours and holidays).</p>
           </div>
 
           <fieldset className="space-y-2 border-t border-line pt-4">

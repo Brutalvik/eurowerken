@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Navigate, Outlet, useLocation } from 'react-router-dom';
+import { Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/Button';
-import { UserX } from 'lucide-react';
+import { Ban, ShieldAlert, UserX } from 'lucide-react';
 import { useAuth, useCurrentUser } from '@/auth/AuthContext';
 import { Header } from './Header';
 import { PageBoundary } from './PageBoundary';
@@ -11,8 +11,9 @@ import { NotificationsProvider } from '@/notifications/NotificationsContext';
 export function AppLayout() {
   const [navOpen, setNavOpen] = useState(false);
   const user = useCurrentUser();
-  const { profileError } = useAuth();
+  const { profileError, isPlatformAdmin, acting } = useAuth();
   const { pathname } = useLocation();
+  const onAdmin = pathname === '/admin' || pathname.startsWith('/admin/');
 
   // Phone drawer: close on navigation and on Escape.
   useEffect(() => setNavOpen(false), [pathname]);
@@ -23,8 +24,12 @@ export function AppLayout() {
     return () => window.removeEventListener('keydown', onKey);
   }, [navOpen]);
 
-  // Not in a workshop yet: choose one first (or finish a saved invite).
-  if (!user.workshop && !profileError) return <Navigate to="/onboarding" replace />;
+  // Not in a workshop yet: choose one first (or finish a saved invite). A platform admin
+  // needs no workshop of their own and goes to the console instead.
+  if (!user.workshop && !profileError) {
+    if (!isPlatformAdmin) return <Navigate to="/onboarding" replace />;
+    if (!onAdmin) return <Navigate to="/admin" replace />;
+  }
 
   return (
     // 100dvh follows mobile browser toolbars; h-screen would hide the bottom under them.
@@ -40,12 +45,15 @@ export function AppLayout() {
           />
         )}
         <div className="flex min-w-0 flex-1 flex-col">
-          <Header onMenuClick={() => setNavOpen(true)} />
+          {acting && <ActingBanner workshopName={user.workshop?.name ?? 'this workshop'} />}
+          <Header onMenuClick={() => setNavOpen(true)} safeTop={!acting} />
           <main className="pb-safe flex-1 overflow-y-auto overscroll-contain p-4 sm:p-5 lg:p-6">
-            {user.role ? (
+            {user.role || (isPlatformAdmin && onAdmin) ? (
               <PageBoundary resetKey={pathname}>
                 <Outlet />
               </PageBoundary>
+            ) : user.suspended && !profileError ? (
+              <SuspendedNotice />
             ) : (
               <NoRoleNotice active={user.active} error={profileError} workshopName={user.workshop?.name ?? null} />
             )}
@@ -53,6 +61,56 @@ export function AppLayout() {
         </div>
       </div>
     </NotificationsProvider>
+  );
+}
+
+/** Shown while a platform admin acts as Manager of a workshop. Stays above the page; the page scrolls under it. */
+function ActingBanner({ workshopName }: { workshopName: string }) {
+  const { stopActing } = useAuth();
+  const navigate = useNavigate();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function onExit() {
+    setBusy(true);
+    setError(null);
+    const err = await stopActing();
+    setBusy(false);
+    if (err) setError(err);
+    else navigate('/admin', { replace: true });
+  }
+
+  return (
+    <div role="region" aria-label="Support session" className="glass-strong pt-safe relative z-20 shrink-0 border-x-0 border-t-0 !border-b-warn/40">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 bg-warn/15 px-4 py-1.5 lg:px-6">
+        <ShieldAlert className="h-4 w-4 shrink-0 text-warn" aria-hidden />
+        <p className="min-w-0 flex-1 text-xs text-fg">
+          Acting as Manager in <span className="font-semibold">{workshopName}</span>
+          <span className="text-fg2"> · Everything you do is recorded</span>
+          {error && <span className="block text-bad">{error}</span>}
+        </p>
+        <Button
+          variant="ghost"
+          onClick={() => void onExit()}
+          disabled={busy}
+          className="min-h-11 shrink-0 border-warn/50 !text-fg"
+        >
+          {busy ? 'Exiting...' : 'Exit'}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function SuspendedNotice() {
+  return (
+    <div className="flex h-72 flex-col items-center justify-center gap-3 text-center">
+      <Ban className="h-8 w-8 text-bad" aria-hidden />
+      <h2 className="font-display text-base font-semibold">Workshop suspended</h2>
+      <p className="max-w-sm text-sm text-fg2">
+        This workshop is suspended. Contact EuroWerken support.
+      </p>
+    </div>
   );
 }
 

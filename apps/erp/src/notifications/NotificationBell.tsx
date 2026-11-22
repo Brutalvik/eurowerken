@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { Bell, CalendarPlus, CalendarX, CheckCheck } from 'lucide-react';
+import { Bell, CheckCheck } from 'lucide-react';
+import { NotificationIcon } from './NotificationIcon';
 import { useNotifications } from './NotificationsContext';
 
 const timeAgo = (iso: string) => {
@@ -10,7 +11,7 @@ const timeAgo = (iso: string) => {
   return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 };
 
-/** Header bell: unread count, and a glass panel with the latest booking notifications. */
+/** Header bell: unread count, and a glass panel with the latest booking and repair notifications. */
 export function NotificationBell() {
   const { notifications, unread, loading, markRead, openNotification } = useNotifications();
   const [open, setOpen] = useState(false);
@@ -66,10 +67,9 @@ export function NotificationBell() {
           <ul className="max-h-[60vh] overflow-y-auto">
             {loading && notifications.length === 0 && <li className="px-4 py-6 text-center text-xs text-fg2">Loading...</li>}
             {!loading && notifications.length === 0 && (
-              <li className="px-4 py-8 text-center text-xs text-fg2">No notifications yet. New online bookings appear here.</li>
+              <li className="px-4 py-8 text-center text-xs text-fg2">No notifications yet. New bookings, customer messages and approvals appear here.</li>
             )}
             {notifications.map((n) => {
-              const Icon = n.kind === 'booking_cancelled' ? CalendarX : CalendarPlus;
               return (
                 <li key={n.id} className="border-b border-line/40 last:border-b-0">
                   <button
@@ -80,9 +80,7 @@ export function NotificationBell() {
                     }}
                     className={`flex w-full items-start gap-3 px-4 py-3 text-left transition hover:bg-surface2/60 ${n.read ? '' : 'bg-accent/[0.06]'}`}
                   >
-                    <span className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${n.kind === 'booking_cancelled' ? 'bg-bad/15 text-bad' : 'bg-accent/15 text-accent'}`}>
-                      <Icon className="h-4 w-4" aria-hidden />
-                    </span>
+                    <NotificationIcon n={n} />
                     <span className="min-w-0 flex-1">
                       <span className={`block truncate text-xs ${n.read ? 'text-fg2' : 'font-semibold text-fg'}`}>{n.title}</span>
                       {n.body && <span className="mt-0.5 block truncate text-[11px] text-fg2">{n.body}</span>}

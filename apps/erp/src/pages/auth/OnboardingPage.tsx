@@ -13,7 +13,7 @@ type Choice = 'join' | 'create';
  */
 export function OnboardingPage() {
   const user = useCurrentUser();
-  const { createWorkshop, requestJoin, signOut } = useAuth();
+  const { createWorkshop, requestJoin, signOut, isPlatformAdmin } = useAuth();
   const [choice, setChoice] = useState<Choice>('join');
   const [value, setValue] = useState('');
   const [busy, setBusy] = useState(false);
@@ -22,6 +22,8 @@ export function OnboardingPage() {
   if (user.workshop) return <Navigate to="/dashboard" replace />;
   const pendingInvite = readPendingInvite();
   if (pendingInvite) return <Navigate to={`/invite/${pendingInvite}`} replace />;
+  // A platform admin needs no workshop of their own: the console is their home.
+  if (isPlatformAdmin) return <Navigate to="/admin" replace />;
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();

@@ -1,5 +1,5 @@
 import type { CSSProperties } from 'react';
-import { formatClock, formatDayKey, formatTime, formatTimeRange, layoutDay, minutesOfDay, servicesLabel, vehicleLabel } from '@/api/appointments';
+import { formatClock, formatDayKey, formatHours, formatTime, formatTimeRange, layoutDay, minutesOfDay, openPeriods, servicesLabel, vehicleLabel } from '@/api/appointments';
 import type { Appointment, DayInfo, TimeWindow } from '@/api/appointments';
 import { Badge } from '@/components/ui/Badge';
 import { APPOINTMENT_BLOCK, APPOINTMENT_STATUS_LABEL, APPOINTMENT_TONE } from '@/lib/status';
@@ -37,26 +37,31 @@ function timeToMinutes(t: string | null): number | null {
   return h * 60 + m;
 }
 
-/** Shading for the parts of a day outside opening hours (or all of it when closed). */
+/** Shading for the parts of a day outside opening hours, the gap between two periods included (or all of it when closed). */
 function ClosedShade({ info, window, ppm }: { info: DayInfo; window: TimeWindow; ppm: number }) {
-  const height = (window.end - window.start) * ppm;
   if (info.closed) {
     return <div aria-hidden className="absolute inset-0 bg-[repeating-linear-gradient(135deg,rgb(var(--fg3)/0.08)_0_6px,transparent_6px_12px)]" />;
   }
-  const opens = timeToMinutes(info.hours.opens);
-  const closes = timeToMinutes(info.hours.closes);
+  // The closed stretches: before the first opening, between periods, after the last closing.
+  const shaded: TimeWindow[] = [];
+  let from = window.start;
+  for (const p of openPeriods(info.hours)) {
+    if (p.start > from) shaded.push({ start: from, end: Math.min(p.start, window.end) });
+    from = Math.max(from, p.end);
+  }
+  if (from < window.end) shaded.push({ start: from, end: window.end });
   return (
     <>
-      {opens !== null && opens > window.start && (
-        <div aria-hidden className="absolute inset-x-0 top-0 bg-fg3/[0.07]" style={{ height: (opens - window.start) * ppm }} />
-      )}
-      {closes !== null && closes < window.end && (
-        <div
-          aria-hidden
-          className="absolute inset-x-0 bg-fg3/[0.07]"
-          style={{ top: (closes - window.start) * ppm, height: height - (closes - window.start) * ppm }}
-        />
-      )}
+      {shaded
+        .filter((z) => z.end > z.start)
+        .map((z) => (
+          <div
+            key={z.start}
+            aria-hidden
+            className="absolute inset-x-0 bg-fg3/[0.07]"
+            style={{ top: (z.start - window.start) * ppm, height: (z.end - z.start) * ppm }}
+          />
+        ))}
     </>
   );
 }
@@ -77,7 +82,7 @@ function dayNote(info: DayInfo): { text: string; title: string } | null {
 
 function hoursText(info: DayInfo): string {
   if (info.closed || !info.hours.opens || !info.hours.closes) return 'Closed';
-  return `Open ${formatClock(info.hours.opens)} to ${formatClock(info.hours.closes)}`;
+  return `Open ${formatHours(info.hours)}`;
 }
 
 interface SlotProps {

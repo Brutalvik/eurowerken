@@ -58,10 +58,24 @@ apps/customer/src/
 apps/customer/public/images/   drop-in photos; README lists the file names
 packages/shared/src/   site.ts, brand.ts, legal.ts
 supabase/migrations/   001 profiles, 002 registration and role_permissions, 003 workshops and invites, 004 workshop_sites,
-                       005 customers, services, team, parts, part_costs, workshop-public bucket
+                       005 customers, services, team, parts, part_costs, workshop-public bucket, 006 customer accounts,
+                       007 nav style, 008 appointments, 009 own website, 010 notifications, 011 hours rule and labour rate,
+                       012 repair orders, 013 repair tracking, 014 split hours, 015 platform admin
+supabase/scripts/      reset_activity.sql (delete all activity, by hand)
 docs/backend-plan.md   phased plan for accounts, bookings, repairs, orders, Stripe
 scripts/db-migrate.sh  applies unapplied migrations with psql
 ```
+
+## Backend status (see docs/backend-plan.md)
+
+- Phase 1 (catalogue, photos, customer identity): done. Phase 2 (customer accounts, Garage, ERP Customers): done.
+- Phase 3 (bookings): done. Migrations 008 to 011: booking settings, opening hours (split days in 014), closures and Canadian holidays (ERP dialog, `apps/erp/src/lib/holidays.ts`), labour rate, `available_slots` and `book_appointment` (server-checked slots and prices), and a trigger that refuses any booking outside opening hours or off the 30-minute grid. ERP Appointments page; customer four-step booking. Live staff notifications (bell, pop-ups, unopened count) from migration 010 via Supabase Realtime.
+- Phase 4 (repair orders): done. Migrations 012 and 013: check-in creates the repair order (`check_in_appointment`), line items with approvals, timeline, photos and video (`repair-media` bucket), messages; customers track, approve and message through `track_repair`, `respond_to_repair_items` and `post_repair_message` (tracking code plus email or phone, also for guests).
+- Platform super admin (migration 015): `platform_admins`, admin sessions ("Open as Manager", every RLS rule applies through `my_workshop()` and `my_role()`), suspension, platform settings (fee percent), audit log. ERP `/admin`. Make an account admin with the insert at the end of 015.
+- Phase 5 (orders, invoices, Stripe Connect, pay in store): next.
+- Local testing: each migration was tested on a throwaway Postgres with stand-ins for Supabase's auth and storage schemas before being applied. `supabase/scripts/reset_activity.sql` deletes all activity data (not a migration; run by hand).
+- Website opening hours are not entered separately: the customer footer is built from the business hours.
+- Pages in both apps load on demand behind an error boundary (PageBoundary), so one broken page does not blank an app. Keep each app compiling at every save.
 
 ## Customer site and branding
 

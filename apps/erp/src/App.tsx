@@ -17,6 +17,7 @@ import type { ReactNode } from 'react';
 
 // Pages inside the app layout load on demand; AppLayout wraps them in a PageBoundary
 // (spinner while loading, a friendly message if one fails).
+const AdminPage = lazy(() => import('@/pages/admin/AdminPage').then((m) => ({ default: m.AdminPage })));
 const AppointmentsPage = lazy(() => import('@/pages/AppointmentsPage').then((m) => ({ default: m.AppointmentsPage })));
 const CustomersPage = lazy(() => import('@/pages/CustomersPage').then((m) => ({ default: m.CustomersPage })));
 const DashboardPage = lazy(() => import('@/pages/DashboardPage').then((m) => ({ default: m.DashboardPage })));
@@ -25,6 +26,7 @@ const InvoicesPage = lazy(() => import('@/pages/InvoicesPage').then((m) => ({ de
 const NotFoundPage = lazy(() => import('@/pages/NotFoundPage').then((m) => ({ default: m.NotFoundPage })));
 const ReportsPage = lazy(() => import('@/pages/ReportsPage').then((m) => ({ default: m.ReportsPage })));
 const RepairOrdersPage = lazy(() => import('@/pages/RepairOrdersPage').then((m) => ({ default: m.RepairOrdersPage })));
+const RepairOrderDetail = lazy(() => import('@/pages/repair-orders/RepairOrderDetail').then((m) => ({ default: m.RepairOrderDetail })));
 const SalesPage = lazy(() => import('@/pages/SalesPage').then((m) => ({ default: m.SalesPage })));
 const SettingsPage = lazy(() => import('@/pages/SettingsPage').then((m) => ({ default: m.SettingsPage })));
 const UsersPage = lazy(() => import('@/pages/UsersPage').then((m) => ({ default: m.UsersPage })));
@@ -77,12 +79,15 @@ export default function App() {
         <Route path="appointments" element={guarded('repair-orders', <AppointmentsPage />)} />
         <Route path="inventory" element={guarded('inventory', <InventoryPage />)} />
         <Route path="repair-orders" element={guarded('repair-orders', <RepairOrdersPage />)} />
+        <Route path="repair-orders/:id" element={guarded('repair-orders', <RepairOrderDetail />)} />
         <Route path="customers" element={guarded('customers', <CustomersPage />)} />
         <Route path="sales" element={guarded('sales', <SalesPage />)} />
         <Route path="invoices" element={guarded('invoices', <InvoicesPage />)} />
         <Route path="reports" element={guarded('reports', <ReportsPage />)} />
         <Route path="users" element={guarded('users', <UsersPage />)} />
         <Route path="settings" element={guarded('settings', <SettingsPage />)} />
+        {/* Platform super admins only; AdminPage shows "not found" to everyone else. */}
+        <Route path="admin" element={<AdminPage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Route>
     </Routes>

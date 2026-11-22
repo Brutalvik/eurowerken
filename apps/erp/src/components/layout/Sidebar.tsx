@@ -9,6 +9,7 @@ import {
   LayoutDashboard,
   LogOut,
   Settings,
+  ShieldAlert,
   ShieldCheck,
   Wrench,
 } from 'lucide-react';
@@ -38,7 +39,7 @@ interface SidebarProps {
 }
 
 export function Sidebar({ open, onNavigate }: SidebarProps) {
-  const { accessFor, signOut } = useAuth();
+  const { accessFor, signOut, isPlatformAdmin, acting } = useAuth();
   const user = useCurrentUser();
   const { unopened } = useNotifications();
   const items: { key: string; to: string; label: string; icon: LucideIcon }[] = [];
@@ -52,6 +53,7 @@ export function Sidebar({ open, onNavigate }: SidebarProps) {
       }
     }
   }
+  if (isPlatformAdmin) items.push({ key: 'admin', to: '/admin', label: 'Platform admin', icon: ShieldAlert });
 
   return (
     // Phone (< md): slide-out drawer. Tablet (md to lg): icon rail. Desktop (lg+): full sidebar.
@@ -81,6 +83,7 @@ export function Sidebar({ open, onNavigate }: SidebarProps) {
             {user.workshop.name}
           </div>
           <div className="font-mono text-[10px] text-white/50">No. {user.workshop.number}</div>
+          {acting && <div className="mt-0.5 text-[10px] font-semibold text-warn">(support session)</div>}
         </div>
       )}
 
@@ -135,7 +138,7 @@ export function Sidebar({ open, onNavigate }: SidebarProps) {
         )}
         <div className="min-w-0 flex-1 md:max-lg:hidden">
           <div className="truncate text-xs font-semibold">{user.name}</div>
-          <div className="truncate text-[10px] text-white/50">{user.role ?? 'Awaiting approval'}</div>
+          <div className="truncate text-[10px] text-white/50">{user.role ?? (isPlatformAdmin ? 'Platform admin' : user.suspended ? 'Workshop suspended' : 'Awaiting approval')}</div>
         </div>
         <button
           type="button"
