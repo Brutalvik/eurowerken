@@ -270,7 +270,7 @@ export function ServicesCard() {
         <div className="space-y-2 pb-2">
           {groups.map((g) => (
             <div key={g.id}>
-              <h3 className="border-t border-line bg-surface2 px-4 py-2 text-[11px] font-semibold uppercase tracking-wider text-fg2 sm:px-5">
+              <h3 className="border-t border-line bg-surface2/50 px-4 py-2 text-[11px] font-semibold uppercase tracking-wider text-fg2 sm:px-5">
                 {g.label} <span className="font-normal text-fg3">({g.rows.length})</span>
               </h3>
               <DataTable columns={columnsFor(g.rows)} rows={g.rows} getKey={(s) => s.id} />

@@ -11,7 +11,7 @@ interface KpiCardProps {
 
 export function KpiCard({ icon: Icon, label, value, caption, change }: KpiCardProps) {
   return (
-    <div className="flex min-w-0 flex-col gap-2.5 rounded-xl border border-line bg-surface p-4 sm:gap-3 sm:p-5">
+    <div className="flex min-w-0 flex-col gap-2.5 glass rounded-xl p-4 sm:gap-3 sm:p-5">
       <div className="flex items-start justify-between gap-2">
         <span className="text-xs font-medium leading-snug text-fg2">{label}</span>
         <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-accent/15 text-accent sm:h-8 sm:w-8">

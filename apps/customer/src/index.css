@@ -9,14 +9,18 @@
  */
 :root {
   color-scheme: light;
-  /* Soft light: grey page, off-white cards, slightly softened text (easier on the eyes than pure white). */
-  --bg: 233 236 241;
-  --surface: 246 247 249;
-  --surface2: 228 232 238;
-  --line: 211 217 226;
-  --fg: 24 33 49;
-  --fg2: 82 93 111;
-  --fg3: 117 129 147;
+  /*
+   * Calm light: a muted grey-blue page, cards only a step lighter, softened
+   * text. Nothing near pure white, so nothing glares. Contrast on --surface:
+   * fg 12.8:1, fg2 5.4:1, fg3 3.6:1 (captions only).
+   */
+  --bg: 224 228 234;
+  --surface: 236 239 243;
+  --surface2: 221 226 233;
+  --line: 204 211 221;
+  --fg: 32 40 56;
+  --fg2: 86 97 114;
+  --fg3: 114 125 142;
   /* --brand-* are set at runtime from the workshop's colour (SiteContext); these are the defaults. */
   --accent: var(--brand-accent, 29 111 240);
   --accent-fg: var(--brand-accent-fg, 255 255 255);
@@ -57,9 +61,17 @@ body {
   -webkit-tap-highlight-color: transparent;
   /* Soft colour wash behind everything, so the glass panels have something to blur. */
   background-image:
-    radial-gradient(60rem 40rem at 100% -10%, rgb(var(--accent) / 0.06), transparent 60%),
-    radial-gradient(50rem 30rem at -10% 30%, rgb(var(--accent) / 0.035), transparent 60%);
+    radial-gradient(60rem 40rem at 100% -10%, rgb(var(--accent) / 0.04), transparent 60%),
+    radial-gradient(50rem 30rem at -10% 30%, rgb(var(--accent) / 0.025), transparent 60%);
   background-attachment: fixed;
+}
+
+/* Dark mode: a faint wash too (a little stronger, as dark glass needs more to blur). */
+.dark body {
+  background-image:
+    radial-gradient(60rem 40rem at 100% -10%, rgb(var(--accent) / 0.07), transparent 60%),
+    radial-gradient(50rem 30rem at -10% 30%, rgb(var(--violet) / 0.04), transparent 60%),
+    radial-gradient(40rem 30rem at 50% 110%, rgb(var(--accent) / 0.035), transparent 60%);
 }
 
 /* iOS zooms into any field under 16px when it gets focus. */
@@ -73,7 +85,7 @@ body {
 
 @layer components {
   .btn-ink {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-ink px-5 py-3 text-sm font-semibold text-bg shadow-lg shadow-ink/10 transition hover:opacity-90 coarse:min-h-12;
+    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-ink px-5 py-3 text-sm font-semibold text-bg shadow-[0_6px_20px_-8px_rgb(var(--ink)/0.25)] transition hover:opacity-90 coarse:min-h-12;
   }
   .btn-outline {
     @apply inline-flex items-center justify-center gap-2 rounded-xl border border-line bg-surface px-5 py-3 text-sm font-semibold text-fg shadow-sm transition hover:bg-surface2 coarse:min-h-12;
@@ -86,17 +98,26 @@ body {
   }
 
   /*
-   * Glass panels. Use on light or tinted backgrounds (cards, floating
-   * badges, sticky bars). .glass-dark is for dark bands and the footer.
+   * Glass panels: frosted, translucent, a thin rim that is lighter at the top,
+   * a soft wide shadow. .glass is for cards; .glass-strong for floating or
+   * prominent cards and cards over busy backgrounds (more opaque, so text
+   * stays readable). .glass-dark is for dark bands and the footer.
+   * Rows inside a glass card get no blur of their own.
    */
   .glass {
-    @apply border border-white/60 bg-surface/65 shadow-[0_8px_32px_rgb(var(--ink)/0.06)] backdrop-blur-xl backdrop-saturate-150 dark:border-white/10 dark:bg-surface/55;
+    @apply border border-white/30 border-t-white/40 bg-surface/55 shadow-[inset_0_1px_0_rgb(255_255_255/0.18),0_10px_40px_-16px_rgb(var(--ink)/0.14)] backdrop-blur-xl backdrop-saturate-150;
+    @apply dark:border-white/[0.07] dark:border-t-white/[0.13] dark:bg-surface/45 dark:shadow-[inset_0_1px_0_rgb(255_255_255/0.05),0_14px_44px_-18px_rgb(0_0_0/0.6)];
   }
   .glass-strong {
-    @apply border border-white/70 bg-surface/80 shadow-[0_12px_40px_rgb(var(--ink)/0.10)] backdrop-blur-2xl backdrop-saturate-150 dark:border-white/10 dark:bg-surface/75;
+    @apply border border-white/35 border-t-white/40 bg-surface/75 shadow-[inset_0_1px_0_rgb(255_255_255/0.22),0_16px_48px_-18px_rgb(var(--ink)/0.18)] backdrop-blur-2xl backdrop-saturate-150;
+    @apply dark:border-white/[0.09] dark:border-t-white/[0.16] dark:bg-surface/70 dark:shadow-[inset_0_1px_0_rgb(255_255_255/0.06),0_18px_52px_-18px_rgb(0_0_0/0.7)];
   }
   .glass-dark {
-    @apply border border-white/10 bg-white/[0.06] backdrop-blur-xl;
+    @apply border border-white/10 border-t-white/[0.16] bg-white/[0.06] shadow-[inset_0_1px_0_rgb(255_255_255/0.06)] backdrop-blur-xl backdrop-saturate-150;
+  }
+  /* Soft lift for glass cards that react to hover (in place of a heavy shadow-xl). */
+  .glass-lift {
+    @apply transition hover:-translate-y-0.5 hover:shadow-[inset_0_1px_0_rgb(255_255_255/0.2),0_18px_48px_-16px_rgb(var(--ink)/0.2)] dark:hover:shadow-[inset_0_1px_0_rgb(255_255_255/0.06),0_20px_52px_-16px_rgb(0_0_0/0.75)];
   }
   .input {
     @apply w-full rounded-xl border border-line bg-surface/80 px-3.5 py-2.5 text-sm text-fg outline-none transition placeholder:text-fg3 focus:border-accent focus:ring-2 focus:ring-accent/20 coarse:min-h-12;

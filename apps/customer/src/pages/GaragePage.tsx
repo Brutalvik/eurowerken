@@ -2,12 +2,15 @@ import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import type { LucideIcon } from 'lucide-react';
-import { Bell, CalendarCheck, Car, FileText, History, Pencil, Plus, RotateCcw, ScanLine, Settings, Trash2 } from 'lucide-react';
+import { Bell, CalendarCheck, CalendarClock, CalendarX, Car, FileText, Pencil, Plus, RotateCcw, ScanLine, Settings, Trash2, User, Wrench } from 'lucide-react';
 import type { CustomerVehicleRow } from '@eurowerken/shared';
+import { cancelMyAppointment, formatZonedDateTime, listMyAppointments, useBookingSettings } from '@/api/booking';
+import type { Appointment, AppointmentStatus } from '@/api/booking';
 import { createVehicle, deleteVehicle, listVehicles, updateVehicle } from '@/api/vehicles';
 import type { VehicleInput } from '@/api/vehicles';
 import { useCustomerAuth } from '@/auth/CustomerAuthContext';
 import type { CustomerAccount } from '@/auth/CustomerAuthContext';
+import { Pill } from '@/components/ui';
 import { sitePath, useSite } from '@/site/SiteContext';
 import { AccountLoadError, NotificationsCard } from '@/pages/account/AccountPage';
 import { VehicleForm } from '@/pages/garage/VehicleForm';
@@ -45,13 +48,9 @@ export function GaragePage() {
         </div>
       </div>
 
+      <MyAppointments account={account} />
+
       <div className="grid gap-6 md:grid-cols-2">
-        <EmptySection
-          id="service-history"
-          icon={History}
-          title="Service history"
-          text="No visits yet. Your bookings and repairs will appear here."
-        />
         <EmptySection id="invoices" icon={FileText} title="Invoices" text="No invoices yet. Invoices from your visits will appear here." />
       </div>
     </div>
@@ -390,5 +389,319 @@ function EmptySection({ id, icon: Icon, title, text }: { id: string; icon: Lucid
         </Link>
       </div>
     </section>
+  );
+}
+
+// Appointments ------------------------------------------------------------------------------
+
+const STATUS: Record<AppointmentStatus, { label: string; tone: 'accent' | 'ok' | 'warn' | 'bad' | 'neutral' }> = {
+  requested: { label: 'Requested', tone: 'warn' },
+  confirmed: { label: 'Confirmed', tone: 'ok' },
+  checked_in: { label: 'Checked in', tone: 'accent' },
+  completed: { label: 'Completed', tone: 'neutral' },
+  cancelled: { label: 'Cancelled', tone: 'bad' },
+  no_show: { label: 'Missed', tone: 'neutral' },
+};
+
+function isUpcoming(a: Appointment): boolean {
+  return ['requested', 'confirmed', 'checked_in'].includes(a.status) && Date.parse(a.starts_at) + a.duration_minutes * 60_000 > Date.now();
+}
+
+type ApptState = { status: 'loading' } | { status: 'error'; message: string } | { status: 'ready'; list: Appointment[] };
+
+function MyAppointments({ account }: { account: CustomerAccount }) {
+  const site = useSite();
+  const setup = useBookingSettings();
+  const [state, setState] = useState<ApptState>({ status: 'loading' });
+  const [announce, setAnnounce] = useState('');
+
+  const load = useCallback(async () => {
+    setState({ status: 'loading' });
+    const { data, error } = await listMyAppointments(account.id, site.workshop_id);
+    setState(error !== null ? { status: 'error', message: error } : { status: 'ready', list: data });
+  }, [account.id, site.workshop_id]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  async function cancel(a: Appointment, reason: string): Promise<string | null> {
+    const err = await cancelMyAppointment(a.id, reason);
+    if (err) return err;
+    setState((s) =>
+      s.status === 'ready' ? { status: 'ready', list: s.list.map((x) => (x.id === a.id ? { ...x, status: 'cancelled', cancel_reason: reason.trim() || null } : x)) } : s,
+    );
+    setAnnounce(`Booking ${a.reference} cancelled.`);
+    return null;
+  }
+
+  const tz = setup.data?.settings.time_zone;
+  const ready = state.status === 'ready' && tz;
+  const upcoming = state.status === 'ready' ? state.list.filter(isUpcoming) : [];
+  const past = state.status === 'ready' ? state.list.filter((a) => !isUpcoming(a)).reverse() : [];
+
+  return (
+    <section aria-labelledby="my-appointments">
+      <h2 id="my-appointments" className="font-display text-xl font-semibold text-fg">
+        My appointments
+      </h2>
+      <p className="sr-only" aria-live="polite">
+        {announce}
+      </p>
+
+      {(state.status === 'loading' || (state.status === 'ready' && setup.loading)) && (
+        <div aria-busy="true" className="mt-5">
+          <p className="sr-only" role="status">
+            Loading your appointments
+          </p>
+          <ul className="grid gap-4 md:grid-cols-2" aria-hidden>
+            {[0, 1].map((i) => (
+              <li key={i} className="glass h-36 animate-pulse rounded-2xl motion-reduce:animate-none" />
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {(state.status === 'error' || (state.status === 'ready' && setup.error)) && (
+        <div role="alert" className="glass mt-5 rounded-2xl border-l-4 border-l-bad p-5">
+          <p className="font-semibold text-fg">We could not load your appointments.</p>
+          <p className="mt-1 text-sm text-fg2">{state.status === 'error' ? state.message : 'Check your connection and try again.'}</p>
+          <button
+            type="button"
+            onClick={() => {
+              if (setup.error) setup.retry();
+              void load();
+            }}
+            className="btn-outline mt-4"
+          >
+            <RotateCcw className="h-4 w-4" aria-hidden />
+            Try again
+          </button>
+        </div>
+      )}
+
+      {ready && state.list.length === 0 && (
+        <div className="glass mt-5 flex flex-col items-center rounded-2xl p-8 text-center">
+          <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-accent/10 text-accent">
+            <CalendarClock className="h-5 w-5" aria-hidden />
+          </span>
+          <p className="mt-4 font-semibold text-fg">No appointments yet</p>
+          <p className="mt-1 max-w-sm text-sm text-fg2">Book a time online and it will appear here.</p>
+          <Link to={sitePath(site, 'book')} className="btn-ink mt-5">
+            <CalendarCheck className="h-4 w-4" aria-hidden />
+            Book
+          </Link>
+        </div>
+      )}
+
+      {ready && state.list.length > 0 && (
+        <div className="mt-5 space-y-6">
+          <div>
+            <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-fg3">Upcoming</h3>
+            {upcoming.length === 0 ? (
+              <p className="glass flex flex-wrap items-center justify-between gap-3 rounded-2xl p-4 text-sm text-fg2">
+                Nothing booked right now.
+                <Link to={sitePath(site, 'book')} className="btn-ink px-4 py-2">
+                  <CalendarCheck className="h-4 w-4" aria-hidden />
+                  Book
+                </Link>
+              </p>
+            ) : (
+              <ul className="grid gap-4 md:grid-cols-2">
+                {upcoming.map((a) => (
+                  <li key={a.id}>
+                    <AppointmentCard appointment={a} timeZone={tz} onCancel={(reason) => cancel(a, reason)} />
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+          {past.length > 0 && (
+            <div>
+              <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-fg3">Past</h3>
+              <ul className="grid gap-4 md:grid-cols-2">
+                {past.map((a) => (
+                  <li key={a.id}>
+                    <AppointmentCard appointment={a} timeZone={tz} />
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function AppointmentCard({
+  appointment: a,
+  timeZone,
+  onCancel,
+}: {
+  appointment: Appointment;
+  timeZone: string;
+  /** Present for upcoming requested or confirmed bookings. */
+  onCancel?: (reason: string) => Promise<string | null>;
+}) {
+  const titleId = useId();
+  const car = [a.vehicle.year, a.vehicle.make, a.vehicle.model].filter(Boolean).join(' ') || 'Vehicle not given';
+  const services = a.services.map((s) => s.name).filter(Boolean);
+  const st = STATUS[a.status] ?? STATUS.requested;
+  const cancellable = !!onCancel && (a.status === 'requested' || a.status === 'confirmed');
+  const cancelBtnRef = useRef<HTMLButtonElement>(null);
+  const [open, setOpen] = useState(false);
+
+  return (
+    <article aria-labelledby={titleId} className="glass flex h-full flex-col rounded-2xl p-5">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0">
+          <h4 id={titleId} className="break-words font-semibold text-fg">
+            {formatZonedDateTime(a.starts_at, timeZone)}
+          </h4>
+          <p className="mt-0.5 font-mono text-xs font-semibold tracking-wider text-fg2">{a.reference}</p>
+        </div>
+        <Pill tone={st.tone}>{st.label}</Pill>
+      </div>
+      <dl className="mt-4 space-y-2 text-sm">
+        <div className="flex gap-2">
+          <dt className="sr-only">Car</dt>
+          <Car className="mt-0.5 h-4 w-4 shrink-0 text-accent" aria-hidden />
+          <dd className="min-w-0 break-words text-fg">{car}</dd>
+        </div>
+        <div className="flex gap-2">
+          <dt className="sr-only">Services</dt>
+          <Wrench className="mt-0.5 h-4 w-4 shrink-0 text-accent" aria-hidden />
+          <dd className="min-w-0 break-words text-fg2">{services.length ? services.join(', ') : 'Problem described; quoted after inspection'}</dd>
+        </div>
+        {a.technician_name && (
+          <div className="flex gap-2">
+            <dt className="sr-only">Technician</dt>
+            <User className="mt-0.5 h-4 w-4 shrink-0 text-accent" aria-hidden />
+            <dd className="min-w-0 break-words text-fg2">{a.technician_name}</dd>
+          </div>
+        )}
+        {a.status === 'cancelled' && a.cancel_reason && (
+          <div className="flex gap-2">
+            <dt className="sr-only">Cancellation reason</dt>
+            <CalendarX className="mt-0.5 h-4 w-4 shrink-0 text-fg3" aria-hidden />
+            <dd className="min-w-0 break-words text-xs text-fg3">{a.cancel_reason}</dd>
+          </div>
+        )}
+      </dl>
+      {cancellable && onCancel && (
+        <div className="mt-auto pt-4">
+          <button
+            ref={cancelBtnRef}
+            type="button"
+            onClick={() => setOpen(true)}
+            className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-fg transition hover:bg-surface2"
+            aria-label={`Cancel booking ${a.reference}`}
+          >
+            <CalendarX className="h-3.5 w-3.5" aria-hidden />
+            Cancel
+          </button>
+          {open && (
+            <CancelDialog
+              appointment={a}
+              when={formatZonedDateTime(a.starts_at, timeZone)}
+              onConfirm={onCancel}
+              onClose={() => {
+                setOpen(false);
+                requestAnimationFrame(() => cancelBtnRef.current?.focus());
+              }}
+            />
+          )}
+        </div>
+      )}
+    </article>
+  );
+}
+
+/** Modal confirm (native dialog: focus is kept inside, Escape closes) with an optional reason. */
+function CancelDialog({
+  appointment: a,
+  when,
+  onConfirm,
+  onClose,
+}: {
+  appointment: Appointment;
+  when: string;
+  onConfirm: (reason: string) => Promise<string | null>;
+  onClose: () => void;
+}) {
+  const ref = useRef<HTMLDialogElement>(null);
+  const keepRef = useRef<HTMLButtonElement>(null);
+  const [reason, setReason] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const titleId = useId();
+  const reasonId = useId();
+
+  useEffect(() => {
+    const el = ref.current;
+    if (el && !el.open) el.showModal();
+    keepRef.current?.focus();
+  }, []);
+
+  async function confirm() {
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    const err = await onConfirm(reason);
+    setBusy(false);
+    if (err) setError(err);
+    else onClose();
+  }
+
+  return (
+    <dialog
+      ref={ref}
+      aria-labelledby={titleId}
+      onCancel={(e) => {
+        e.preventDefault();
+        if (!busy) onClose();
+      }}
+      className="glass-strong w-[min(28rem,calc(100vw-2rem))] rounded-3xl bg-transparent p-0 text-fg backdrop:bg-ink/50 backdrop:backdrop-blur-sm"
+    >
+      <div className="p-5 sm:p-6">
+        <h2 id={titleId} className="font-display text-lg font-semibold text-fg">
+          Cancel this booking?
+        </h2>
+        <p className="mt-1 text-sm text-fg2">
+          {a.reference}, {when}. The time is given back to the workshop.
+        </p>
+        <label htmlFor={reasonId} className="mt-4 block text-sm font-semibold text-fg">
+          Reason <span className="text-xs font-normal text-fg3">Optional</span>
+        </label>
+        <textarea
+          id={reasonId}
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          maxLength={300}
+          rows={3}
+          className="mt-1.5 w-full rounded-xl border border-line bg-surface px-3 py-2 text-sm text-fg outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
+        />
+        {error && (
+          <p role="alert" className="mt-3 text-sm font-medium text-bad">
+            {error}
+          </p>
+        )}
+        <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <button ref={keepRef} type="button" onClick={onClose} disabled={busy} className="btn-outline min-h-11 disabled:opacity-60">
+            Keep booking
+          </button>
+          <button
+            type="button"
+            onClick={() => void confirm()}
+            aria-disabled={busy || undefined}
+            className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl bg-bad px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90"
+          >
+            <CalendarX className="h-4 w-4" aria-hidden />
+            {busy ? 'Cancelling...' : 'Yes, cancel booking'}
+          </button>
+        </div>
+      </div>
+    </dialog>
   );
 }

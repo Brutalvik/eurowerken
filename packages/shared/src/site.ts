@@ -24,6 +24,8 @@ export interface WorkshopSite {
   instagram_url: string | null;
   facebook_url: string | null;
   youtube_url: string | null;
+  /** The workshop's own existing website, linked from the customer site (migration 009). */
+  own_website_url?: string | null;
   /** Customer site navigation (migration 007): the liquid-glass tab bar or the classic header menu. */
   nav_style?: NavStyle;
   published: boolean;

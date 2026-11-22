@@ -124,7 +124,7 @@ export function QuantityStepper({
 }) {
   const btn = 'flex h-9 w-9 items-center justify-center text-fg2 transition hover:text-fg disabled:opacity-40 coarse:h-11 coarse:w-11';
   return (
-    <div className="inline-flex items-center rounded-xl border border-line bg-surface" role="group" aria-label={label}>
+    <div className="inline-flex items-center rounded-xl border border-line bg-surface/80" role="group" aria-label={label}>
       <button type="button" className={btn} onClick={() => onChange(value - 1)} disabled={value <= min} aria-label="Decrease">
         <Minus className="h-3.5 w-3.5" />
       </button>

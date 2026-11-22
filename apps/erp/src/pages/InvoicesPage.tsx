@@ -50,7 +50,7 @@ export function InvoicesPage() {
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 [&>*:last-child:nth-child(odd)]:col-span-2 sm:[&>*:last-child:nth-child(odd)]:col-span-1">
         {summary.map((card) => (
-          <div key={card.label} className="rounded-xl border border-line bg-surface p-4 sm:p-5">
+          <div key={card.label} className="glass rounded-xl p-4 sm:p-5">
             <div className="text-xs text-fg2">{card.label}</div>
             <div className={`mt-2 font-display text-xl font-semibold ${card.color}`}>{formatCurrency(card.value)}</div>
           </div>

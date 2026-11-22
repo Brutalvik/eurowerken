@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { Car, LogIn, LogOut, Menu, Moon, Search, ShoppingCart, Star, Sun, UserRound, X } from 'lucide-react';
+import { Car, Globe, LogIn, LogOut, Menu, Moon, Search, ShoppingCart, Star, Sun, UserRound, X } from 'lucide-react';
 import { useCustomerAuth } from '@/auth/CustomerAuthContext';
 import { useResolvedCart } from '@/cart/CartContext';
 import { sitePath, useSite } from '@/site/SiteContext';
@@ -30,7 +30,6 @@ export function SiteHeader() {
   const { status, signOut } = useCustomerAuth();
   const navigate = useNavigate();
   const signedIn = status === 'signed-in' || status === 'recovery';
-  const nextParam = /\/(login|register|reset-password)$/.test(pathname) ? '' : `?next=${encodeURIComponent(pathname)}`;
 
   async function onSignOut() {
     setOpen(false);
@@ -132,7 +131,7 @@ export function SiteHeader() {
             <AccountMenu onSignOut={() => void onSignOut()} />
           ) : (
             <Link
-              to={`${sitePath(site, 'login')}${nextParam}`}
+              to={sitePath(site, 'login')}
               className={
                 pill
                   ? 'hidden h-10 items-center whitespace-nowrap rounded-full px-3 text-sm font-medium text-fg2 transition hover:text-fg sm:inline-flex'
@@ -178,7 +177,7 @@ export function SiteHeader() {
           className={
             pill
               ? 'dark pb-safe fixed inset-x-3 bottom-3 top-[calc(4.75rem+env(safe-area-inset-top))] overflow-y-auto rounded-3xl border border-white/10 bg-black/75 text-fg shadow-2xl backdrop-blur-2xl backdrop-saturate-150 sm:inset-x-4 xl:hidden'
-              : 'pb-safe fixed inset-x-0 top-[calc(4rem+env(safe-area-inset-top))] h-[calc(100dvh-4rem-env(safe-area-inset-top))] overflow-y-auto border-t border-line bg-surface xl:hidden'
+              : 'pb-safe fixed inset-x-0 top-[calc(4rem+env(safe-area-inset-top))] h-[calc(100dvh-4rem-env(safe-area-inset-top))] overflow-y-auto border-t border-white/30 bg-surface/90 backdrop-blur-2xl backdrop-saturate-150 dark:border-white/10 dark:bg-surface/85 xl:hidden'
           }
         >
           <nav aria-label="Mobile" className="container-site flex flex-col py-4">
@@ -202,7 +201,19 @@ export function SiteHeader() {
                 My Garage
               </Link>
             </div>
-            <MobileAccount signedIn={signedIn} loginHref={`${sitePath(site, 'login')}${nextParam}`} onSignOut={() => void onSignOut()} />
+            {site.own_website_url && (
+              <a
+                href={site.own_website_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-6 flex items-center gap-2 text-sm font-semibold text-accent coarse:min-h-11"
+              >
+                <Globe className="h-4 w-4" aria-hidden />
+                Visit our website
+                <span className="sr-only">(opens in a new tab)</span>
+              </a>
+            )}
+            <MobileAccount signedIn={signedIn} loginHref={sitePath(site, 'login')} onSignOut={() => void onSignOut()} />
             <button type="button" onClick={toggle} className="mt-6 flex items-center gap-2 text-sm font-medium text-fg2">
               {mode === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
               {mode === 'dark' ? 'Light mode' : 'Dark mode'}

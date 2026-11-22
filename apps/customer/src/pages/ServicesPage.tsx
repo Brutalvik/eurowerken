@@ -84,7 +84,7 @@ export function ServicesPage() {
           <button
             type="button"
             onClick={() => scrollToSection('services-list')}
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-accent px-5 py-3 text-sm font-semibold text-accent-fg shadow-lg shadow-accent/20 transition hover:opacity-90 coarse:min-h-12"
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-accent px-5 py-3 text-sm font-semibold text-accent-fg shadow-md shadow-accent/15 transition hover:opacity-90 coarse:min-h-12"
           >
             Explore Services
             <ArrowRight className="h-4 w-4" aria-hidden />
@@ -286,7 +286,7 @@ function ServiceList({ services: all }: { services: Service[] }) {
 function ServiceCard({ service, bookTo }: { service: Service; bookTo: string }) {
   const Icon = SERVICE_ICONS[service.icon];
   return (
-    <article className="glass flex h-full flex-col rounded-2xl p-5 transition hover:-translate-y-0.5 hover:shadow-xl">
+    <article className="glass glass-lift flex h-full flex-col rounded-2xl p-5">
       <div className="flex items-start justify-between gap-3">
         <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-accent/10 text-accent">
           <Icon className="h-5 w-5" aria-hidden />

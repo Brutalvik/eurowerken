@@ -58,7 +58,7 @@ export function RepairTimeline({ steps, progress }: { steps: RepairCase['timelin
                 s.state === 'done'
                   ? 'bg-ok/15 text-ok'
                   : s.state === 'current'
-                    ? 'bg-accent text-accent-fg shadow-lg shadow-accent/30 ring-4 ring-accent/15'
+                    ? 'bg-accent text-accent-fg shadow-md shadow-accent/20 ring-4 ring-accent/15'
                     : 'border border-line bg-surface2 text-fg3'
               }`}
             >
@@ -141,7 +141,7 @@ export function MediaGrid({ media, columns = 'sm:grid-cols-4' }: { media: Repair
           />
           {m.video && (
             <span aria-hidden className="absolute inset-0 flex items-center justify-center">
-              <span className="flex h-11 w-11 items-center justify-center rounded-full bg-accent text-accent-fg shadow-lg shadow-accent/30">
+              <span className="flex h-11 w-11 items-center justify-center rounded-full bg-accent text-accent-fg shadow-md shadow-accent/20">
                 <Play className="ml-0.5 h-5 w-5 fill-current" />
               </span>
             </span>

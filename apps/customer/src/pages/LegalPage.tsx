@@ -9,7 +9,7 @@ import type { LegalDocument } from '@eurowerken/shared';
  */
 export function LegalPage({ doc, standalone = false }: { doc: LegalDocument; standalone?: boolean }) {
   const body = (
-    <article className="mx-auto max-w-3xl rounded-2xl border border-line bg-surface p-6 sm:p-10">
+    <article className="glass-strong mx-auto max-w-3xl rounded-2xl p-6 sm:p-10">
       <h1 className="font-display text-2xl font-bold text-fg sm:text-3xl">{doc.title}</h1>
       <p className="mt-1 text-xs text-fg3">
         {MADE_BY_NOTICE} Effective {LEGAL_EFFECTIVE_DATE}.

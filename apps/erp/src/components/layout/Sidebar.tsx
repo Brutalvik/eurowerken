@@ -1,4 +1,5 @@
 import { NavLink } from 'react-router-dom';
+import { useNotifications } from '@/notifications/NotificationsContext';
 import {
   BadgeDollarSign,
   BarChart3,
@@ -17,6 +18,7 @@ import { useAuth, useCurrentUser } from '@/auth/AuthContext';
 import { LegalFooter } from '@/pages/legal/LegalPage';
 import { MODULE_LABELS, MODULE_ORDER } from '@/auth/rbac';
 import type { ModuleId } from '@/auth/rbac';
+import { EXTRA_PAGES } from '@/config/nav';
 
 const NAV_ICONS: Record<ModuleId, LucideIcon> = {
   dashboard: LayoutDashboard,
@@ -38,7 +40,18 @@ interface SidebarProps {
 export function Sidebar({ open, onNavigate }: SidebarProps) {
   const { accessFor, signOut } = useAuth();
   const user = useCurrentUser();
-  const visible = MODULE_ORDER.filter((m) => accessFor(m) !== 'none');
+  const { unopened } = useNotifications();
+  const items: { key: string; to: string; label: string; icon: LucideIcon }[] = [];
+  for (const module of MODULE_ORDER) {
+    if (accessFor(module) !== 'none') {
+      items.push({ key: module, to: `/${module}`, label: MODULE_LABELS[module], icon: NAV_ICONS[module] });
+    }
+    for (const extra of EXTRA_PAGES) {
+      if (extra.after === module && accessFor(extra.module) !== 'none') {
+        items.push({ key: extra.path, to: `/${extra.path}`, label: extra.label, icon: extra.icon });
+      }
+    }
+  }
 
   return (
     // Phone (< md): slide-out drawer. Tablet (md to lg): icon rail. Desktop (lg+): full sidebar.
@@ -72,22 +85,36 @@ export function Sidebar({ open, onNavigate }: SidebarProps) {
       )}
 
       <nav aria-label="Main" className="no-scrollbar flex-1 space-y-0.5 overflow-y-auto px-2 py-3">
-        {visible.map((module) => {
-          const Icon = NAV_ICONS[module];
+        {items.map((item) => {
+          const Icon = item.icon;
           return (
             <NavLink
-              key={module}
-              to={`/${module}`}
+              key={item.key}
+              to={item.to}
               onClick={onNavigate}
-              title={MODULE_LABELS[module]}
+              title={item.label}
               className={({ isActive }) =>
                 `flex items-center gap-2.5 rounded-lg px-3 py-2 text-xs transition coarse:py-3 md:max-lg:justify-center md:max-lg:px-0 ${
                   isActive ? 'bg-accent font-semibold text-white' : 'text-white/65 hover:bg-white/5 hover:text-white'
                 }`
               }
             >
-              <Icon className="h-4 w-4 shrink-0" aria-hidden />
-              <span className="md:max-lg:sr-only">{MODULE_LABELS[module]}</span>
+              <span className="relative">
+                <Icon className="h-4 w-4 shrink-0" aria-hidden />
+                {item.key === 'appointments' && unopened > 0 && (
+                  // Tablet rail: a small dot on the icon (the full count shows beside the label elsewhere).
+                  <span className="absolute -right-1 -top-1 hidden h-2 w-2 rounded-full bg-bad md:max-lg:block" aria-hidden />
+                )}
+              </span>
+              <span className="md:max-lg:sr-only">{item.label}</span>
+              {item.key === 'appointments' && unopened > 0 && (
+                <span
+                  className="ml-auto flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-bad px-1.5 text-[10px] font-bold leading-none text-white md:max-lg:hidden"
+                  aria-label={`${unopened} new`}
+                >
+                  {unopened > 99 ? '99+' : unopened}
+                </span>
+              )}
             </NavLink>
           );
         })}

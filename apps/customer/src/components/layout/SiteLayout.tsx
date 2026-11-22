@@ -1,9 +1,10 @@
-import { Outlet, useParams } from 'react-router-dom';
+import { Outlet, useLocation, useParams } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { CustomerAuthProvider } from '@/auth/CustomerAuthContext';
 import { CartProvider } from '@/cart/CartContext';
 import { SiteProvider, useSiteLoader } from '@/site/SiteContext';
 import { SiteNotFound } from '@/pages/SiteNotFound';
+import { PageBoundary } from './PageBoundary';
 import { SiteFooter } from './SiteFooter';
 import { SiteHeader } from './SiteHeader';
 import { SiteTabBar } from './SiteTabBar';
@@ -12,6 +13,7 @@ import { SiteTabBar } from './SiteTabBar';
 export function SiteLayout() {
   const { slug } = useParams();
   const state = useSiteLoader(slug);
+  const { pathname } = useLocation();
 
   if (state.status === 'loading') {
     return (
@@ -46,13 +48,15 @@ export function SiteLayout() {
               : 'flex-1'
           }
         >
-          <Outlet />
+          <PageBoundary resetKey={pathname}>
+            <Outlet />
+          </PageBoundary>
         </main>
         <SiteFooter />
         {state.site.nav_style !== 'classic' && (
           <>
             {/* Room under the footer so the docked tab bar never covers it. */}
-            <div aria-hidden className="h-[calc(112px+env(safe-area-inset-bottom))] bg-sidebar sm:h-[150px]" />
+            <div aria-hidden className="h-[calc(96px+env(safe-area-inset-bottom))] bg-sidebar sm:h-[124px]" />
             <SiteTabBar />
           </>
         )}

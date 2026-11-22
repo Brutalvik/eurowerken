@@ -1,49 +1,33 @@
 /** Small pieces shared by the booking steps. */
-import type { FormEvent, ReactNode, RefObject } from 'react';
-import { ArrowLeft, ArrowRight } from 'lucide-react';
-import { STEPS } from './model';
-import type { Errors, Field, StepInfo } from './model';
+import type { ReactNode } from 'react';
+import { AlertCircle, ArrowLeft, ArrowRight, CalendarCheck, Check, Loader2 } from 'lucide-react';
+import type { Errors, Field } from './model';
 
-/** Classes for a selectable glass tile: lifts, glows and tints when chosen. */
-export function tileClass(on: boolean, invalid = false): string {
-  return `group relative rounded-2xl border text-left outline-none backdrop-blur-md transition duration-200 ease-out focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg active:scale-[0.98] motion-reduce:transform-none coarse:min-h-11 ${
+/**
+ * A selectable glass card wrapping a real checkbox or radio (visually hidden
+ * inside it). Calm: a tinted fill, an accent border and a check mark when
+ * chosen; a focus ring when the input has keyboard focus.
+ */
+export function choiceClass(on: boolean, invalid = false): string {
+  return `relative flex cursor-pointer rounded-2xl border backdrop-blur-md transition-colors duration-150 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-accent has-[:focus-visible]:ring-offset-2 has-[:focus-visible]:ring-offset-bg ${
     on
-      ? 'scale-[1.015] border-accent/70 bg-accent/10 shadow-[0_0_0_4px_rgb(var(--accent)/0.12),0_16px_36px_-14px_rgb(var(--accent)/0.55)]'
+      ? 'border-accent bg-accent/10 shadow-[0_0_0_1px_rgb(var(--accent))]'
       : invalid
-        ? 'border-bad/50 bg-surface/60 hover:bg-surface/80'
-        : 'border-white/70 bg-surface/55 shadow-[0_4px_18px_rgb(var(--ink)/0.05)] hover:-translate-y-0.5 hover:border-accent/40 hover:bg-surface/80 dark:border-white/10'
+        ? 'border-bad/60 bg-surface/60 hover:bg-surface/80'
+        : 'border-white/70 bg-surface/60 hover:border-accent/50 hover:bg-surface/85 dark:border-white/10'
   }`;
 }
 
-/** Classes for a selectable chip (model, year, urgency, time). */
-export function chipClass(on: boolean, invalid = false): string {
-  return `rounded-full border px-4 py-2 text-sm font-medium tabular-nums outline-none backdrop-blur-md transition duration-200 ease-out focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg active:scale-95 motion-reduce:transform-none coarse:min-h-11 ${
-    on
-      ? 'border-accent bg-accent text-accent-fg shadow-[0_8px_22px_-8px_rgb(var(--accent)/0.7)]'
-      : invalid
-        ? 'border-bad/50 bg-surface/60 text-fg'
-        : 'border-white/70 bg-surface/60 text-fg2 hover:border-accent/40 hover:text-fg dark:border-white/10'
-  }`;
-}
-
-/** A round badge whose check draws in when the tile is chosen. */
-export function CheckBadge({ on, className = '' }: { on: boolean; className?: string }) {
+/** The round mark in the corner of a choice card: empty, or filled with a check. */
+export function CheckMark({ on, radio = false, className = '' }: { on: boolean; radio?: boolean; className?: string }) {
   return (
     <span
       aria-hidden
-      className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border transition duration-300 ${
-        on ? 'scale-100 border-accent bg-accent text-accent-fg' : 'scale-90 border-line bg-surface/70 text-transparent'
+      className={`flex h-6 w-6 shrink-0 items-center justify-center border transition-colors duration-150 ${radio ? 'rounded-full' : 'rounded-lg'} ${
+        on ? 'border-accent bg-accent text-accent-fg' : 'border-line bg-surface/80 text-transparent'
       } ${className}`}
     >
-      <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round">
-        <path
-          d="M5 12.5l4.5 4.5L19 7.5"
-          pathLength={1}
-          strokeDasharray={1}
-          strokeDashoffset={on ? 0 : 1}
-          className="transition-[stroke-dashoffset] delay-75 duration-300 ease-out"
-        />
-      </svg>
+      <Check className="h-3.5 w-3.5" strokeWidth={3} />
     </span>
   );
 }
@@ -51,7 +35,8 @@ export function CheckBadge({ on, className = '' }: { on: boolean; className?: st
 export function ErrorText({ field, error }: { field: Field; error?: string }) {
   if (!error) return null;
   return (
-    <p id={`${field}-error`} className="mt-2 text-xs font-medium text-bad">
+    <p id={`${field}-error`} className="mt-2 flex items-start gap-1.5 text-xs font-medium text-bad">
+      <AlertCircle className="mt-px h-3.5 w-3.5 shrink-0" aria-hidden />
       {error}
     </p>
   );
@@ -59,112 +44,130 @@ export function ErrorText({ field, error }: { field: Field; error?: string }) {
 
 /** aria-invalid and aria-describedby for a control whose field has an error. */
 export function errorProps(errors: Errors, field: Field, hintId?: string) {
-  if (errors[field]) return { 'aria-invalid': true as const, 'aria-describedby': `${field}-error` };
+  if (errors[field]) return { 'aria-invalid': true as const, 'aria-describedby': hintId ? `${field}-error ${hintId}` : `${field}-error` };
   return hintId ? { 'aria-describedby': hintId } : {};
 }
 
-export function GroupLabel({ id, children, optional }: { id: string; children: ReactNode; optional?: boolean }) {
+export function GroupLabel({ id, children, optional, as: Tag = 'p' }: { id?: string; children: ReactNode; optional?: boolean; as?: 'p' | 'legend' | 'h3' }) {
   return (
-    <p id={id} className="mb-3 flex items-baseline gap-2 text-sm font-semibold text-fg">
+    <Tag id={id} className="mb-3 flex items-baseline gap-2 p-0 text-sm font-semibold text-fg">
       {children}
       {optional && <span className="text-xs font-normal text-fg3">Optional</span>}
-    </p>
+    </Tag>
   );
 }
 
 /**
- * One step: a frosted card with its heading (focused on each change), the
- * content, and Back and Continue at the end of the card (not docked, because
- * the site has a tab bar at the bottom of phones).
+ * The one action bar at the bottom of the step card: Back on the left, a
+ * status in the middle (the last change, then what is left or where things
+ * stand) and the primary button that says where it goes. The button is never
+ * disabled: when the step is not complete it looks quieter, the bar says what
+ * is left, and pressing it points at what is missing.
  */
-export function StepFrame({
-  step,
-  index,
-  headingRef,
-  errors,
-  showErrors,
+export function ActionBar({
   onBack,
-  onContinue,
-  continueLabel = 'Continue',
-  continueIcon,
-  children,
-  footer,
+  primaryLabel,
+  isConfirm,
+  complete,
+  hint,
+  showAlert,
+  attempt,
+  status,
+  feedback,
+  docked,
+  busy = false,
+  error = null,
 }: {
-  step: StepInfo;
-  index: number;
-  headingRef: RefObject<HTMLHeadingElement>;
-  /** This step's current errors (shown inline once showErrors is set). */
-  errors: Errors;
-  showErrors: boolean;
+  /** The booking request is on its way: the button says so and further presses are ignored. */
+  busy?: boolean;
+  /** A problem from the server, in plain words, shown as an alert in the bar. */
+  error?: string | null;
+  /** The site has the docked tab bar at the bottom: the sticky bar stops above it. */
+  docked: boolean;
   onBack?: () => void;
-  onContinue: () => void;
-  continueLabel?: string;
-  continueIcon?: ReactNode;
-  children: ReactNode;
-  /** Shown above the buttons (deposit, terms on the review step). */
-  footer?: ReactNode;
+  primaryLabel: string;
+  isConfirm: boolean;
+  complete: boolean;
+  /** What is left on this step (null when complete). */
+  hint: string | null;
+  /** The visitor pressed the button with something missing: the hint becomes an alert. */
+  showAlert: boolean;
+  /** Changes on each press with something missing, so the alert is announced again. */
+  attempt: number;
+  /** Where the step stands, shown when it is complete (for example the running total). */
+  status?: ReactNode;
+  /** The last change (for example "Oil Service added"); this element is the page's live region. */
+  feedback: string;
 }) {
-  const missing = step.fields.map((f) => errors[f]).filter((m): m is string => !!m);
-  const valid = missing.length === 0;
-  const hintId = `step-${step.id}-hint`;
-
-  function onSubmit(e: FormEvent) {
-    e.preventDefault();
-    onContinue();
-  }
-
+  const hintId = 'book-action-hint';
   return (
-    <form noValidate onSubmit={onSubmit} aria-labelledby={`step-${step.id}-title`} className="glass-strong book-sheen rounded-3xl p-5 sm:p-8">
-      <p className="eyebrow">
-        Step {index + 1} of {STEPS.length}
-      </p>
-      <h2
-        id={`step-${step.id}-title`}
-        ref={headingRef}
-        tabIndex={-1}
-        className="mt-2 font-display text-xl font-bold leading-tight text-fg outline-none sm:text-2xl"
-      >
-        {step.question}
-      </h2>
-      <p className="mt-1.5 text-sm text-fg2">{step.blurb}</p>
-
-      {showErrors && !valid && (
-        <p role="alert" className="mt-4 rounded-2xl border border-bad/30 bg-bad/10 px-4 py-3 text-sm text-bad">
-          {missing.length === 1 ? missing[0] : `Please fix the ${missing.length} highlighted items below.`}
-        </p>
-      )}
-
-      <div className="mt-6">{children}</div>
-
-      {footer && <div className="mt-6">{footer}</div>}
-
-      <div className="mt-8 flex flex-col-reverse gap-3 border-t border-line/70 pt-5 sm:flex-row sm:items-start sm:justify-between">
-        {onBack ? (
-          <button type="button" onClick={onBack} className="btn-outline bg-surface/60 backdrop-blur-md">
+    <div
+      className={`glass-strong z-10 mt-8 rounded-2xl p-3 sm:p-4 lg:sticky ${docked ? 'lg:bottom-[calc(9rem+env(safe-area-inset-bottom))]' : 'lg:bottom-4'}`}
+    >
+      <div className="flex flex-wrap items-center gap-3">
+        {onBack && (
+          <button type="button" onClick={onBack} disabled={busy} className="btn-outline min-h-11 disabled:opacity-60 whitespace-nowrap bg-surface/60 px-3.5 backdrop-blur-md sm:px-4">
             <ArrowLeft className="h-4 w-4" aria-hidden />
             Back
           </button>
-        ) : (
-          <span className="hidden sm:block" />
         )}
-        <div className="flex flex-col gap-2 sm:items-end">
-          <button
-            type="submit"
-            aria-disabled={!valid || undefined}
-            aria-describedby={!valid ? hintId : undefined}
-            className={`btn-ink w-full transition sm:w-auto sm:min-w-44 ${valid ? '' : 'opacity-45 shadow-none hover:opacity-55'}`}
-          >
-            {continueIcon}
-            {continueLabel}
-            {!continueIcon && <ArrowRight className="h-4 w-4" aria-hidden />}
-          </button>
-          {!valid && (
-            <p id={hintId} className="text-center text-xs text-fg3 sm:text-right">
-              {missing[0]}
+
+        <div className="order-first min-w-0 basis-full sm:order-none sm:basis-0 sm:flex-1">
+          <p role="status" aria-live="polite" className="text-xs font-medium text-ok">
+            {feedback && (
+              <span key={feedback} className="book-reveal inline-flex items-start gap-1.5">
+                <Check className="mt-px h-3.5 w-3.5 shrink-0" strokeWidth={3} aria-hidden />
+                {feedback}
+              </span>
+            )}
+          </p>
+          {error ? (
+            <p id={hintId} role="alert" className="mt-0.5 flex items-start gap-1.5 text-sm font-medium text-bad">
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+              {error}
             </p>
+          ) : !complete && hint ? (
+            showAlert ? (
+              <p key={attempt} id={hintId} role="alert" className="mt-0.5 flex items-start gap-1.5 text-sm font-medium text-bad">
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+                {hint}
+              </p>
+            ) : (
+              <p id={hintId} className="mt-0.5 text-sm text-fg2">
+                {hint}
+              </p>
+            )
+          ) : (
+            status && <div className="mt-0.5 truncate text-sm font-semibold tabular-nums text-fg">{status}</div>
           )}
         </div>
+
+        <button
+          type="submit"
+          aria-disabled={busy || undefined}
+          aria-describedby={error || (!complete && hint) ? hintId : undefined}
+          className={`inline-flex min-h-11 flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-xl px-4 py-3 text-sm font-semibold transition-opacity sm:flex-none sm:px-5 coarse:min-h-12 ${
+            busy
+              ? 'cursor-wait bg-accent/80 text-accent-fg'
+              : complete
+              ? 'bg-accent text-accent-fg shadow-[0_10px_24px_-12px_rgb(var(--accent)/0.9)] hover:opacity-90'
+              : 'border border-line bg-surface/80 text-fg hover:border-accent/50'
+          }`}
+        >
+          {busy ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden />
+              Booking your time...
+            </>
+          ) : (
+            <>
+              {isConfirm && <CalendarCheck className="h-4 w-4" aria-hidden />}
+              {primaryLabel}
+              {!isConfirm && <ArrowRight className="h-4 w-4" aria-hidden />}
+            </>
+          )}
+        </button>
       </div>
-    </form>
+    </div>
   );
 }

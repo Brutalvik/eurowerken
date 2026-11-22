@@ -289,8 +289,13 @@ function errorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
 }
 
+/** Drops every cached entry whose key starts with `prefix`, so the next use loads it again. */
+export function forgetCached(prefix: string): void {
+  for (const key of [...cache.keys()]) if (key.startsWith(prefix)) cache.delete(key);
+}
+
 /** Loads `key` once per session (shared across components); key null means nothing to load. */
-function useLoadable<T>(key: string | null, fetcher: () => Promise<T>): Loadable<T> {
+export function useLoadable<T>(key: string | null, fetcher: () => Promise<T>): Loadable<T> {
   const [nonce, setNonce] = useState(0);
   const [failed, setFailed] = useState<{ key: string; message: string } | null>(null);
   const [, setLoadedKey] = useState<string | null>(null);

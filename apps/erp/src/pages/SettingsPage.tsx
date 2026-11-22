@@ -4,11 +4,12 @@ import { useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/Button';
 import { Card, CardHeader } from '@/components/ui/Card';
 import { PillTabs } from '@/components/ui/PillTabs';
+import { BookingCard } from './settings/BookingCard';
 import { ServicesCard } from './settings/ServicesCard';
 import { TeamCard } from './settings/TeamCard';
 import { WebsiteCard } from './settings/WebsiteCard';
 
-const TABS = ['Website', 'Services', 'Team', 'Workshop'] as const;
+const TABS = ['Website', 'Services', 'Team', 'Booking', 'Workshop'] as const;
 type Tab = (typeof TABS)[number];
 
 interface FieldProps {
@@ -53,6 +54,7 @@ export function SettingsPage() {
         )}
         {tab === 'Services' && <ServicesCard />}
         {tab === 'Team' && <TeamCard />}
+        {tab === 'Booking' && <BookingCard />}
         {tab === 'Workshop' && <WorkshopSettings />}
       </div>
     </div>

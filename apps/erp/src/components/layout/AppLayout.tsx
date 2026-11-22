@@ -4,7 +4,9 @@ import { Button } from '@/components/ui/Button';
 import { UserX } from 'lucide-react';
 import { useAuth, useCurrentUser } from '@/auth/AuthContext';
 import { Header } from './Header';
+import { PageBoundary } from './PageBoundary';
 import { Sidebar } from './Sidebar';
+import { NotificationsProvider } from '@/notifications/NotificationsContext';
 
 export function AppLayout() {
   const [navOpen, setNavOpen] = useState(false);
@@ -26,27 +28,31 @@ export function AppLayout() {
 
   return (
     // 100dvh follows mobile browser toolbars; h-screen would hide the bottom under them.
-    <div className="flex h-[100dvh] overflow-hidden bg-bg">
-      <Sidebar open={navOpen} onNavigate={() => setNavOpen(false)} />
-      {navOpen && (
-        <button
-          type="button"
-          aria-label="Close navigation"
-          onClick={() => setNavOpen(false)}
-          className="fixed inset-0 z-30 bg-black/50 md:hidden"
-        />
-      )}
-      <div className="flex min-w-0 flex-1 flex-col">
-        <Header onMenuClick={() => setNavOpen(true)} />
-        <main className="pb-safe flex-1 overflow-y-auto overscroll-contain p-4 sm:p-5 lg:p-6">
-          {user.role ? (
-            <Outlet />
-          ) : (
-            <NoRoleNotice active={user.active} error={profileError} workshopName={user.workshop?.name ?? null} />
-          )}
-        </main>
+    <NotificationsProvider>
+      <div className="flex h-[100dvh] overflow-hidden">
+        <Sidebar open={navOpen} onNavigate={() => setNavOpen(false)} />
+        {navOpen && (
+          <button
+            type="button"
+            aria-label="Close navigation"
+            onClick={() => setNavOpen(false)}
+            className="fixed inset-0 z-30 bg-black/50 md:hidden"
+          />
+        )}
+        <div className="flex min-w-0 flex-1 flex-col">
+          <Header onMenuClick={() => setNavOpen(true)} />
+          <main className="pb-safe flex-1 overflow-y-auto overscroll-contain p-4 sm:p-5 lg:p-6">
+            {user.role ? (
+              <PageBoundary resetKey={pathname}>
+                <Outlet />
+              </PageBoundary>
+            ) : (
+              <NoRoleNotice active={user.active} error={profileError} workshopName={user.workshop?.name ?? null} />
+            )}
+          </main>
+        </div>
       </div>
-    </div>
+    </NotificationsProvider>
   );
 }
 

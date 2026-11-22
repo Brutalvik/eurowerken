@@ -4,14 +4,18 @@
 
 :root {
   color-scheme: light;
-  /* Soft light: grey page, off-white cards, slightly softened text (easier on the eyes than pure white). */
-  --bg: 230 234 240;
-  --surface: 245 247 250;
-  --surface2: 236 240 245;
-  --line: 210 217 228;
-  --fg: 20 31 49;
-  --fg2: 79 97 122;
-  --fg3: 114 131 155;
+  /*
+   * Calm light: a muted grey-blue page, cards only a step lighter, softened
+   * text. Nothing near pure white, so nothing glares. Contrast on --surface:
+   * fg 12.7:1, fg2 5.4:1, fg3 3.6:1 (captions only).
+   */
+  --bg: 222 226 233;
+  --surface: 235 238 242;
+  --surface2: 228 232 238;
+  --line: 204 211 222;
+  --fg: 30 40 58;
+  --fg2: 80 97 120;
+  --fg3: 110 126 148;
   --accent: 29 111 240;
   --accent-fg: 255 255 255;
   --ok: 5 150 105;
@@ -41,6 +45,17 @@
 body {
   @apply bg-bg font-sans text-fg antialiased;
   -webkit-tap-highlight-color: transparent;
+  /* A very soft accent wash behind everything, so the glass cards have something to blur. */
+  background-image:
+    radial-gradient(60rem 40rem at 100% -10%, rgb(var(--accent) / 0.05), transparent 60%),
+    radial-gradient(50rem 32rem at 10% 110%, rgb(var(--accent) / 0.03), transparent 60%);
+  background-attachment: fixed;
+}
+
+.dark body {
+  background-image:
+    radial-gradient(60rem 40rem at 100% -10%, rgb(var(--accent) / 0.07), transparent 60%),
+    radial-gradient(50rem 32rem at 10% 110%, rgb(var(--violet) / 0.04), transparent 60%);
 }
 
 /* iOS zooms into any field under 16px when it gets focus; touch screens get 16px fields. */
@@ -49,6 +64,23 @@ body {
   select,
   textarea {
     font-size: 16px !important;
+  }
+}
+
+@layer components {
+  /*
+   * Glass cards: frosted, translucent, a thin rim lighter at the top, a soft
+   * wide shadow. .glass for cards; .glass-strong for floating or prominent
+   * cards and the header (more opaque, so text stays readable).
+   * Table rows and list items inside a glass card get no blur of their own.
+   */
+  .glass {
+    @apply border border-white/30 border-t-white/40 bg-surface/55 shadow-[inset_0_1px_0_rgb(255_255_255/0.18),0_10px_36px_-18px_rgb(var(--sidebar)/0.18)] backdrop-blur-xl backdrop-saturate-150;
+    @apply dark:border-white/[0.07] dark:border-t-white/[0.13] dark:bg-surface/45 dark:shadow-[inset_0_1px_0_rgb(255_255_255/0.05),0_14px_44px_-18px_rgb(0_0_0/0.6)];
+  }
+  .glass-strong {
+    @apply border border-white/35 border-t-white/40 bg-surface/75 shadow-[inset_0_1px_0_rgb(255_255_255/0.22),0_16px_48px_-20px_rgb(var(--sidebar)/0.22)] backdrop-blur-2xl backdrop-saturate-150;
+    @apply dark:border-white/[0.09] dark:border-t-white/[0.16] dark:bg-surface/70 dark:shadow-[inset_0_1px_0_rgb(255_255_255/0.06),0_18px_52px_-18px_rgb(0_0_0/0.7)];
   }
 }
 

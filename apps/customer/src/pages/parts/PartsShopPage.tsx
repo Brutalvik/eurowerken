@@ -341,7 +341,7 @@ function VehicleSelector({ initial, onSubmit }: { initial: Vehicle | null; onSub
             ))}
           </select>
         </div>
-        <button type="submit" className="inline-flex items-center justify-center gap-2 rounded-xl bg-accent px-5 py-2.5 text-sm font-semibold text-accent-fg shadow-lg shadow-accent/20 transition hover:opacity-90 coarse:min-h-12">
+        <button type="submit" className="inline-flex items-center justify-center gap-2 rounded-xl bg-accent px-5 py-2.5 text-sm font-semibold text-accent-fg shadow-md shadow-accent/15 transition hover:opacity-90 coarse:min-h-12">
           <Search className="h-4 w-4" aria-hidden />
           Find Parts
         </button>
@@ -544,8 +544,8 @@ function PartCard({ part, vehicle }: { part: Part; vehicle: Vehicle | null }) {
   }, [added]);
 
   return (
-    <article className="group relative flex h-full flex-col overflow-hidden rounded-2xl border border-line bg-surface p-3 shadow-sm transition hover:-translate-y-0.5 hover:shadow-xl">
-      <div className="relative overflow-hidden rounded-xl bg-surface2">
+    <article className="glass glass-lift group relative flex h-full flex-col overflow-hidden rounded-2xl p-3">
+      <div className="relative overflow-hidden rounded-xl bg-surface2/70">
         <Link to={href} tabIndex={-1} aria-hidden>
           <Photo
             src={part.image}

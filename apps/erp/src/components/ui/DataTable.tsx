@@ -43,7 +43,7 @@ export function DataTable<T>({
   cardsBelow = columns.length >= 7 ? 'lg' : 'md',
   onRowClick,
 }: DataTableProps<T>) {
-  const clickable = onRowClick ? 'cursor-pointer hover:bg-surface2' : '';
+  const clickable = onRowClick ? 'cursor-pointer hover:bg-surface2/60' : '';
   // Written out in full so Tailwind finds the class names.
   const cardsClass = cardsBelow === 'lg' ? 'lg:hidden' : 'md:hidden';
   const tableClass = cardsBelow === 'lg' ? 'hidden overflow-x-auto lg:block' : 'hidden overflow-x-auto md:block';
@@ -105,7 +105,7 @@ export function DataTable<T>({
       <div className={tableClass}>
         <table className="w-full min-w-[640px] border-collapse text-xs">
           <thead>
-            <tr className="border-b border-line bg-surface2">
+            <tr className="border-b border-line bg-surface2/50">
               {columns.map((col) => (
                 <th
                   key={col.header}

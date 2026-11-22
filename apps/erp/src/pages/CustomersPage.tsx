@@ -277,7 +277,7 @@ function CustomerDialog({ customer, onClose }: { customer: Customer | null; onCl
             ) : (
               <ul className="space-y-2">
                 {customer.vehicles.map((v) => (
-                  <li key={v.id} className="flex gap-3 rounded-lg border border-line bg-surface2 p-3">
+                  <li key={v.id} className="flex gap-3 rounded-lg border border-line/70 bg-surface2/50 p-3">
                     <Car className="mt-0.5 h-4 w-4 shrink-0 text-fg3" aria-hidden />
                     <div className="min-w-0 flex-1">
                       <div className="break-words font-semibold text-fg">

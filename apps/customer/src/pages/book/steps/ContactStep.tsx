@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { BellRing, Mail, MessageSquareText, UserCheck } from 'lucide-react';
+import { BellRing, Mail, MessageSquareText } from 'lucide-react';
 import type { Errors, Field, FormState } from '../model';
 import { ErrorText, errorProps } from '../ui';
 
@@ -42,13 +42,13 @@ function ToggleRow({
   return (
     <label
       htmlFor={id}
-      className={`flex cursor-pointer items-center gap-3 rounded-2xl border p-3.5 backdrop-blur-md transition focus-within:ring-2 focus-within:ring-accent/40 coarse:min-h-12 ${
-        checked ? 'border-accent/50 bg-accent/10' : 'border-white/70 bg-surface/55 dark:border-white/10'
+      className={`flex cursor-pointer items-center gap-3 rounded-2xl border p-3.5 backdrop-blur-md transition has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-accent min-h-12 ${
+        checked ? 'border-accent bg-accent/10' : 'border-white/70 bg-surface/55 dark:border-white/10'
       }`}
     >
       <Icon className={`h-4 w-4 shrink-0 ${checked ? 'text-accent' : 'text-fg3'}`} aria-hidden />
       <span className="min-w-0 flex-1 text-sm text-fg2">{children}</span>
-      <input id={id} type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="h-4 w-4 shrink-0 accent-accent coarse:h-5 coarse:w-5" />
+      <input id={id} type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="h-5 w-5 shrink-0 accent-accent" />
     </label>
   );
 }
@@ -57,23 +57,14 @@ export function ContactStep({
   form,
   set,
   shown,
-  prefilled,
 }: {
   form: FormState;
   set: <K extends keyof FormState>(key: K, value: FormState[K]) => void;
   shown: Errors;
-  /** Signed in: the details came from the account. */
-  prefilled: boolean;
 }) {
   const input = 'input bg-surface/60 backdrop-blur-md';
   return (
     <div className="space-y-8">
-      {prefilled && (
-        <p className="book-reveal flex items-start gap-2 rounded-2xl border border-ok/25 bg-ok/10 px-3.5 py-3 text-xs leading-relaxed text-ok">
-          <UserCheck className="mt-px h-4 w-4 shrink-0" aria-hidden />
-          Filled in from your account. Changes here apply to this booking only.
-        </p>
-      )}
       <div className="grid gap-4 sm:grid-cols-2">
         <TextField field="firstName" label="First name" shown={shown}>
           <input
@@ -129,7 +120,7 @@ export function ContactStep({
       <fieldset>
         <legend className="mb-3 flex items-center gap-2 p-0 text-sm font-semibold text-fg">
           <BellRing className="h-4 w-4 text-accent" aria-hidden />
-          Reminder preferences
+          Reminders
         </legend>
         <div className="grid gap-3 sm:grid-cols-2">
           <ToggleRow id="remind-email" checked={form.remindEmail} onChange={(v) => set('remindEmail', v)} Icon={Mail}>

@@ -25,7 +25,7 @@ export function PillTabs<T extends string>({ options, value, onChange, label }: 
             className={`shrink-0 whitespace-nowrap rounded-lg px-3 py-1.5 text-xs transition coarse:min-h-10 coarse:px-3.5 ${
               active
                 ? 'bg-accent font-semibold text-white'
-                : 'border border-line bg-surface text-fg2 hover:text-fg'
+                : 'border border-line bg-surface/70 text-fg2 hover:text-fg'
             }`}
           >
             {option}

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
-import { EMPTY_FORM, URGENCY } from './model';
+import { toIsoDate } from './Calendar';
+import { EMPTY_FORM, URGENCY, isSlotValue } from './model';
 import type { FormState } from './model';
 
 const KEY_PREFIX = 'ew-book-draft';
@@ -33,6 +34,10 @@ function sanitize(raw: unknown): FormState {
     }
   }
   if (!URGENCY.some((u) => u.id === out.urgency)) out.urgency = 'routine';
+  // Older drafts kept the time as "09:00", and a saved time may have passed: drop those, keep the rest.
+  const yesterday = toIsoDate(new Date(Date.now() - 86_400_000));
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(out.date) || out.date < yesterday) out.date = '';
+  if (!out.date || !isSlotValue(out.time) || Date.parse(out.time) <= Date.now()) out.time = '';
   return out;
 }
 

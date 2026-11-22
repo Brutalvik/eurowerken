@@ -1,3 +1,4 @@
+import { lazy } from 'react';
 import { Route, Routes } from 'react-router-dom';
 import { PRIVACY, TERMS } from '@eurowerken/shared';
 import { RequireCustomer } from '@/auth/RequireCustomer';
@@ -6,21 +7,21 @@ import { AccountPage } from '@/pages/account/AccountPage';
 import { LoginPage } from '@/pages/account/LoginPage';
 import { RegisterPage } from '@/pages/account/RegisterPage';
 import { ResetPasswordPage } from '@/pages/account/ResetPasswordPage';
-import { BookPage } from '@/pages/BookPage';
-import { CartPage } from '@/pages/CartPage';
+const BookPage = lazy(() => import('@/pages/BookPage').then((m) => ({ default: m.BookPage })));
+const CartPage = lazy(() => import('@/pages/CartPage').then((m) => ({ default: m.CartPage })));
 import { ComingSoonPage } from '@/pages/ComingSoonPage';
-import { ExpertsPage } from '@/pages/ExpertsPage';
-import { GaragePage } from '@/pages/GaragePage';
+const ExpertsPage = lazy(() => import('@/pages/ExpertsPage').then((m) => ({ default: m.ExpertsPage })));
+const GaragePage = lazy(() => import('@/pages/GaragePage').then((m) => ({ default: m.GaragePage })));
 import { HomePage } from '@/pages/HomePage';
 import { LegalPage } from '@/pages/LegalPage';
-import { PartDetailsPage } from '@/pages/parts/PartDetailsPage';
-import { PartsShopPage } from '@/pages/parts/PartsShopPage';
-import { ReviewsPage } from '@/pages/ReviewsPage';
+const PartDetailsPage = lazy(() => import('@/pages/parts/PartDetailsPage').then((m) => ({ default: m.PartDetailsPage })));
+const PartsShopPage = lazy(() => import('@/pages/parts/PartsShopPage').then((m) => ({ default: m.PartsShopPage })));
+const ReviewsPage = lazy(() => import('@/pages/ReviewsPage').then((m) => ({ default: m.ReviewsPage })));
 import { RootPage } from '@/pages/RootPage';
-import { ServicesPage } from '@/pages/ServicesPage';
+const ServicesPage = lazy(() => import('@/pages/ServicesPage').then((m) => ({ default: m.ServicesPage })));
 import { SiteNotFound } from '@/pages/SiteNotFound';
-import { CaseDetailsPage } from '@/pages/track/CaseDetailsPage';
-import { TrackPage } from '@/pages/track/TrackPage';
+const CaseDetailsPage = lazy(() => import('@/pages/track/CaseDetailsPage').then((m) => ({ default: m.CaseDetailsPage })));
+const TrackPage = lazy(() => import('@/pages/track/TrackPage').then((m) => ({ default: m.TrackPage })));
 
 export default function App() {
   return (

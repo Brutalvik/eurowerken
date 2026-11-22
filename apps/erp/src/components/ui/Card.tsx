@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 
 export function Card({ children, className = '' }: { children: ReactNode; className?: string }) {
-  return <section className={`rounded-xl border border-line bg-surface ${className}`}>{children}</section>;
+  return <section className={`glass rounded-xl ${className}`}>{children}</section>;
 }
 
 interface CardHeaderProps {

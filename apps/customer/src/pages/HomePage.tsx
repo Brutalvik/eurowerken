@@ -237,7 +237,7 @@ function Services() {
             const Icon = SERVICE_ICON_COMPONENTS[s.icon];
             return (
               <li key={s.id}>
-                <article className="group flex h-full flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-sm transition hover:-translate-y-1 hover:shadow-xl">
+                <article className="glass glass-lift group flex h-full flex-col overflow-hidden rounded-2xl hover:-translate-y-1">
                   <div className="aspect-[4/3] overflow-hidden">
                     <Photo src={s.image} alt={s.name} icon={Icon} className="h-full w-full transition duration-500 group-hover:scale-105" />
                   </div>
@@ -282,7 +282,7 @@ function GaragePreview() {
               <User className="h-4 w-4" aria-hidden />
             </span>
           </div>
-          <div className="mt-5 flex items-center gap-4 rounded-2xl border border-line bg-surface2 p-3">
+          <div className="mt-5 flex items-center gap-4 rounded-2xl border border-line/70 bg-surface2/60 p-3">
             <Photo name="garage-car" alt="Customer's BMW M3" icon={Car} className="h-16 w-24 shrink-0 rounded-xl" />
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold text-fg">2022 BMW M3 Competition</p>
@@ -365,7 +365,7 @@ function Technicians() {
           {shown.map((t) => {
             const tags = (t.makes.length > 0 ? t.makes : t.specialties).slice(0, 3);
             return (
-              <li key={t.id} className="w-[75%] shrink-0 snap-start overflow-hidden rounded-2xl border border-line bg-surface shadow-sm sm:w-auto">
+              <li key={t.id} className="glass w-[75%] shrink-0 snap-start overflow-hidden rounded-2xl sm:w-auto">
                 <Photo src={t.image} alt={`${t.name}, ${t.role}`} icon={User} className="aspect-square w-full" />
                 <div className="p-4">
                   <h3 className="font-display font-semibold text-fg">{t.name}</h3>

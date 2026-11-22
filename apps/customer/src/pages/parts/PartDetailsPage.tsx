@@ -152,7 +152,7 @@ function Gallery({ part }: { part: Part }) {
   const count = Math.max(1, images.length);
   return (
     <div className="min-w-0">
-      <div className="relative overflow-hidden rounded-2xl border border-line bg-surface">
+      <div className="glass relative overflow-hidden rounded-2xl">
         <Photo
           src={current}
           alt={`${part.name}, photo ${Math.min(index + 1, count)} of ${count}`}

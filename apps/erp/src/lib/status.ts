@@ -39,3 +39,35 @@ export const ROLE_TONE: Record<Role, Tone> = {
   'Parts Staff': 'warn',
   Accountant: 'bad',
 };
+
+// Appointments (src/api/appointments.ts) -----------------------------------------
+
+type AppointmentStatus = 'requested' | 'confirmed' | 'checked_in' | 'completed' | 'cancelled' | 'no_show';
+
+export const APPOINTMENT_STATUS_LABEL: Record<AppointmentStatus, string> = {
+  requested: 'Requested',
+  confirmed: 'Confirmed',
+  checked_in: 'Checked in',
+  completed: 'Completed',
+  cancelled: 'Cancelled',
+  no_show: 'No-show',
+};
+
+export const APPOINTMENT_TONE: Record<AppointmentStatus, Tone> = {
+  requested: 'warn',
+  confirmed: 'info',
+  checked_in: 'violet',
+  completed: 'ok',
+  cancelled: 'neutral',
+  no_show: 'bad',
+};
+
+/** Calendar block colours per status (written out so Tailwind finds them). */
+export const APPOINTMENT_BLOCK: Record<AppointmentStatus, string> = {
+  requested: 'border-warn bg-warn/15 hover:bg-warn/25',
+  confirmed: 'border-accent bg-accent/15 hover:bg-accent/25',
+  checked_in: 'border-violet bg-violet/15 hover:bg-violet/25',
+  completed: 'border-ok bg-ok/15 hover:bg-ok/25',
+  cancelled: 'border-fg3 bg-fg3/10 text-fg3 line-through hover:bg-fg3/20',
+  no_show: 'border-bad bg-bad/10 hover:bg-bad/20',
+};

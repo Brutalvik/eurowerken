@@ -201,8 +201,8 @@ function firstName(name: string): string {
 function TechnicianCard({ tech, open, onToggle }: { tech: Technician; open: boolean; onToggle: () => void }) {
   return (
     <article
-      className={`group relative flex h-full flex-col overflow-hidden rounded-2xl border bg-surface shadow-sm transition hover:-translate-y-0.5 hover:shadow-xl ${
-        open ? 'border-accent ring-2 ring-accent/20' : 'border-line'
+      className={`glass glass-lift group relative flex h-full flex-col overflow-hidden rounded-2xl ${
+        open ? 'border-accent ring-2 ring-accent/20' : ''
       }`}
     >
       <Photo src={tech.image} alt={`${tech.name}, ${tech.role}`} icon={User} className="aspect-[4/3] w-full" />

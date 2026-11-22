@@ -33,6 +33,7 @@ const TEXT_FIELDS: { key: keyof Draft; label: string; placeholder?: string; hint
   { key: 'phone', label: 'Phone', type: 'tel', placeholder: '(555) 123-4567' },
   { key: 'email', label: 'Contact email', type: 'email', placeholder: 'service@example.com' },
   { key: 'address', label: 'Address', placeholder: '1234 Autobahn Drive, Calgary, AB' },
+  { key: 'own_website_url', label: 'Your own website', type: 'url', placeholder: 'https://www.yourworkshop.com', hint: 'Optional. If you already have a website, customers see a "Visit our website" link.' },
   { key: 'logo_url', label: 'Logo URL', placeholder: 'https://...', hint: 'Optional. A square image works best. Starts with https://' },
   { key: 'instagram_url', label: 'Instagram', placeholder: 'https://instagram.com/...' },
   { key: 'facebook_url', label: 'Facebook', placeholder: 'https://facebook.com/...' },

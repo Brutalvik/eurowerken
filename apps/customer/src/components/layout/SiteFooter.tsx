@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { Clock, Facebook, Instagram, Mail, MapPin, Phone, Youtube } from 'lucide-react';
+import { Clock, ExternalLink, Facebook, Globe, Instagram, Mail, MapPin, Phone, Youtube } from 'lucide-react';
 import { sitePath, useSite } from '@/site/SiteContext';
 import { Wordmark } from '../Wordmark';
 
@@ -103,7 +103,22 @@ export function SiteFooter() {
               <span className="whitespace-pre-line">{site.hours}</span>
             </li>
           )}
-          {!site.address && !site.phone && !site.email && !site.hours && (
+          {site.own_website_url && (
+            <li className="flex gap-2.5">
+              <Globe className="mt-0.5 h-4 w-4 shrink-0 text-accent" aria-hidden />
+              <a
+                href={site.own_website_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 font-medium text-white/80 hover:text-white"
+              >
+                Visit our website
+                <ExternalLink className="h-3.5 w-3.5" aria-hidden />
+                <span className="sr-only">(opens in a new tab)</span>
+              </a>
+            </li>
+          )}
+          {!site.address && !site.phone && !site.email && !site.hours && !site.own_website_url && (
             <li className="text-white/40">Contact details coming soon.</li>
           )}
         </FooterColumn>

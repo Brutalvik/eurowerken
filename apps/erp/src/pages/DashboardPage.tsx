@@ -11,6 +11,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
+import { useAuth } from '@/auth/AuthContext';
 import { Badge } from '@/components/ui/Badge';
 import { Card, CardHeader } from '@/components/ui/Card';
 import { DataTable } from '@/components/ui/DataTable';
@@ -22,6 +23,7 @@ import { formatCompactCurrency, formatCurrency, formatCurrencyWhole } from '@/li
 import { REPAIR_TONE, STOCK_LABEL, STOCK_TONE, stockStatus } from '@/lib/status';
 import { chartPalette } from '@/theme/chartPalette';
 import { useTheme } from '@/theme/ThemeProvider';
+import { TodayAppointmentsCard } from './appointments/TodayAppointmentsCard';
 
 const orderColumns: Column<RepairOrder>[] = [
   { header: 'Order', cell: (o) => o.id, className: 'font-semibold text-accent' },
@@ -34,6 +36,7 @@ const orderColumns: Column<RepairOrder>[] = [
 
 export function DashboardPage() {
   const { mode } = useTheme();
+  const { can } = useAuth();
   const palette = chartPalette(mode);
 
   const latest = revenueSeries[revenueSeries.length - 1];
@@ -79,6 +82,8 @@ export function DashboardPage() {
           caption={`${unpaid.length} invoices outstanding`}
         />
       </div>
+
+      {can('repair-orders', 'view') && <TodayAppointmentsCard />}
 
       <div className="grid gap-4 xl:grid-cols-[1fr_300px]">
         <Card className="p-4 sm:p-5">
@@ -184,7 +189,7 @@ export function DashboardPage() {
               const status = stockStatus(part);
               const fill = Math.min(100, (part.stock / part.minStock) * 100);
               return (
-                <li key={part.id} className="rounded-lg border border-line bg-surface2 p-3">
+                <li key={part.id} className="rounded-lg border border-line/70 bg-surface2/50 p-3">
                   <div className="text-xs font-semibold leading-snug text-fg">{part.name}</div>
                   <div className="mt-1.5 flex items-center justify-between">
                     <span className="text-[10px] text-fg3">{part.id}</span>

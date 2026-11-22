@@ -84,7 +84,7 @@ export function AuthScreen({ children, legal = true }: { children: ReactNode; le
       <div
         className={`mx-auto flex min-h-[calc(100dvh-4rem-env(safe-area-inset-top))] w-full max-w-[432px] flex-col justify-center px-4 pt-10 sm:pt-14 xl:min-h-[calc(100dvh-76px-env(safe-area-inset-top))] ${
           // The liquid-glass tab bar docks over the bottom of the screen: keep the card clear of it.
-          site.nav_style === 'classic' ? 'pb-10 sm:pb-14' : 'pb-36 sm:pb-44'
+          site.nav_style === 'classic' ? 'pb-10 sm:pb-14' : 'pb-32 sm:pb-36'
         }`}
       >
         {children}

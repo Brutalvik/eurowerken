@@ -1,17 +1,18 @@
-import { useId, useState } from 'react';
 import type { ReactNode } from 'react';
-import { CalendarClock, Car, ChevronDown, User, Wrench } from 'lucide-react';
+import { CalendarClock, Car, User, Wrench } from 'lucide-react';
 import type { Service } from '@/api/catalogue';
 import { formatMoneyWhole } from '@/lib/format';
-import { formatLongDate } from './Calendar';
-import { formatSlot, priceRange } from './model';
+import { formatWhen } from './model';
 
 export interface SummaryData {
   vehicle: string;
   services: Service[];
   notes: string;
   date: string;
+  /** The chosen slot's starts_at. */
   time: string;
+  /** The workshop's time zone, for showing the time. */
+  timeZone: string;
   expertName?: string;
   low: number;
   high: number;
@@ -21,22 +22,20 @@ export function estimateText(d: Pick<SummaryData, 'services' | 'low' | 'high'>):
   return d.services.length ? `${formatMoneyWhole(d.low)} to ${formatMoneyWhole(d.high)}` : formatMoneyWhole(0);
 }
 
-/** "3 services · $380 to $560" */
-export function pillText(d: SummaryData): string {
+/** "2 services · est. $250 to $380", or the notes-only case. Shown in the action bar on the services step. */
+export function totalText(d: SummaryData): string {
   const n = d.services.length;
-  if (n === 0) return d.vehicle ? `${d.vehicle} · no services yet` : 'No services selected yet';
-  return `${n} ${n === 1 ? 'service' : 'services'} · ${estimateText(d)}`;
+  if (n === 0) return d.notes.trim() ? 'Problem described · We will quote after inspection' : 'No services yet';
+  return `${n} ${n === 1 ? 'service' : 'services'} · est. ${estimateText(d)}`;
 }
 
 function Row({ Icon, label, children }: { Icon: typeof Car; label: string; children: ReactNode }) {
   return (
     <div className="flex gap-3">
-      <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-accent/10 text-accent">
-        <Icon className="h-4 w-4" aria-hidden />
-      </span>
+      <Icon className="mt-0.5 h-4 w-4 shrink-0 text-accent" aria-hidden />
       <div className="min-w-0 flex-1">
-        <dt className="text-[11px] font-semibold uppercase tracking-wider text-fg3">{label}</dt>
-        <dd className="mt-0.5 break-words text-sm font-semibold text-fg">{children}</dd>
+        <dt className="text-xs font-semibold uppercase tracking-wider text-fg3">{label}</dt>
+        <dd className="mt-0.5 break-words text-sm font-medium text-fg">{children}</dd>
       </div>
     </div>
   );
@@ -46,101 +45,52 @@ function Empty({ children }: { children: ReactNode }) {
   return <span className="font-normal text-fg3">{children}</span>;
 }
 
-function SummaryBody({ d }: { d: SummaryData }) {
+/** Desktop: a slim sticky glass card beside the step with what is chosen so far. */
+export function SummaryCard({ d, className = '' }: { d: SummaryData; className?: string }) {
   return (
-    <>
-      <dl className="space-y-4">
-        <Row Icon={Car} label="Vehicle">
-          {d.vehicle || <Empty>Not selected yet</Empty>}
+    <aside aria-label="Your booking so far" className={`glass-strong rounded-3xl p-5 lg:sticky lg:top-24 ${className}`}>
+      <h2 className="font-display text-base font-semibold text-fg">Your booking</h2>
+      <dl className="mt-4 space-y-4">
+        <Row Icon={Car} label="Car">
+          {d.vehicle || <Empty>Not chosen yet</Empty>}
         </Row>
         <Row Icon={Wrench} label="Services">
           {d.services.length === 0 ? (
-            <Empty>{d.notes.trim() ? 'As described in your notes' : 'None selected yet'}</Empty>
+            <Empty>{d.notes.trim() ? 'Problem described' : 'None yet'}</Empty>
           ) : (
             <ul className="space-y-1">
-              {d.services.map((s) => {
-                const [sl, sh] = priceRange(s);
-                return (
-                  <li key={s.id} className="book-reveal flex justify-between gap-3 font-normal">
-                    <span className="min-w-0 text-fg">{s.name}</span>
-                    <span className="shrink-0 tabular-nums text-fg3">
-                      {formatMoneyWhole(sl)} to {formatMoneyWhole(sh)}
-                    </span>
-                  </li>
-                );
-              })}
+              {d.services.map((s) => (
+                <li key={s.id} className="flex justify-between gap-3">
+                  <span className="min-w-0">{s.name}</span>
+                  <span className="shrink-0 font-normal tabular-nums text-fg3">from {formatMoneyWhole(s.priceFrom)}</span>
+                </li>
+              ))}
             </ul>
           )}
         </Row>
-        <Row Icon={CalendarClock} label="Date and time">
+        <Row Icon={CalendarClock} label="Time">
           {d.date ? (
             <>
-              {formatLongDate(d.date)}
-              <span className="block font-normal text-fg2">{d.time ? formatSlot(d.time) : 'Choose a time'}</span>
+              {formatWhen(d.date, d.time, d.timeZone)}
+              {!d.time && <span className="block font-normal text-fg3">Pick a time</span>}
             </>
           ) : (
             <Empty>Not chosen yet</Empty>
           )}
         </Row>
-        <Row Icon={User} label="Expert">
+        <Row Icon={User} label="Technician">
           {d.expertName ?? 'Any available'}
         </Row>
       </dl>
       <div className="mt-5 border-t border-line/70 pt-4">
         <div className="flex items-baseline justify-between gap-3">
-          <p className="text-sm font-semibold text-fg">Estimated total</p>
-          <p className="font-display text-xl font-bold tabular-nums text-fg">{estimateText(d)}</p>
+          <p className="text-sm font-semibold text-fg">Estimate</p>
+          <p className="font-display text-lg font-bold tabular-nums text-fg">
+            {d.services.length ? estimateText(d) : d.notes.trim() ? 'After inspection' : formatMoneyWhole(0)}
+          </p>
         </div>
-        <p className="mt-1 text-right text-[11px] text-fg3">Final price determined after inspection. Taxes extra.</p>
-      </div>
-    </>
-  );
-}
-
-/** Desktop: a frosted card beside the step. */
-export function SummaryCard({ d, className = '' }: { d: SummaryData; className?: string }) {
-  return (
-    <aside aria-label="Appointment summary" className={`glass-strong book-sheen rounded-3xl p-6 lg:sticky lg:top-24 ${className}`}>
-      <h2 className="font-display text-lg font-semibold text-fg">Your appointment</h2>
-      <p className="sr-only" aria-live="polite">
-        Estimated total {estimateText(d)}
-      </p>
-      <div className="mt-5">
-        <SummaryBody d={d} />
+        <p className="mt-1 text-right text-xs text-fg3">Final price after inspection. Taxes extra.</p>
       </div>
     </aside>
-  );
-}
-
-/** Phones and tablets: a glass pill with the running estimate that opens into the full summary. */
-export function SummaryPill({ d, className = '' }: { d: SummaryData; className?: string }) {
-  const [open, setOpen] = useState(false);
-  const panelId = useId();
-  return (
-    <section aria-label="Appointment summary" className={`glass-strong book-sheen overflow-hidden rounded-3xl transition-[border-radius] ${className}`}>
-      <button
-        type="button"
-        aria-expanded={open}
-        aria-controls={open ? panelId : undefined}
-        onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-center gap-3 px-4 py-3 text-left outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent coarse:min-h-12"
-      >
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent text-accent-fg">
-          <Wrench className="h-4 w-4" aria-hidden />
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className="block text-[11px] font-semibold uppercase tracking-wider text-fg3">Your appointment</span>
-          <span className="block truncate text-sm font-semibold tabular-nums text-fg" aria-live="polite">
-            {pillText(d)}
-          </span>
-        </span>
-        <ChevronDown className={`h-5 w-5 shrink-0 text-fg2 transition-transform duration-300 ${open ? 'rotate-180' : ''}`} aria-hidden />
-      </button>
-      {open && (
-        <div id={panelId} className="book-reveal border-t border-line/70 px-4 pb-5 pt-4">
-          <SummaryBody d={d} />
-        </div>
-      )}
-    </section>
   );
 }
