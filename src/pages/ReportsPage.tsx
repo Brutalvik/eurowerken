@@ -16,6 +16,7 @@ const technicianColumns: Column<TechnicianStat>[] = [
   { header: 'Revenue generated', cell: (t) => formatCurrencyWhole(t.revenue), className: 'font-semibold text-fg' },
   {
     header: 'Rating',
+    mobile: 'corner',
     cell: (t) => (
       <span className="inline-flex items-center gap-1 font-semibold text-fg">
         <Star className="h-3.5 w-3.5 fill-warn text-warn" aria-hidden />
@@ -40,7 +41,7 @@ export function ReportsPage() {
   return (
     <div className="space-y-4">
       <div className="grid gap-4 lg:grid-cols-2">
-        <Card className="p-5">
+        <Card className="p-4 sm:p-5">
           <CardHeader title="Monthly revenue" subtitle="Last 6 months" />
           <div className="h-56" role="img" aria-label="Bar chart of monthly revenue for the last six months">
             <ResponsiveContainer width="100%" height="100%">
@@ -64,7 +65,7 @@ export function ReportsPage() {
           </div>
         </Card>
 
-        <Card className="p-5">
+        <Card className="p-4 sm:p-5">
           <CardHeader title="Top parts by volume" subtitle="Units sold this month" />
           <div className="h-56" role="img" aria-label="Horizontal bar chart of units sold for the top five parts">
             <ResponsiveContainer width="100%" height="100%">
@@ -88,7 +89,7 @@ export function ReportsPage() {
       </div>
 
       <Card className="overflow-hidden">
-        <div className="p-5 pb-3">
+        <div className="p-4 pb-3 sm:p-4 sm:p-5 sm:pb-3">
           <CardHeader title="Technician performance" />
         </div>
         <DataTable columns={technicianColumns} rows={technicianStats} getKey={(t) => t.name} />

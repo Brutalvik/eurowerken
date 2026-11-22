@@ -38,6 +38,36 @@
 
 body {
   @apply bg-bg font-sans text-fg antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* iOS zooms into any field under 16px when it gets focus; touch screens get 16px fields. */
+@media (pointer: coarse) {
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
+@layer utilities {
+  /* Room for notches and home indicators when installed or wrapped as an app (viewport-fit=cover). */
+  .pt-safe {
+    padding-top: env(safe-area-inset-top);
+  }
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .pl-safe {
+    padding-left: env(safe-area-inset-left);
+  }
+  /* Horizontal scrollers (tab rows on phones) without a visible bar. */
+  .no-scrollbar {
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
 }
 
 ::-webkit-scrollbar {

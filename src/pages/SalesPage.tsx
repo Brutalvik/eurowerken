@@ -11,10 +11,10 @@ import { formatCurrency } from '@/lib/format';
 
 const columns: Column<Sale>[] = [
   { header: 'Sale', cell: (s) => s.id, className: 'font-semibold text-accent' },
-  { header: 'Type', cell: (s) => <Badge tone={s.kind === 'Parts' ? 'warn' : 'info'}>{s.kind}</Badge> },
+  { header: 'Type', cell: (s) => <Badge tone={s.kind === 'Parts' ? 'warn' : 'info'}>{s.kind}</Badge>, mobile: 'corner' },
   { header: 'Customer', cell: (s) => s.customer, className: 'text-fg' },
   { header: 'Items', cell: (s) => s.items },
-  { header: 'Total', cell: (s) => formatCurrency(s.total), className: 'font-semibold text-fg' },
+  { header: 'Total', cell: (s) => formatCurrency(s.total), className: 'font-semibold text-fg', mobile: 'corner' },
   { header: 'When', cell: (s) => s.when, className: 'text-fg3' },
   { header: 'Payment', cell: (s) => s.payment },
 ];
@@ -34,9 +34,9 @@ export function SalesPage() {
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 [&>*:last-child:nth-child(odd)]:col-span-2 sm:[&>*:last-child:nth-child(odd)]:col-span-1">
         {summary.map((card) => (
-          <div key={card.label} className="rounded-xl border border-line bg-surface p-5">
+          <div key={card.label} className="rounded-xl border border-line bg-surface p-4 sm:p-5">
             <div className="text-xs text-fg2">{card.label}</div>
             <div className="mt-2 font-display text-xl font-semibold text-fg">{card.value}</div>
             <div className="mt-1 text-[11px] text-fg3">{card.caption}</div>
@@ -45,7 +45,7 @@ export function SalesPage() {
       </div>
 
       <Card className="overflow-hidden">
-        <div className="p-5 pb-3">
+        <div className="p-4 pb-3 sm:p-4 sm:p-5 sm:pb-3">
           <CardHeader
             title="Recent transactions"
             action={

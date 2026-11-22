@@ -8,12 +8,12 @@ export function AuthShell({ title, subtitle, children }: { title: string; subtit
   const { mode, toggle } = useTheme();
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center bg-bg px-4 py-10">
+    <div className="pt-safe pb-safe relative flex min-h-[100dvh] items-center justify-center bg-bg px-4 py-10">
       <button
         type="button"
         onClick={toggle}
         aria-label={mode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-        className="absolute right-4 top-4 rounded-lg border border-line bg-surface2 p-2 text-fg2 hover:text-fg"
+        className="absolute right-4 top-[max(1rem,env(safe-area-inset-top))] rounded-lg border border-line bg-surface2 p-2 text-fg2 hover:text-fg"
       >
         {mode === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
       </button>
@@ -55,7 +55,7 @@ export function Field({ label, id, ...rest }: FieldProps) {
       </label>
       <input
         id={id}
-        className="w-full rounded-lg border border-line bg-surface2 px-3 py-2 text-sm text-fg outline-none placeholder:text-fg3 focus:border-accent focus:ring-2 focus:ring-accent/20"
+        className="w-full rounded-lg border border-line bg-surface2 px-3 py-2 text-sm text-fg outline-none coarse:min-h-11 placeholder:text-fg3 focus:border-accent focus:ring-2 focus:ring-accent/20"
         {...rest}
       />
     </div>
@@ -73,7 +73,7 @@ export function FormMessage({ tone, children }: { tone: 'error' | 'success'; chi
 
 export function FullScreenLoader() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-bg" role="status" aria-label="Loading">
+    <div className="flex min-h-[100dvh] items-center justify-center bg-bg" role="status" aria-label="Loading">
       <Loader2 className="h-6 w-6 animate-spin text-accent" aria-hidden />
     </div>
   );
@@ -89,7 +89,7 @@ export function GoogleButton({ onClick, disabled, label }: { onClick: () => void
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="flex w-full items-center justify-center gap-2.5 rounded-lg border border-line bg-surface px-3.5 py-2 text-xs font-semibold text-fg transition hover:bg-surface2 disabled:cursor-not-allowed disabled:opacity-50"
+      className="flex w-full items-center justify-center gap-2.5 rounded-lg border border-line bg-surface px-3.5 py-2 text-xs font-semibold coarse:min-h-11 text-fg transition hover:bg-surface2 disabled:cursor-not-allowed disabled:opacity-50"
     >
       <svg viewBox="0 0 48 48" className="h-4 w-4" aria-hidden>
         <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z" />

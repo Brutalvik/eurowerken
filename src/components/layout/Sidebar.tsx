@@ -38,16 +38,18 @@ export function Sidebar({ open, onNavigate }: SidebarProps) {
   const visible = MODULE_ORDER.filter((m) => accessFor(m) !== 'none');
 
   return (
+    // Phone (< md): slide-out drawer. Tablet (md to lg): icon rail. Desktop (lg+): full sidebar.
     <aside
-      className={`fixed inset-y-0 left-0 z-40 flex w-56 flex-col border-r border-white/10 bg-sidebar text-white transition-transform lg:static lg:translate-x-0 ${
-        open ? 'translate-x-0' : '-translate-x-full'
+      aria-label="Sidebar"
+      className={`pt-safe pb-safe pl-safe fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r border-white/10 bg-sidebar text-white transition-transform duration-200 md:static md:w-16 md:translate-x-0 lg:w-56 ${
+        open ? 'translate-x-0 shadow-2xl' : '-translate-x-full'
       }`}
     >
-      <div className="flex items-center gap-2.5 border-b border-white/10 px-4 py-5">
-        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent">
+      <div className="flex items-center gap-2.5 border-b border-white/10 px-4 py-5 md:max-lg:justify-center md:max-lg:px-0">
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent">
           <Wrench className="h-4 w-4 text-white" aria-hidden />
         </span>
-        <div>
+        <div className="md:max-lg:hidden">
           <div className="font-display text-[15px] font-bold leading-none">
             {BRAND.prefix}
             <span className="text-accent">{BRAND.suffix}</span>
@@ -57,7 +59,7 @@ export function Sidebar({ open, onNavigate }: SidebarProps) {
       </div>
 
       {user.workshop && (
-        <div className="border-b border-white/10 px-4 py-3">
+        <div className="border-b border-white/10 px-4 py-3 md:max-lg:hidden">
           <div className="text-[9px] uppercase tracking-widest text-white/50">Workshop</div>
           <div className="mt-0.5 truncate text-xs font-semibold" title={user.workshop.name}>
             {user.workshop.name}
@@ -66,7 +68,7 @@ export function Sidebar({ open, onNavigate }: SidebarProps) {
         </div>
       )}
 
-      <nav aria-label="Main" className="flex-1 space-y-0.5 overflow-y-auto px-2 py-3">
+      <nav aria-label="Main" className="no-scrollbar flex-1 space-y-0.5 overflow-y-auto px-2 py-3">
         {visible.map((module) => {
           const Icon = NAV_ICONS[module];
           return (
@@ -74,20 +76,21 @@ export function Sidebar({ open, onNavigate }: SidebarProps) {
               key={module}
               to={`/${module}`}
               onClick={onNavigate}
+              title={MODULE_LABELS[module]}
               className={({ isActive }) =>
-                `flex items-center gap-2.5 rounded-lg px-3 py-2 text-xs transition ${
+                `flex items-center gap-2.5 rounded-lg px-3 py-2 text-xs transition coarse:py-3 md:max-lg:justify-center md:max-lg:px-0 ${
                   isActive ? 'bg-accent font-semibold text-white' : 'text-white/65 hover:bg-white/5 hover:text-white'
                 }`
               }
             >
-              <Icon className="h-4 w-4" aria-hidden />
-              {MODULE_LABELS[module]}
+              <Icon className="h-4 w-4 shrink-0" aria-hidden />
+              <span className="md:max-lg:sr-only">{MODULE_LABELS[module]}</span>
             </NavLink>
           );
         })}
       </nav>
 
-      <div className="flex items-center gap-2.5 border-t border-white/10 px-4 py-3">
+      <div className="flex items-center gap-2.5 border-t border-white/10 px-4 py-3 md:max-lg:flex-col md:max-lg:px-2">
         {user.avatarUrl ? (
           <img
             src={user.avatarUrl}
@@ -100,7 +103,7 @@ export function Sidebar({ open, onNavigate }: SidebarProps) {
             {user.initials}
           </span>
         )}
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1 md:max-lg:hidden">
           <div className="truncate text-xs font-semibold">{user.name}</div>
           <div className="truncate text-[10px] text-white/50">{user.role ?? 'Awaiting approval'}</div>
         </div>
@@ -109,7 +112,7 @@ export function Sidebar({ open, onNavigate }: SidebarProps) {
           onClick={() => void signOut()}
           aria-label="Sign out"
           title="Sign out"
-          className="ml-auto rounded-lg p-1.5 text-white/60 hover:bg-white/10 hover:text-white"
+          className="rounded-lg p-1.5 text-white/60 hover:bg-white/10 hover:text-white coarse:p-2.5 md:max-lg:mx-auto lg:ml-auto"
         >
           <LogOut className="h-4 w-4" aria-hidden />
         </button>

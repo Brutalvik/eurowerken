@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Navigate, Outlet } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/Button';
 import { UserX } from 'lucide-react';
 import { useAuth, useCurrentUser } from '@/auth/AuthContext';
@@ -10,24 +10,35 @@ export function AppLayout() {
   const [navOpen, setNavOpen] = useState(false);
   const user = useCurrentUser();
   const { profileError } = useAuth();
+  const { pathname } = useLocation();
+
+  // Phone drawer: close on navigation and on Escape.
+  useEffect(() => setNavOpen(false), [pathname]);
+  useEffect(() => {
+    if (!navOpen) return;
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setNavOpen(false);
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [navOpen]);
 
   // Not in a workshop yet: choose one first (or finish a saved invite).
   if (!user.workshop && !profileError) return <Navigate to="/onboarding" replace />;
 
   return (
-    <div className="flex h-screen overflow-hidden bg-bg">
+    // 100dvh follows mobile browser toolbars; h-screen would hide the bottom under them.
+    <div className="flex h-[100dvh] overflow-hidden bg-bg">
       <Sidebar open={navOpen} onNavigate={() => setNavOpen(false)} />
       {navOpen && (
         <button
           type="button"
           aria-label="Close navigation"
           onClick={() => setNavOpen(false)}
-          className="fixed inset-0 z-30 bg-black/50 lg:hidden"
+          className="fixed inset-0 z-30 bg-black/50 md:hidden"
         />
       )}
       <div className="flex min-w-0 flex-1 flex-col">
         <Header onMenuClick={() => setNavOpen(true)} />
-        <main className="flex-1 overflow-y-auto p-4 lg:p-6">
+        <main className="pb-safe flex-1 overflow-y-auto overscroll-contain p-4 sm:p-5 lg:p-6">
           {user.role ? (
             <Outlet />
           ) : (

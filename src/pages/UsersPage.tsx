@@ -99,7 +99,7 @@ export function UsersPage() {
             value={m.role ?? ''}
             disabled={savingId === m.id}
             onChange={(e) => void update(m.id, { role: (e.target.value || null) as Role | null })}
-            className="rounded-md border border-line bg-surface2 px-2 py-1 text-xs text-fg outline-none focus:border-accent"
+            className="rounded-md border border-line bg-surface2 px-2 py-1 text-xs text-fg outline-none focus:border-accent coarse:min-h-11"
           >
             <option value="">Awaiting approval</option>
             {ROLES.filter((r) => isManager || r !== 'Manager' || m.role === 'Manager').map((r) => (
@@ -118,6 +118,7 @@ export function UsersPage() {
     { header: 'Since', cell: (m) => dateFormat.format(new Date(m.created_at)), className: 'text-fg3' },
     {
       header: 'Status',
+      mobile: 'footer',
       cell: (m) => (
         <div className="flex items-center gap-2">
           <Badge tone={m.active ? 'ok' : 'neutral'}>{m.active ? 'Active' : 'Deactivated'}</Badge>
@@ -139,7 +140,7 @@ export function UsersPage() {
   return (
     <div className="space-y-4">
       {user?.workshop && (
-        <Card className="flex flex-wrap items-center justify-between gap-3 p-5">
+        <Card className="flex flex-wrap items-center justify-between gap-3 p-4 sm:p-5">
           <div>
             <h2 className="font-display text-sm font-semibold text-fg">{user.workshop.name}</h2>
             <p className="mt-0.5 text-xs text-fg2">
@@ -156,7 +157,7 @@ export function UsersPage() {
       {canManage && <InvitesCard isManager={isManager} />}
 
       <Card className="overflow-hidden">
-        <div className="p-5 pb-3">
+        <div className="p-4 pb-3 sm:p-4 sm:p-5 sm:pb-3">
           <CardHeader
             title="Team"
             subtitle={
@@ -179,7 +180,7 @@ export function UsersPage() {
         />
       </Card>
 
-      <Card className="p-5">
+      <Card className="p-4 sm:p-5">
         <CardHeader
           title="Role permissions"
           subtitle={
@@ -209,7 +210,7 @@ export function UsersPage() {
             <tbody>
               {MODULE_ORDER.map((module) => (
                 <tr key={module} className="border-b border-line last:border-b-0">
-                  <th scope="row" className="px-3 py-2.5 text-left font-medium text-fg">
+                  <th scope="row" className="sticky left-0 z-10 bg-surface px-3 py-2.5 text-left font-medium text-fg">
                     {MODULE_LABELS[module]}
                   </th>
                   {ROLES.map((role) => {
@@ -223,7 +224,7 @@ export function UsersPage() {
                             value={access}
                             disabled={savingCell === `${role}:${module}`}
                             onChange={(e) => void setAccess(role, module, e.target.value as Access)}
-                            className="rounded-md border border-line bg-surface2 px-2 py-1 text-xs text-fg outline-none focus:border-accent"
+                            className="rounded-md border border-line bg-surface2 px-2 py-1 text-xs text-fg outline-none focus:border-accent coarse:min-h-11"
                           >
                             {(['none', 'view', 'full'] as Access[]).map((a) => (
                               <option key={a} value={a}>

@@ -1,3 +1,5 @@
+import plugin from 'tailwindcss/plugin';
+
 const token = (name) => `rgb(var(--${name}) / <alpha-value>)`;
 
 /** @type {import('tailwindcss').Config} */
@@ -27,5 +29,10 @@ export default {
       },
     },
   },
-  plugins: [],
+  plugins: [
+    plugin(({ addVariant }) => {
+      // Touch screens (phones, tablets): bigger targets. Use as coarse:min-h-11.
+      addVariant('coarse', '@media (pointer: coarse)');
+    }),
+  ],
 };

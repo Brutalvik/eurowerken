@@ -22,8 +22,8 @@ const columns: Column<RepairOrder>[] = [
   { header: 'Service', cell: (o) => o.service },
   { header: 'Technician', cell: (o) => o.technician },
   { header: 'Date', cell: (o) => o.date, className: 'text-fg3' },
-  { header: 'Status', cell: (o) => <Badge tone={REPAIR_TONE[o.status]}>{o.status}</Badge> },
-  { header: 'Total', cell: (o) => formatCurrency(o.total), className: 'font-semibold text-fg' },
+  { header: 'Status', cell: (o) => <Badge tone={REPAIR_TONE[o.status]}>{o.status}</Badge>, mobile: 'corner' },
+  { header: 'Total', cell: (o) => formatCurrency(o.total), className: 'font-semibold text-fg', mobile: 'corner' },
 ];
 
 export function RepairOrdersPage() {
@@ -33,7 +33,7 @@ export function RepairOrdersPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
         <PillTabs label="Repair order status" options={TABS} value={tab} onChange={setTab} />
         {can('repair-orders', 'full') && (
           <Button>

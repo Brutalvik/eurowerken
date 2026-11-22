@@ -34,6 +34,7 @@ export function InventoryPage() {
     { header: 'Part ID', cell: (p) => p.id, className: 'font-semibold text-accent' },
     {
       header: 'Name',
+      mobile: 'title',
       cell: (p) => (
         <div>
           <div className="font-medium text-fg">{p.name}</div>
@@ -54,6 +55,7 @@ export function InventoryPage() {
     { header: 'Unit cost', cell: (p) => formatCurrency(p.unitCost), className: 'font-medium text-fg' },
     {
       header: 'Status',
+      mobile: 'corner',
       cell: (p) => {
         const status = stockStatus(p);
         return <Badge tone={STOCK_TONE[status]}>{STOCK_LABEL[status]}</Badge>;
@@ -61,6 +63,7 @@ export function InventoryPage() {
     },
     {
       header: 'Actions',
+      mobile: 'footer',
       cell: () =>
         canEdit ? (
           <div className="flex gap-1.5">
@@ -79,8 +82,8 @@ export function InventoryPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+        <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
           <SearchInput value={search} onChange={setSearch} placeholder="Search parts, IDs, SKUs" />
           <PillTabs label="Part category" options={CATEGORIES} value={category} onChange={setCategory} />
         </div>

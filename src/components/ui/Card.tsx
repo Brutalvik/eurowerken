@@ -12,7 +12,7 @@ interface CardHeaderProps {
 
 export function CardHeader({ title, subtitle, action }: CardHeaderProps) {
   return (
-    <div className="mb-4 flex items-start justify-between gap-3">
+    <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
       <div>
         <h2 className="font-display text-sm font-semibold text-fg">{title}</h2>
         {subtitle && <p className="mt-0.5 text-xs text-fg2">{subtitle}</p>}

@@ -22,7 +22,7 @@ function Field({ id, label, value, onChange, type = 'text' }: FieldProps): React
         type={type}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full rounded-lg border border-line bg-surface2 px-3 py-2 text-xs text-fg outline-none focus:border-accent"
+        className="w-full rounded-lg border border-line bg-surface2 px-3 py-2 text-xs text-fg outline-none focus:border-accent coarse:min-h-11"
       />
     </div>
   );
@@ -51,7 +51,7 @@ export function SettingsPage() {
         setSaved(true);
       }}
     >
-      <Card className="p-5">
+      <Card className="p-4 sm:p-5">
         <CardHeader title="Workshop profile" subtitle="Shown on invoices and customer emails" />
         <div className="grid gap-4 sm:grid-cols-2">
           <Field id="shop-name" label="Business name" value={name} onChange={update(setName)} />
@@ -60,7 +60,7 @@ export function SettingsPage() {
         </div>
       </Card>
 
-      <Card className="p-5">
+      <Card className="p-4 sm:p-5">
         <CardHeader title="Invoicing" subtitle="Defaults applied to new invoices" />
         <div className="grid gap-4 sm:grid-cols-3">
           <Field id="tax-label" label="Tax label" value={taxLabel} onChange={update(setTaxLabel)} />

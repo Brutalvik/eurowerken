@@ -28,8 +28,8 @@ const orderColumns: Column<RepairOrder>[] = [
   { header: 'Customer', cell: (o) => o.customer, className: 'text-fg' },
   { header: 'Vehicle', cell: (o) => o.vehicle },
   { header: 'Technician', cell: (o) => o.technician },
-  { header: 'Status', cell: (o) => <Badge tone={REPAIR_TONE[o.status]}>{o.status}</Badge> },
-  { header: 'Total', cell: (o) => formatCurrency(o.total), className: 'font-semibold text-fg' },
+  { header: 'Status', cell: (o) => <Badge tone={REPAIR_TONE[o.status]}>{o.status}</Badge>, mobile: 'corner' },
+  { header: 'Total', cell: (o) => formatCurrency(o.total), className: 'font-semibold text-fg', mobile: 'corner' },
 ];
 
 export function DashboardPage() {
@@ -57,7 +57,7 @@ export function DashboardPage() {
 
   return (
     <div className="space-y-5">
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
         <KpiCard
           icon={DollarSign}
           label="Revenue (this month)"
@@ -81,7 +81,7 @@ export function DashboardPage() {
       </div>
 
       <div className="grid gap-4 xl:grid-cols-[1fr_300px]">
-        <Card className="p-5">
+        <Card className="p-4 sm:p-5">
           <CardHeader
             title="Revenue trend"
             subtitle="Last 6 months against target"
@@ -138,7 +138,7 @@ export function DashboardPage() {
           </div>
         </Card>
 
-        <Card className="p-5">
+        <Card className="p-4 sm:p-5">
           <CardHeader title="Revenue mix" subtitle="By service category" />
           <div className="h-32" role="img" aria-label="Donut chart of revenue share by service category">
             <ResponsiveContainer width="100%" height="100%">
@@ -168,13 +168,13 @@ export function DashboardPage() {
 
       <div className="grid gap-4 xl:grid-cols-[1fr_300px]">
         <Card className="overflow-hidden">
-          <div className="p-5 pb-3">
+          <div className="p-4 pb-3 sm:p-4 sm:p-5 sm:pb-3">
             <CardHeader title="Recent repair orders" />
           </div>
           <DataTable columns={orderColumns} rows={repairOrders.slice(0, 4)} getKey={(o) => o.id} />
         </Card>
 
-        <Card className="p-5">
+        <Card className="p-4 sm:p-5">
           <CardHeader
             title="Stock alerts"
             action={stockAlerts.length > 0 ? <Badge tone="bad">{stockAlerts.length} to reorder</Badge> : undefined}

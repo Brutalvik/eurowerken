@@ -77,7 +77,7 @@ export function InvitesCard({ isManager, onChanged }: { isManager: boolean; onCh
   const now = Date.now();
 
   return (
-    <Card className="p-5">
+    <Card className="p-4 sm:p-5">
       <CardHeader
         title="Invite someone"
         subtitle="They join with the role you pick, no approval needed. The link works once, for that email, for 7 days."
@@ -90,13 +90,13 @@ export function InvitesCard({ isManager, onChanged }: { isManager: boolean; onCh
           aria-label="Email to invite"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className="min-w-0 flex-1 rounded-lg border border-line bg-surface2 px-3 py-2 text-xs text-fg outline-none placeholder:text-fg3 focus:border-accent"
+          className="min-w-0 flex-1 rounded-lg border border-line bg-surface2 px-3 py-2 text-xs text-fg outline-none placeholder:text-fg3 focus:border-accent coarse:min-h-11"
         />
         <select
           aria-label="Role for the invite"
           value={role}
           onChange={(e) => setRole(e.target.value as Role)}
-          className="rounded-lg border border-line bg-surface2 px-2 py-2 text-xs text-fg outline-none focus:border-accent"
+          className="rounded-lg border border-line bg-surface2 px-2 py-2 text-xs text-fg outline-none focus:border-accent coarse:min-h-11"
         >
           {ROLES.filter((r) => isManager || r !== 'Manager').map((r) => (
             <option key={r} value={r}>

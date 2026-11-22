@@ -71,6 +71,29 @@ scripts/
 | Users & Roles | full | none | none | none |
 | Settings | full | none | none | none |
 
+## Responsive design and future apps
+
+Every screen must work at phone, tablet and desktop widths. Check each new page at 375, 768 and 1280 px.
+
+| Width | Navigation | Tables | Layout |
+|---|---|---|---|
+| Phone, under 768 (`< md`) | Slide-out drawer from the header menu button | Cards | Single column, KPI tiles two across, filter tabs scroll sideways |
+| Tablet, 768 to 1023 (`md`) | Icon rail, labels as tooltips and for screen readers | Cards for tables of 7+ columns, table otherwise | Two-column grids |
+| Desktop, 1024 and up (`lg`) | Full sidebar | Table | Full grids |
+
+- Tables: `DataTable` turns rows into cards below `md` (below `lg` for 7+ columns, override with `cardsBelow`). Give each column a `mobile` slot: `title`, `corner` (status, total), `footer` (actions), `hide`, or unset (label and value).
+- Touch: the `coarse:` Tailwind variant targets touch screens (phones and tablets of any width). Buttons, inputs and selects are at least 40 to 44 px tall there. Touch-screen fields are 16 px so iOS does not zoom on focus.
+- Use `h-[100dvh]`, not `h-screen`. The `pt-safe`, `pb-safe` and `pl-safe` utilities keep content clear of notches; `viewport-fit=cover` is set in `index.html`.
+- The app installs to a home screen (`public/manifest.webmanifest`, standalone, any orientation), which covers the workshop tablet use for now.
+
+### Room for the planned apps
+
+- Planned: a customer mobile app (track repairs, approve estimates, pay) and a workshop tablet or technician app (assigned jobs, status, inspection photos). The customer web app lives in its own repo.
+- Keep logic and data access out of components. When data moves off `data/mock.ts`, put typed calls in `src/api/` and shared types in `src/data/types.ts`, so both can move into a shared package that a React Native (Expo) app imports.
+- Likely monorepo later: `apps/erp-web`, `apps/customer-web`, `apps/customer-mobile`, `apps/workshop-tablet`, `packages/api-client`, `packages/types`, `packages/design-tokens` (the colour tokens in `index.css` and `chartPalette.ts` become the single source).
+- Backend: the architecture diagram shows a shared Node/Express API. Today Supabase provides auth, Postgres and RLS directly. Plan: Supabase stays the system of record (auth, database, storage); the Node API (or Supabase Edge Functions) handles workflows such as invoicing, purchase orders, payments and notifications, verifying the Supabase session token. Web and mobile clients all use the same sign-in and the same API.
+- Open decisions: customers were planned on MSAL (Azure AD) while staff are on Supabase Auth (Supabase can add Azure as a provider, so one system is possible). The diagram says the ERP is dark only; the app keeps the light and dark toggle.
+
 ## Workshops, authentication and access control
 
 - Multi-workshop (multi-tenant) on one Supabase database. `public.workshops` has a public 6-digit `number`. Each account belongs to at most one workshop (`profiles.workshop_id`). Workshops are walled off by RLS: every workshop-owned table carries `workshop_id` and its policies check `workshop_id = public.my_workshop()`.
