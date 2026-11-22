@@ -1,10 +1,10 @@
 import { useRef, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { CheckCircle2, CreditCard, Lock, PackageSearch, RotateCcw, ShieldCheck, ShoppingCart, Trash2, Wallet } from 'lucide-react';
+import { CheckCircle2, CreditCard, Info, Lock, PackageSearch, RotateCcw, ShieldCheck, ShoppingCart, Trash2, Wallet, X } from 'lucide-react';
 import { Photo } from '@/components/Photo';
-import { Breadcrumbs, DemoNotice, QuantityStepper, StepCard } from '@/components/ui';
-import { useCart } from '@/cart/CartContext';
+import { Breadcrumbs, DemoNotice, LoadError, QuantityStepper, SkeletonGrid, StepCard } from '@/components/ui';
+import { useCart, useResolvedCart } from '@/cart/CartContext';
 import type { CartLine } from '@/cart/CartContext';
 import { formatMoney } from '@/lib/format';
 import { sitePath, useSite } from '@/site/SiteContext';
@@ -105,18 +105,32 @@ interface PlacedOrder {
 export function CartPage() {
   const site = useSite();
   const cart = useCart();
+  const resolved = useResolvedCart();
   const [order, setOrder] = useState<PlacedOrder | null>(null);
 
   return (
     <>
       <Breadcrumbs items={[{ label: 'Parts Shop', to: sitePath(site, 'parts') }, { label: order ? 'Order received' : 'Cart & Checkout' }]} />
       <div className="container-site pb-20 pt-6">
+        {!order && cart.removedCount > 0 && <RemovedNotice count={cart.removedCount} onDismiss={cart.dismissRemoved} />}
         {order ? (
           <OrderConfirmation order={order} />
-        ) : cart.lines.length === 0 ? (
+        ) : resolved.loading ? (
+          <>
+            <h1 className="sr-only">Cart and checkout</h1>
+            <SkeletonGrid label="Loading your cart" count={2} className="grid max-w-3xl gap-4" card="h-32" />
+          </>
+        ) : resolved.error ? (
+          <>
+            <h1 className="sr-only">Cart and checkout</h1>
+            <LoadError what="parts in your cart" onRetry={resolved.retry} className="mx-auto max-w-lg" />
+          </>
+        ) : resolved.lines.length === 0 ? (
           <EmptyCart />
         ) : (
           <Checkout
+            lines={resolved.lines}
+            subtotal={resolved.subtotal}
             onPlaced={(o) => {
               setOrder(o);
               cart.clear();
@@ -126,6 +140,26 @@ export function CartPage() {
         )}
       </div>
     </>
+  );
+}
+
+function RemovedNotice({ count, onDismiss }: { count: number; onDismiss: () => void }) {
+  return (
+    <div role="status" className="glass mb-6 flex items-start gap-3 rounded-2xl px-4 py-3 text-sm text-fg">
+      <Info className="mt-0.5 h-4 w-4 shrink-0 text-warn" aria-hidden />
+      <p className="min-w-0 flex-1">
+        {count === 1 ? 'One item was' : `${count} items were`} removed from your cart because{' '}
+        {count === 1 ? 'it is' : 'they are'} no longer available.
+      </p>
+      <button
+        type="button"
+        onClick={onDismiss}
+        aria-label="Dismiss notice"
+        className="-my-1 -mr-2 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-fg3 transition hover:bg-surface2 hover:text-fg coarse:h-11 coarse:w-11"
+      >
+        <X className="h-4 w-4" aria-hidden />
+      </button>
+    </div>
   );
 }
 
@@ -145,8 +179,7 @@ function EmptyCart() {
 
 // Checkout ----------------------------------------------------------------------------------
 
-function Checkout({ onPlaced }: { onPlaced: (o: PlacedOrder) => void }) {
-  const { lines, subtotal } = useCart();
+function Checkout({ lines, subtotal, onPlaced }: { lines: CartLine[]; subtotal: number; onPlaced: (o: PlacedOrder) => void }) {
   const [shipping, setShipping] = useState<Shipping>(EMPTY_SHIPPING);
   const [errors, setErrors] = useState<ShippingErrors>({});
   const [submitted, setSubmitted] = useState(false);
@@ -202,7 +235,7 @@ function Checkout({ onPlaced }: { onPlaced: (o: PlacedOrder) => void }) {
       <h1 className="sr-only">Cart and checkout</h1>
       {/* Phones: cart, summary, shipping, payment. Desktop: form left, sticky summary right. */}
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px] lg:gap-8 xl:grid-cols-[minmax(0,1fr)_400px]">
-        <CartSection />
+        <CartSection lines={lines} />
 
         <aside aria-label="Order summary" className="lg:col-start-2 lg:row-span-3 lg:row-start-1">
           <div className="glass-strong rounded-2xl p-5 sm:p-6 lg:sticky lg:top-24">
@@ -397,16 +430,16 @@ function TermsNote() {
   );
 }
 
-function CartSection() {
+function CartSection({ lines }: { lines: CartLine[] }) {
   const site = useSite();
-  const { lines, setQty, remove } = useCart();
+  const { setQty, remove } = useCart();
   return (
     <StepCard step={1} title="Your Cart" className="lg:col-start-1">
       <ul className="divide-y divide-line">
         {lines.map(({ part, qty }) => (
           <li key={part.id} className="flex gap-4 py-4 first:pt-0 last:pb-0">
             <Link to={sitePath(site, `parts/${part.slug}`)} tabIndex={-1} aria-hidden className="shrink-0">
-              <Photo name={part.image} alt="" icon={PackageSearch} fit="contain" className="h-20 w-20 rounded-xl border border-line bg-surface sm:h-24 sm:w-24" />
+              <Photo src={part.image} alt="" icon={PackageSearch} fit="contain" className="h-20 w-20 rounded-xl border border-line bg-surface sm:h-24 sm:w-24" />
             </Link>
             <div className="flex min-w-0 flex-1 flex-col">
               <div className="flex items-start justify-between gap-2">
@@ -415,7 +448,7 @@ function CartSection() {
                     {part.name}
                   </Link>
                   <p className="mt-0.5 text-xs text-fg3">
-                    {part.brand} &middot; {part.quality} &middot; Part # {part.partNumber}
+                    {[part.brand, part.quality, part.partNumber && `Part # ${part.partNumber}`].filter(Boolean).join(' \u00b7 ')}
                   </p>
                 </div>
                 <button
@@ -572,7 +605,7 @@ function OrderConfirmation({ order }: { order: PlacedOrder }) {
         <ul className="mt-4 divide-y divide-line">
           {order.lines.map(({ part, qty }) => (
             <li key={part.id} className="flex items-center gap-4 py-3">
-              <Photo name={part.image} alt="" icon={PackageSearch} fit="contain" className="h-14 w-14 shrink-0 rounded-xl border border-line bg-surface" />
+              <Photo src={part.image} alt="" icon={PackageSearch} fit="contain" className="h-14 w-14 shrink-0 rounded-xl border border-line bg-surface" />
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-semibold text-fg">{part.name}</p>
                 <p className="text-xs text-fg3">Quantity {qty}</p>

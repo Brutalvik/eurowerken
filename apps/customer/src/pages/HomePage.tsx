@@ -7,7 +7,6 @@ import {
   Car,
   CheckCircle2,
   ChevronRight,
-  Gauge,
   PackageSearch,
   Quote,
   Receipt,
@@ -15,13 +14,17 @@ import {
   ShieldCheck,
   Star,
   User,
-  Wrench,
 } from 'lucide-react';
+import { useServices, useTeam } from '@/api/catalogue';
 import { Photo } from '@/components/Photo';
-import { GARAGE_FEATURES, HERO_STATS, SERVICES, TECHNICIANS, TESTIMONIALS } from '@/data/landing';
+import { SERVICE_ICON_COMPONENTS } from '@/components/serviceIcons';
+import { SkeletonGrid } from '@/components/ui';
+import { GARAGE_FEATURES, HERO_STATS, TESTIMONIALS } from '@/data/landing';
 import { sitePath, useSite } from '@/site/SiteContext';
 
-const SERVICE_ICONS = [ScanLine, Gauge, CalendarCheck, Wrench];
+/** How many services and team members the home page previews. */
+const PREVIEW_COUNT = 4;
+
 const GARAGE_ICONS = [Car, ScanLine, Receipt];
 
 export function HomePage() {
@@ -212,6 +215,11 @@ function SectionHeading({ eyebrow, title, text, center = true }: { eyebrow: stri
 
 function Services() {
   const site = useSite();
+  const { data, loading } = useServices();
+  // Hidden when the workshop lists no services, or they could not be loaded (the Services page explains).
+  if (!loading && (!data || data.length === 0)) return null;
+  // Badged services first, then the workshop's order.
+  const shown = [...(data ?? [])].sort((a, b) => Number(!a.badge) - Number(!b.badge)).slice(0, PREVIEW_COUNT);
   return (
     <section className="container-site py-20 sm:py-24">
       <SectionHeading
@@ -219,25 +227,38 @@ function Services() {
         title="Comprehensive Care for European Vehicles"
         text="From routine maintenance to complex rebuilds, every job is done to manufacturer standards by specialists in your make."
       />
-      <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-        {SERVICES.map((s, i) => {
-          const Icon = SERVICE_ICONS[i % SERVICE_ICONS.length]!;
-          return (
-            <article key={s.title} className="group overflow-hidden rounded-2xl border border-line bg-surface shadow-sm transition hover:-translate-y-1 hover:shadow-xl">
-              <div className="aspect-[4/3] overflow-hidden">
-                <Photo name={s.image} alt={s.title} icon={Icon} label={`${s.image}.jpg`} className="h-full w-full transition duration-500 group-hover:scale-105" />
-              </div>
-              <div className="p-5">
-                <h3 className="font-display text-lg font-semibold text-fg">{s.title}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-fg2">{s.text}</p>
-                <Link to={sitePath(site, 'services')} className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-accent hover:underline coarse:min-h-11">
-                  Learn more <ChevronRight className="h-4 w-4" aria-hidden />
-                </Link>
-              </div>
-            </article>
-          );
-        })}
-      </div>
+      {loading ? (
+        <div className="mt-12">
+          <SkeletonGrid label="Loading services" count={PREVIEW_COUNT} className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4" card="h-80" />
+        </div>
+      ) : (
+        <ul className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+          {shown.map((s) => {
+            const Icon = SERVICE_ICON_COMPONENTS[s.icon];
+            return (
+              <li key={s.id}>
+                <article className="group flex h-full flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-sm transition hover:-translate-y-1 hover:shadow-xl">
+                  <div className="aspect-[4/3] overflow-hidden">
+                    <Photo src={s.image} alt={s.name} icon={Icon} className="h-full w-full transition duration-500 group-hover:scale-105" />
+                  </div>
+                  <div className="flex flex-1 flex-col p-5">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-fg3">{s.categoryLabel}</p>
+                    <h3 className="mt-1 font-display text-lg font-semibold text-fg">{s.name}</h3>
+                    {s.text && <p className="mt-2 line-clamp-3 text-sm leading-relaxed text-fg2">{s.text}</p>}
+                    <Link
+                      to={`${sitePath(site, 'book')}?service=${encodeURIComponent(s.id)}`}
+                      className="mt-auto inline-flex items-center gap-1 pt-4 text-sm font-semibold text-accent hover:underline coarse:min-h-11"
+                    >
+                      Book this service <ChevronRight className="h-4 w-4" aria-hidden />
+                      <span className="sr-only">: {s.name}</span>
+                    </Link>
+                  </div>
+                </article>
+              </li>
+            );
+          })}
+        </ul>
+      )}
       <div className="mt-10 text-center">
         <Link to={sitePath(site, 'services')} className="btn-outline">
           View All Services
@@ -317,6 +338,10 @@ function GaragePreview() {
 
 function Technicians() {
   const site = useSite();
+  const { data, loading } = useTeam();
+  // Hidden when the workshop lists nobody, or the team could not be loaded (the Experts page explains).
+  if (!loading && (!data || data.length === 0)) return null;
+  const shown = (data ?? []).slice(0, PREVIEW_COUNT);
   return (
     <section className="container-site py-20 sm:py-24">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
@@ -330,25 +355,36 @@ function Technicians() {
           Meet the Experts <ArrowRight className="h-4 w-4" aria-hidden />
         </Link>
       </div>
-      {/* Phones: swipe sideways. Larger screens: grid. */}
-      <ul className="no-scrollbar -mx-4 mt-10 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-2 sm:mx-0 sm:grid sm:grid-cols-2 sm:overflow-visible sm:px-0 lg:grid-cols-4">
-        {TECHNICIANS.map((t) => (
-          <li key={t.name} className="w-[75%] shrink-0 snap-start overflow-hidden rounded-2xl border border-line bg-surface shadow-sm sm:w-auto">
-            <Photo name={t.image} alt={`${t.name}, ${t.role}`} icon={User} label={`${t.image}.jpg`} className="aspect-square w-full" />
-            <div className="p-4">
-              <h3 className="font-display font-semibold text-fg">{t.name}</h3>
-              <p className="text-sm text-fg2">{t.role}</p>
-              <div className="mt-3 flex flex-wrap gap-1.5">
-                {t.tags.map((tag) => (
-                  <span key={tag} className="rounded-md bg-surface2 px-2 py-0.5 text-[11px] font-medium text-fg2">
-                    {tag}
-                  </span>
-                ))}
-              </div>
-            </div>
-          </li>
-        ))}
-      </ul>
+      {loading ? (
+        <div className="mt-10">
+          <SkeletonGrid label="Loading the team" count={PREVIEW_COUNT} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4" card="h-80" />
+        </div>
+      ) : (
+        /* Phones: swipe sideways. Larger screens: grid. */
+        <ul className="no-scrollbar -mx-4 mt-10 flex snap-x snap-mandatory gap-4 overflow-x-auto px-4 pb-2 sm:mx-0 sm:grid sm:grid-cols-2 sm:overflow-visible sm:px-0 lg:grid-cols-4">
+          {shown.map((t) => {
+            const tags = (t.makes.length > 0 ? t.makes : t.specialties).slice(0, 3);
+            return (
+              <li key={t.id} className="w-[75%] shrink-0 snap-start overflow-hidden rounded-2xl border border-line bg-surface shadow-sm sm:w-auto">
+                <Photo src={t.image} alt={`${t.name}, ${t.role}`} icon={User} className="aspect-square w-full" />
+                <div className="p-4">
+                  <h3 className="font-display font-semibold text-fg">{t.name}</h3>
+                  <p className="text-sm text-fg2">{t.role}</p>
+                  {tags.length > 0 && (
+                    <ul className="mt-3 flex flex-wrap gap-1.5" aria-label="Specialises in">
+                      {tags.map((tag) => (
+                        <li key={tag} className="rounded-md bg-surface2 px-2 py-0.5 text-[11px] font-medium text-fg2">
+                          {tag}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
     </section>
   );
 }

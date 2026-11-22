@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, NavLink, useLocation } from 'react-router-dom';
 import { Menu, Moon, Search, ShoppingCart, Sun, User, X } from 'lucide-react';
-import { useCart } from '@/cart/CartContext';
+import { useResolvedCart } from '@/cart/CartContext';
 import { sitePath, useSite } from '@/site/SiteContext';
 import { useTheme } from '@/theme/ThemeProvider';
 import { Wordmark } from '../Wordmark';
@@ -13,7 +13,7 @@ const iconButton =
 export function SiteHeader() {
   const site = useSite();
   const { mode, toggle } = useTheme();
-  const { count } = useCart();
+  const { count } = useResolvedCart();
   const { pathname } = useLocation();
   const [open, setOpen] = useState(false);
 

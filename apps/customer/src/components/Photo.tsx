@@ -3,8 +3,10 @@ import type { LucideIcon } from 'lucide-react';
 import { ImageIcon } from 'lucide-react';
 
 interface PhotoProps {
-  /** File in public/images, without extension. Tried as .jpg, then .png. */
-  name: string;
+  /** Full image URL (for example a workshop upload). Tried first when given. */
+  src?: string;
+  /** File in public/images, without extension. Tried as .png, .jpg, then .webp, after src. */
+  name?: string;
   alt: string;
   className?: string;
   icon?: LucideIcon;
@@ -15,13 +17,24 @@ interface PhotoProps {
 }
 
 /**
- * A photo slot. Shows public/images/<name>.png (or .jpg, .webp) when the file
- * exists, otherwise a styled placeholder so the layout never breaks.
+ * A photo slot. Shows `src` when given and it loads, then public/images/<name>.png
+ * (or .jpg, .webp) when the file exists, otherwise a styled placeholder so the
+ * layout never breaks.
  */
-export function Photo({ name, alt, className = '', icon: Icon = ImageIcon, label, fit = 'cover' }: PhotoProps) {
+export function Photo({ src, name, alt, className = '', icon: Icon = ImageIcon, label, fit = 'cover' }: PhotoProps) {
   // .png first for cut-outs with a transparent background, then .jpg, then .webp.
-  const sources = [`/images/${name}.png`, `/images/${name}.jpg`, `/images/${name}.webp`];
+  const sources = [
+    ...(src ? [src] : []),
+    ...(name ? [`/images/${name}.png`, `/images/${name}.jpg`, `/images/${name}.webp`] : []),
+  ];
   const [index, setIndex] = useState(0);
+  // A different picture in the same slot starts again from its first source.
+  const [shown, setShown] = useState(`${src ?? ''}|${name ?? ''}`);
+  const id = `${src ?? ''}|${name ?? ''}`;
+  if (shown !== id) {
+    setShown(id);
+    setIndex(0);
+  }
 
   if (index < sources.length) {
     return (

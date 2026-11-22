@@ -1,8 +1,15 @@
 import { useState } from 'react';
 import type { ReactNode } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/Button';
 import { Card, CardHeader } from '@/components/ui/Card';
+import { PillTabs } from '@/components/ui/PillTabs';
+import { ServicesCard } from './settings/ServicesCard';
+import { TeamCard } from './settings/TeamCard';
 import { WebsiteCard } from './settings/WebsiteCard';
+
+const TABS = ['Website', 'Services', 'Team', 'Workshop'] as const;
+type Tab = (typeof TABS)[number];
 
 interface FieldProps {
   id: string;
@@ -30,6 +37,30 @@ function Field({ id, label, value, onChange, type = 'text' }: FieldProps): React
 }
 
 export function SettingsPage() {
+  // The open tab lives in the address (?tab=services), so it survives a reload and can be linked to.
+  const [params, setParams] = useSearchParams();
+  const tab: Tab = TABS.find((t) => t.toLowerCase() === params.get('tab')) ?? 'Website';
+  const setTab = (t: Tab) => setParams(t === 'Website' ? {} : { tab: t.toLowerCase() }, { replace: true });
+
+  return (
+    <div className="space-y-4">
+      <PillTabs label="Settings sections" options={TABS} value={tab} onChange={setTab} />
+      <div role="tabpanel" aria-label={tab}>
+        {tab === 'Website' && (
+          <div className="max-w-3xl">
+            <WebsiteCard />
+          </div>
+        )}
+        {tab === 'Services' && <ServicesCard />}
+        {tab === 'Team' && <TeamCard />}
+        {tab === 'Workshop' && <WorkshopSettings />}
+      </div>
+    </div>
+  );
+}
+
+/** Workshop profile and invoicing defaults (not yet saved to the database). */
+function WorkshopSettings() {
   const [name, setName] = useState('EuroWerken');
   const [email, setEmail] = useState('service@eurowerken.com');
   const [phone, setPhone] = useState('');
@@ -45,7 +76,6 @@ export function SettingsPage() {
 
   return (
     <div className="max-w-3xl space-y-4">
-    <WebsiteCard />
     <form
       className="space-y-4"
       onSubmit={(e) => {

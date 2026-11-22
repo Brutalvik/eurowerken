@@ -1,18 +1,17 @@
-import { useId, useRef, useState } from 'react';
+import { useId, useMemo, useRef, useState } from 'react';
 import type { KeyboardEvent } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { CheckCircle2, Heart, PackageSearch, Plus, ShieldCheck, ShoppingCart, Store, ThumbsUp, Truck } from 'lucide-react';
+import { useParts, usePart } from '@/api/catalogue';
+import type { Part } from '@/api/catalogue';
 import { Photo } from '@/components/Photo';
-import { Breadcrumbs, Pill, QuantityStepper, Stars } from '@/components/ui';
-import { findPart, relatedParts } from '@/data/catalog';
-import type { Part } from '@/data/catalog';
+import { Breadcrumbs, LoadError, Pill, QuantityStepper, Stars } from '@/components/ui';
 import { useCart } from '@/cart/CartContext';
 import { formatMoney } from '@/lib/format';
 import { sitePath, useSite } from '@/site/SiteContext';
 import { readVehicle, vehicleLabel, vehicleQuery } from './vehicle';
 import type { Vehicle } from './vehicle';
 
-const GALLERY_SIZE = 5;
 const MAX_QTY = 20;
 
 /** Sample reviews until reviews come from the backend. */
@@ -42,8 +41,35 @@ export function PartDetailsPage() {
   const site = useSite();
   const { partSlug } = useParams();
   const [params] = useSearchParams();
-  const part = partSlug ? findPart(partSlug) : undefined;
+  const { data: part, loading, error, retry } = usePart(partSlug);
   const vehicle = readVehicle(params);
+
+  if (loading) {
+    return (
+      <div className="container-site py-10" aria-busy="true">
+        <p className="sr-only" aria-live="polite">
+          Loading part
+        </p>
+        <div aria-hidden className="glass grid animate-pulse gap-8 rounded-3xl p-4 motion-reduce:animate-none sm:p-6 lg:grid-cols-2 lg:p-8">
+          <span className="aspect-square w-full rounded-2xl bg-surface2 sm:aspect-[4/3]" />
+          <span className="flex flex-col gap-4">
+            <span className="h-5 w-32 rounded bg-surface2" />
+            <span className="h-8 w-4/5 rounded bg-surface2" />
+            <span className="h-4 w-1/2 rounded bg-surface2" />
+            <span className="h-32 w-full rounded-2xl bg-surface2" />
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="container-site py-20">
+        <LoadError what="part" onRetry={retry} className="mx-auto max-w-lg" />
+      </div>
+    );
+  }
 
   if (!part) {
     return (
@@ -51,7 +77,7 @@ export function PartDetailsPage() {
         <div className="glass mx-auto max-w-lg rounded-3xl px-6 py-14 text-center">
           <PackageSearch className="mx-auto h-10 w-10 text-fg3" aria-hidden />
           <h1 className="mt-4 font-display text-2xl font-bold text-ink">Part not found</h1>
-          <p className="mt-2 text-sm text-fg2">This part may have been removed, or the link is incomplete.</p>
+          <p className="mt-2 text-sm text-fg2">This part may no longer be available, or the link is incomplete.</p>
           <Link to={`${sitePath(site, 'parts')}${vehicleQuery(vehicle)}`} className="btn-ink mt-8">
             Back to the Parts Shop
           </Link>
@@ -86,7 +112,7 @@ export function PartDetailsPage() {
         </section>
         <InfoTabs part={part} />
         <BoughtTogether part={part} vehicle={vehicle} />
-        <ReviewsSection part={part} />
+        {hasReviews(part) && <ReviewsSection part={part} />}
       </div>
     </>
   );
@@ -121,18 +147,17 @@ function FitmentBar({ part, vehicle, shopHref }: { part: Part; vehicle: Vehicle 
 function Gallery({ part }: { part: Part }) {
   const [index, setIndex] = useState(0);
   const [favourite, setFavourite] = useState(false);
-  const names = Array.from({ length: GALLERY_SIZE }, (_, i) => (i === 0 ? part.image : `${part.image}-${i + 1}`));
-  const current = names[index] ?? part.image;
+  const images = part.images;
+  const current = images[index] ?? images[0];
+  const count = Math.max(1, images.length);
   return (
     <div className="min-w-0">
       <div className="relative overflow-hidden rounded-2xl border border-line bg-surface">
-        {/* key: a new Photo per image, so a missing file does not keep the previous fallback state. */}
         <Photo
-          key={current}
-          name={current}
-          alt={`${part.name}, photo ${index + 1} of ${names.length}`}
+          src={current}
+          alt={`${part.name}, photo ${Math.min(index + 1, count)} of ${count}`}
           icon={PackageSearch}
-          label={`${current}.png`}
+          label={images.length === 0 ? 'Photo coming soon' : undefined}
           fit="contain"
           className="aspect-square w-full sm:aspect-[4/3]"
         />
@@ -146,21 +171,23 @@ function Gallery({ part }: { part: Part }) {
           <Heart className={`h-4 w-4 ${favourite ? 'fill-bad text-bad' : ''}`} aria-hidden />
         </button>
       </div>
-      <ul className="no-scrollbar mt-3 flex gap-2.5 overflow-x-auto pb-1" aria-label="Photos">
-        {names.map((n, i) => (
-          <li key={n} className="shrink-0">
-            <button
-              type="button"
-              onClick={() => setIndex(i)}
-              aria-label={`Show photo ${i + 1}`}
-              aria-pressed={i === index}
-              className={`block overflow-hidden rounded-xl border-2 transition ${i === index ? 'border-ink' : 'border-line hover:border-fg3'}`}
-            >
-              <Photo name={n} alt="" icon={PackageSearch} fit="contain" className="h-16 w-16 bg-surface sm:h-20 sm:w-20" />
-            </button>
-          </li>
-        ))}
-      </ul>
+      {images.length > 1 && (
+        <ul className="no-scrollbar mt-3 flex gap-2.5 overflow-x-auto pb-1" aria-label="Photos">
+          {images.map((url, i) => (
+            <li key={url} className="shrink-0">
+              <button
+                type="button"
+                onClick={() => setIndex(i)}
+                aria-label={`Show photo ${i + 1}`}
+                aria-pressed={i === index}
+                className={`block overflow-hidden rounded-xl border-2 transition ${i === index ? 'border-ink' : 'border-line hover:border-fg3'}`}
+              >
+                <Photo src={url} alt="" icon={PackageSearch} fit="contain" className="h-16 w-16 bg-surface sm:h-20 sm:w-20" />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }
@@ -186,20 +213,34 @@ function BuyBox({ part }: { part: Part }) {
         {stockPill(part.stock)}
       </div>
       <h1 className="mt-3 font-display text-2xl font-bold leading-tight tracking-tight text-ink sm:text-3xl">{part.name}</h1>
-      <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-fg2">
-        <span className="flex items-center gap-1.5">
-          <Stars rating={part.rating} />
-          <a href="#reviews" className="hover:text-fg hover:underline">
-            {part.rating} ({part.reviewCount} reviews)
-          </a>
-        </span>
-        <span className="text-line" aria-hidden>
-          |
-        </span>
-        <span>
-          Part #: <span className="font-medium text-fg">{part.partNumber}</span>
-        </span>
-      </div>
+      {(hasReviews(part) || part.partNumber || part.brand) && (
+        <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-fg2">
+          {hasReviews(part) && (
+            <>
+              <span className="flex items-center gap-1.5">
+                <Stars rating={part.rating ?? 0} />
+                <a href="#reviews" className="hover:text-fg hover:underline">
+                  {part.rating} ({part.reviewCount} reviews)
+                </a>
+              </span>
+              <span className="text-line" aria-hidden>
+                |
+              </span>
+            </>
+          )}
+          {part.brand && <span className="font-medium text-fg">{part.brand}</span>}
+          {part.brand && part.partNumber && (
+            <span className="text-line" aria-hidden>
+              |
+            </span>
+          )}
+          {part.partNumber && (
+            <span>
+              Part #: <span className="font-medium text-fg">{part.partNumber}</span>
+            </span>
+          )}
+        </div>
+      )}
 
       <div className="mt-6 rounded-2xl border border-line bg-surface2/60 p-4 sm:p-5">
         <p className="flex flex-wrap items-baseline gap-x-3">
@@ -214,7 +255,7 @@ function BuyBox({ part }: { part: Part }) {
             </span>
           )}
         </p>
-        <p className="mt-1 text-xs text-fg3">{part.summary}</p>
+        {part.summary && <p className="mt-1 text-xs text-fg3">{part.summary}</p>}
         <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
           <QuantityStepper value={qty} onChange={(v) => setQty(Math.min(maxQty, Math.max(1, v)))} max={maxQty} />
           <button
@@ -281,12 +322,27 @@ function BuyBox({ part }: { part: Part }) {
 
 // Tabs ------------------------------------------------------------------------------------
 
-const TABS = ['Description', 'Technical Specs', 'OEM Cross Reference', 'Warranty'] as const;
+const ALL_TABS = ['Description', 'Technical Specs', 'OEM Cross Reference', 'Warranty'] as const;
+type Tab = (typeof ALL_TABS)[number];
+
+function hasReviews(part: Part): boolean {
+  return part.rating !== undefined && (part.reviewCount ?? 0) > 0;
+}
 
 function InfoTabs({ part }: { part: Part }) {
   const base = useId();
   const [active, setActive] = useState(0);
   const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  // Tabs the workshop has filled in; Description and Technical Specs are always shown.
+  const TABS = ALL_TABS.filter(
+    (t): t is Tab => (t !== 'OEM Cross Reference' || part.oemReferences.length > 0) && (t !== 'Warranty' || part.warranty !== ''),
+  );
+  const facts = [
+    { label: 'Brand', value: part.brand },
+    { label: 'Part number', value: part.partNumber },
+    { label: 'Quality', value: part.quality },
+    ...part.specs,
+  ].filter((s) => s.value);
 
   function onKeyDown(e: KeyboardEvent<HTMLDivElement>) {
     const last = TABS.length - 1;
@@ -335,9 +391,10 @@ function InfoTabs({ part }: { part: Part }) {
           tabIndex={0}
           className="p-5 text-sm leading-relaxed text-fg2 outline-none sm:p-8"
         >
-          {i === 0 && (
+          {t === 'Description' && (
             <>
               <h2 className="font-display text-lg font-semibold text-fg">Product Description</h2>
+              {part.description.length === 0 && <p className="mt-3">{part.summary || 'Ask us for details about this part.'}</p>}
               {part.description.map((d) => (
                 <p key={d} className="mt-3">
                   {d}
@@ -355,19 +412,17 @@ function InfoTabs({ part }: { part: Part }) {
               )}
             </>
           )}
-          {i === 1 && (
+          {t === 'Technical Specs' && (
             <dl className="max-w-xl divide-y divide-line">
-              {[{ label: 'Brand', value: part.brand }, { label: 'Part number', value: part.partNumber }, { label: 'Quality', value: part.quality }, ...part.specs].map(
-                (s) => (
-                  <div key={s.label} className="flex justify-between gap-4 py-2.5">
-                    <dt className="text-fg3">{s.label}</dt>
-                    <dd className="text-right font-medium text-fg">{s.value}</dd>
-                  </div>
-                ),
-              )}
+              {facts.map((s) => (
+                <div key={s.label} className="flex justify-between gap-4 py-2.5">
+                  <dt className="text-fg3">{s.label}</dt>
+                  <dd className="text-right font-medium text-fg">{s.value}</dd>
+                </div>
+              ))}
             </dl>
           )}
-          {i === 2 && (
+          {t === 'OEM Cross Reference' && (
             <>
               <p>This part replaces the following manufacturer part numbers:</p>
               <ul className="mt-3 flex flex-wrap gap-2">
@@ -379,7 +434,7 @@ function InfoTabs({ part }: { part: Part }) {
               </ul>
             </>
           )}
-          {i === 3 && (
+          {t === 'Warranty' && (
             <>
               <p className="font-medium text-fg">{part.warranty}</p>
               <p className="mt-3">
@@ -396,13 +451,24 @@ function InfoTabs({ part }: { part: Part }) {
 
 // Frequently bought together ---------------------------------------------------------------
 
+/** Other in-stock parts in the same category (a simple rule until order history can suggest better). */
+function relatedParts(part: Part, all: Part[], count = 2): Part[] {
+  return all.filter((p) => p.id !== part.id && p.category === part.category && p.stock > 0).slice(0, count);
+}
+
 function BoughtTogether({ part, vehicle }: { part: Part; vehicle: Vehicle | null }) {
+  const { data } = useParts();
+  const related = useMemo(() => (data ? relatedParts(part, data) : []), [data, part]);
+  if (related.length === 0) return null;
+  // key: start with every item ticked again when the suggestions change.
+  return <Bundle key={related.map((p) => p.id).join(',')} items={[part, ...related]} vehicle={vehicle} />;
+}
+
+function Bundle({ items, vehicle }: { items: Part[]; vehicle: Vehicle | null }) {
   const site = useSite();
   const { add } = useCart();
-  const items = [part, ...relatedParts(part)];
   const [checked, setChecked] = useState<Set<string>>(() => new Set(items.map((p) => p.id)));
   const [added, setAdded] = useState(false);
-  if (items.length < 2) return null;
 
   const selected = items.filter((p) => checked.has(p.id));
   const total = selected.reduce((n, p) => n + p.price, 0);
@@ -429,7 +495,7 @@ function BoughtTogether({ part, vehicle }: { part: Part; vehicle: Vehicle | null
               {i > 0 && <Plus className="hidden h-4 w-4 shrink-0 text-fg3 sm:block" aria-hidden />}
               <div className="flex items-center gap-3 sm:w-36 sm:flex-col sm:text-center">
                 <Link to={`${sitePath(site, `parts/${p.slug}`)}${vehicleQuery(vehicle)}`} tabIndex={-1} aria-hidden className="shrink-0">
-                  <Photo name={p.image} alt="" icon={PackageSearch} fit="contain" className="h-16 w-16 rounded-xl border border-line bg-surface sm:h-20 sm:w-20" />
+                  <Photo src={p.image} alt="" icon={PackageSearch} fit="contain" className="h-16 w-16 rounded-xl border border-line bg-surface sm:h-20 sm:w-20" />
                 </Link>
                 <label className="flex cursor-pointer items-start gap-2 text-xs text-fg2 sm:flex-col sm:items-center">
                   <input type="checkbox" checked={checked.has(p.id)} onChange={() => toggle(p.id)} className="mt-0.5 h-4 w-4 shrink-0 accent-accent coarse:h-5 coarse:w-5" />
@@ -483,7 +549,9 @@ function distribution(total: number): number[] {
 }
 
 function ReviewsSection({ part }: { part: Part }) {
-  const counts = distribution(part.reviewCount);
+  const total = part.reviewCount ?? 0;
+  const rating = part.rating ?? 0;
+  const counts = distribution(total);
   return (
     <section id="reviews" aria-labelledby="reviews-title" className="scroll-mt-24">
       <h2 id="reviews-title" className="font-display text-xl font-bold text-ink sm:text-2xl">
@@ -492,16 +560,16 @@ function ReviewsSection({ part }: { part: Part }) {
       <div className="mt-5 grid gap-6 lg:grid-cols-[300px_1fr]">
         <div className="glass self-start rounded-3xl p-6">
           <div className="flex items-end gap-3">
-            <p className="font-display text-5xl font-bold text-fg">{part.rating.toFixed(1)}</p>
+            <p className="font-display text-5xl font-bold text-fg">{rating.toFixed(1)}</p>
             <div className="pb-1">
-              <Stars rating={part.rating} />
-              <p className="mt-1 text-xs text-fg3">Based on {part.reviewCount} reviews</p>
+              <Stars rating={rating} />
+              <p className="mt-1 text-xs text-fg3">Based on {total} reviews</p>
             </div>
           </div>
           <ul className="mt-6 space-y-2" aria-label="Ratings breakdown">
             {counts.map((c, i) => {
               const stars = 5 - i;
-              const pct = part.reviewCount ? (c / part.reviewCount) * 100 : 0;
+              const pct = total ? (c / total) * 100 : 0;
               return (
                 <li key={stars} className="flex items-center gap-3 text-xs text-fg2">
                   <span className="w-12 shrink-0 whitespace-nowrap" aria-hidden>

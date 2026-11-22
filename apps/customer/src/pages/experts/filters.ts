@@ -1,5 +1,5 @@
 import { VEHICLE_MAKES } from '@/data/catalog';
-import type { Technician } from '@/data/catalog';
+import type { Technician } from '@/api/catalogue';
 
 export interface ExpertFilters {
   specialty: string;
@@ -51,7 +51,7 @@ export function makeOptions(techs: Technician[]): string[] {
 export function matchesFilters(t: Technician, f: ExpertFilters): boolean {
   if (f.specialty && !t.specialties.includes(f.specialty)) return false;
   if (f.language && !t.languages.includes(f.language)) return false;
-  if (f.minYears && t.years < f.minYears) return false;
+  if (f.minYears && (t.years ?? 0) < f.minYears) return false;
   if (f.make && !t.makes.some((m) => m === ALL_MAKES || makeKey(m) === makeKey(f.make))) return false;
   return true;
 }

@@ -28,7 +28,8 @@ npm run build                # all workspaces
 
 ## Product context
 
-- The customer site is built from the design screenshots: home, services, experts, parts shop, part details, cart and checkout, booking, repair tracking, repair case details, reviews, customer garage. All run on sample data (`apps/customer/src/data/catalog.ts`); flows that need the backend (checkout payment, booking confirmation, estimate approval, messages, reviews, garage accounts) work on the page and show a notice that they are not connected yet. Card fields at checkout are layout only and are never read.
+- Backend work follows `docs/backend-plan.md` (phases 1 to 5: catalogue and customer identity, customer accounts, bookings, repair orders, orders and Stripe Connect payments with pay-in-store). Phase 1 is built: services, team and parts are real data (managed in the ERP: Settings > Services and Team, Inventory), with photos in the `workshop-public` storage bucket.
+- The customer site is built from the design screenshots: home, services, experts, parts shop, part details, cart and checkout, booking, repair tracking, repair case details, reviews, customer garage. Services, experts and parts read Supabase (`apps/customer/src/api/catalogue.ts`); reviews, repair cases and the garage still use sample data (`apps/customer/src/data/catalog.ts`); flows that need the backend (checkout payment, booking confirmation, estimate approval, messages, reviews, garage accounts) work on the page and show a notice that they are not connected yet. Card fields at checkout are layout only and are never read.
 - Data flow: customer books online, appointment lands in the ERP, technician updates repair status, customer sees it live, parts used decrement inventory, invoice is generated, payment is recorded in sales and reports.
 - ERP brand name lives in `apps/erp/src/config/brand.ts`. Company name and legal entity live in `packages/shared/src/legal.ts` (`COMPANY`).
 
@@ -40,20 +41,25 @@ apps/erp/src/
   components/  layout/ (AppLayout, Sidebar, Header), ui/ (Badge, Button, Card, DataTable, KpiCard, PillTabs, SearchInput)
   config/      brand.ts
   data/        types.ts, mock.ts (static mock data, one export per future API resource)
+  api/         catalogue.ts (services, team, parts, part costs, image upload)
   lib/         format.ts (CAD), status.ts, supabase.ts, invites.ts
-  pages/       one file per module; auth/ (login, register, onboarding, invite, reset, setup), users/, settings/ (WebsiteCard), legal/ (Terms, Privacy)
+  pages/       one file per module; auth/ (login, register, onboarding, invite, reset, setup), users/, settings/ (WebsiteCard, ServicesCard, TeamCard),
+               inventory/ (PartForm, Dialog, ConfirmDialog), legal/ (Terms, Privacy)
   theme/       ThemeProvider, chartPalette (hex per mode for recharts)
 apps/customer/src/
   site/        SiteContext: loads the published workshop_sites row for /:slug, applies the workshop's colour to --accent and --accent-fg
   cart/        CartContext: cart per site in localStorage, synced across tabs
   components/  layout/ (SiteLayout, SiteHeader, SiteFooter, nav), ui/ (PageHero, Breadcrumbs, Stars, Pill, StepCard, QuantityStepper, DemoNotice), Photo, Wordmark
-  data/        catalog.ts (parts, services, technicians, reviews, repair cases, garage: one export per future table), landing.ts
+  api/         catalogue.ts (services, team, parts hooks, cached per workshop)
+  data/        catalog.ts (sample reviews, repair cases, garage, vehicle lists until later phases), landing.ts
   lib/         supabase.ts, format.ts (CAD)
   pages/       HomePage, ServicesPage, ExpertsPage, parts/ (shop, details), CartPage, BookPage, track/ (lookup, case details),
                ReviewsPage, GaragePage, LegalPage, RootPage (/), SiteNotFound; page-local helpers in folders next to them
 apps/customer/public/images/   drop-in photos; README lists the file names
 packages/shared/src/   site.ts, brand.ts, legal.ts
-supabase/migrations/   001 profiles, 002 registration and role_permissions, 003 workshops and invites, 004 workshop_sites
+supabase/migrations/   001 profiles, 002 registration and role_permissions, 003 workshops and invites, 004 workshop_sites,
+                       005 customers, services, team, parts, part_costs, workshop-public bucket
+docs/backend-plan.md   phased plan for accounts, bookings, repairs, orders, Stripe
 scripts/db-migrate.sh  applies unapplied migrations with psql
 ```
 

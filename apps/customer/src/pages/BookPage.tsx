@@ -2,9 +2,10 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent, ReactNode, RefObject } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { ArrowRight, CalendarCheck, Car, CheckCircle2, Clock, Info, User, Wrench } from 'lucide-react';
-import { Breadcrumbs, DemoNotice, PageHero, StepCard } from '@/components/ui';
-import { BOOKABLE_SERVICES as SERVICES, TECHNICIANS, VEHICLE_MAKES, VEHICLE_YEARS } from '@/data/catalog';
-import type { Service } from '@/data/catalog';
+import { useServices, useTeam } from '@/api/catalogue';
+import type { Service, Technician } from '@/api/catalogue';
+import { Breadcrumbs, DemoNotice, EmptyCatalogue, LoadError, PageHero, StepCard } from '@/components/ui';
+import { VEHICLE_MAKES, VEHICLE_YEARS } from '@/data/catalog';
 import { formatMoneyWhole } from '@/lib/format';
 import { sitePath, useSite } from '@/site/SiteContext';
 import { Calendar, formatLongDate, fromIsoDate, toIsoDate } from './book/Calendar';
@@ -20,8 +21,13 @@ const URGENCY: { id: Urgency; label: string }[] = [
 const WEEKDAY_SLOTS = ['08:00', '09:00', '10:30', '13:00', '14:30', '16:00'];
 const SATURDAY_SLOTS = ['09:00', '10:30'];
 
-/** Technicians who take bookings (service advisors do not). */
-const EXPERTS = TECHNICIANS.filter((t) => !/advisor/i.test(t.role));
+/** Team members who take bookings (service advisors do not). */
+function bookableExperts(team: Technician[]): Technician[] {
+  return team.filter((t) => !/advisor/i.test(t.role));
+}
+
+const NO_SERVICES: Service[] = [];
+const NO_TEAM: Technician[] = [];
 
 interface FormState {
   make: string;
@@ -49,13 +55,15 @@ type Errors = Partial<Record<Field, string>>;
 /** Order matters: the first field with an error gets focus. */
 const FIELD_ORDER: Field[] = ['make', 'model', 'year', 'vin', 'services', 'date', 'time', 'firstName', 'lastName', 'email', 'phone'];
 
-function validate(f: FormState): Errors {
+/** hasServices: the workshop lists services to pick from; otherwise the notes must say what is needed. */
+function validate(f: FormState, hasServices: boolean): Errors {
   const e: Errors = {};
   if (!f.make) e.make = 'Select the make of your vehicle.';
   if (!f.model) e.model = f.make ? 'Select the model.' : 'Select a make first, then the model.';
   if (!f.year) e.year = 'Select the model year.';
   if (f.vin && !/^[A-HJ-NPR-Z0-9]{17}$/.test(f.vin)) e.vin = 'A VIN is 17 letters and numbers (no I, O or Q). Leave it empty if unsure.';
-  if (f.services.length === 0) e.services = 'Select at least one service.';
+  if (hasServices && f.services.length === 0) e.services = 'Select at least one service.';
+  if (!hasServices && !f.notes.trim()) e.services = 'Describe the work your car needs in the notes.';
   if (!f.date) e.date = 'Choose a date for your appointment.';
   if (!f.time) e.time = f.date ? 'Choose a time.' : 'Choose a date first, then a time.';
   if (!f.firstName.trim()) e.firstName = 'Enter your first name.';
@@ -98,21 +106,27 @@ function makeReference(): string {
 export function BookPage() {
   const site = useSite();
   const [params] = useSearchParams();
+  const servicesLoad = useServices();
+  const teamLoad = useTeam();
+  const offered = servicesLoad.data ?? NO_SERVICES;
+  const experts = useMemo(() => bookableExperts(teamLoad.data ?? NO_TEAM), [teamLoad.data]);
+  const hasServices = servicesLoad.loading || offered.length > 0;
 
+  // ?service=<id> and ?tech=<id> are kept until the lists load, then checked against them.
   const [form, setForm] = useState<FormState>(() => {
-    const service = SERVICES.find((s) => s.id === params.get('service'));
-    const expert = EXPERTS.find((t) => t.id === params.get('tech'));
+    const service = params.get('service');
+    const expert = params.get('tech');
     return {
       make: '',
       model: '',
       year: '',
       vin: '',
-      services: service ? [service.id] : [],
+      services: service ? [service] : [],
       notes: '',
       urgency: 'routine',
       date: '',
       time: '',
-      expert: expert?.id ?? '',
+      expert: expert ?? '',
       firstName: '',
       lastName: '',
       email: '',
@@ -137,10 +151,21 @@ export function BookPage() {
     });
   }
 
+  // Drop preselected ids the workshop does not offer (any more).
+  useEffect(() => {
+    if (!servicesLoad.data) return;
+    const known = new Set(servicesLoad.data.map((s) => s.id));
+    setForm((f) => (f.services.every((id) => known.has(id)) ? f : { ...f, services: f.services.filter((id) => known.has(id)) }));
+  }, [servicesLoad.data]);
+  useEffect(() => {
+    if (!teamLoad.data) return;
+    setForm((f) => (!f.expert || experts.some((t) => t.id === f.expert) ? f : { ...f, expert: '' }));
+  }, [teamLoad.data, experts]);
+
   // After the first attempt, keep the messages in step with what the visitor fixes.
   useEffect(() => {
-    if (submitted) setErrors(validate(form));
-  }, [form, submitted]);
+    if (submitted) setErrors(validate(form, hasServices));
+  }, [form, submitted, hasServices]);
 
   useEffect(() => {
     if (reference) {
@@ -149,7 +174,7 @@ export function BookPage() {
     }
   }, [reference]);
 
-  const selectedServices = useMemo(() => SERVICES.filter((s) => form.services.includes(s.id)), [form.services]);
+  const selectedServices = useMemo(() => offered.filter((s) => form.services.includes(s.id)), [offered, form.services]);
   const [low, high] = selectedServices.reduce<[number, number]>(
     ([l, h], s) => {
       const [sl, sh] = priceRange(s);
@@ -157,13 +182,13 @@ export function BookPage() {
     },
     [0, 0],
   );
-  const expert = EXPERTS.find((t) => t.id === form.expert);
+  const expert = experts.find((t) => t.id === form.expert);
   const vehicle = [form.year, form.make, form.model].filter(Boolean).join(' ');
 
   function onSubmit(e: FormEvent) {
     e.preventDefault();
     setSubmitted(true);
-    const found = validate(form);
+    const found = validate(form, hasServices);
     setErrors(found);
     const first = FIELD_ORDER.find((f) => found[f]);
     if (first) {
@@ -179,7 +204,7 @@ export function BookPage() {
       dayRef.current?.scrollIntoView({ block: 'center' });
       return;
     }
-    const id = field === 'services' ? `service-${SERVICES[0]!.id}` : field === 'time' ? 'time-slot-0' : `book-${field}`;
+    const id = field === 'services' ? (offered[0] ? `service-${offered[0].id}` : 'book-notes') : field === 'time' ? 'time-slot-0' : `book-${field}`;
     document.getElementById(id)?.focus();
   }
 
@@ -270,10 +295,34 @@ export function BookPage() {
           </StepCard>
 
           <StepCard step={2} title="Select Services">
-            <fieldset aria-describedby={errors.services ? 'services-error' : undefined}>
+            {servicesLoad.loading ? (
+              <div aria-busy="true">
+                <p className="sr-only" aria-live="polite">
+                  Loading services
+                </p>
+                <ul aria-hidden className="grid gap-3 sm:grid-cols-2">
+                  {Array.from({ length: 4 }, (_, i) => (
+                    <li key={i} className="glass flex h-24 animate-pulse flex-col gap-2 rounded-xl p-3.5 motion-reduce:animate-none">
+                      <span className="h-4 w-2/3 rounded bg-surface2" />
+                      <span className="h-3 w-full rounded bg-surface2" />
+                      <span className="h-3 w-1/2 rounded bg-surface2" />
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : servicesLoad.error ? (
+              <LoadError what="services" onRetry={servicesLoad.retry} />
+            ) : offered.length === 0 ? (
+              <EmptyCatalogue
+                Icon={Wrench}
+                title="Tell us what your car needs"
+                text="This workshop has not listed its services online yet. Describe the work in the notes below, or call us."
+              />
+            ) : null}
+            <fieldset aria-describedby={errors.services ? 'services-error' : undefined} hidden={offered.length === 0}>
               <legend className="sr-only">Services</legend>
               <div className="grid gap-3 sm:grid-cols-2">
-                {SERVICES.map((s) => {
+                {offered.map((s) => {
                   const checked = form.services.includes(s.id);
                   const [sl, sh] = priceRange(s);
                   return (
@@ -293,23 +342,25 @@ export function BookPage() {
                       />
                       <span className="min-w-0">
                         <span className="block text-sm font-semibold text-fg">{s.name}</span>
-                        <span className="mt-0.5 block text-xs leading-relaxed text-fg3">{s.text}</span>
+                        {s.text && <span className="mt-0.5 block text-xs leading-relaxed text-fg3">{s.text}</span>}
                         <span className="mt-1.5 flex flex-wrap gap-x-3 text-xs">
                           <span className="font-semibold text-fg">
                             Est. {formatMoneyWhole(sl)} to {formatMoneyWhole(sh)}
                           </span>
-                          <span className="inline-flex items-center gap-1 text-fg3">
-                            <Clock className="h-3 w-3" aria-hidden />
-                            {s.duration}
-                          </span>
+                          {s.duration && (
+                            <span className="inline-flex items-center gap-1 text-fg3">
+                              <Clock className="h-3 w-3" aria-hidden />
+                              {s.duration}
+                            </span>
+                          )}
                         </span>
                       </span>
                     </label>
                   );
                 })}
               </div>
-              <ErrorText field="services" error={errors.services} />
             </fieldset>
+            <ErrorText field="services" error={errors.services} />
             <div className="mt-5">
               <label htmlFor="book-notes" className="label">
                 Describe the issue or add notes
@@ -319,6 +370,7 @@ export function BookPage() {
                 className="input min-h-28 resize-y"
                 value={form.notes}
                 onChange={(e) => set('notes', e.target.value)}
+                {...(!hasServices && errors.services ? err('services') : {})}
                 maxLength={1000}
                 placeholder="Please describe any strange noises, vibrations or specific requests..."
               />
@@ -415,19 +467,28 @@ export function BookPage() {
                   <ErrorText field="time" error={errors.time} />
                 </div>
 
-                <div>
-                  <label htmlFor="book-expert" className="label">
-                    Preferred expert (optional)
-                  </label>
-                  <select id="book-expert" className="input" value={form.expert} onChange={(e) => set('expert', e.target.value)}>
-                    <option value="">Any available expert</option>
-                    {EXPERTS.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.name}, {t.role}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                {/* Optional: hidden when the workshop lists nobody (or the team could not be loaded). */}
+                {(teamLoad.loading || experts.length > 0) && (
+                  <div aria-busy={teamLoad.loading || undefined}>
+                    <label htmlFor="book-expert" className="label">
+                      Preferred expert (optional)
+                    </label>
+                    <select
+                      id="book-expert"
+                      className="input"
+                      value={teamLoad.loading ? '' : form.expert}
+                      onChange={(e) => set('expert', e.target.value)}
+                      disabled={teamLoad.loading}
+                    >
+                      <option value="">{teamLoad.loading ? 'Loading experts...' : 'Any available expert'}</option>
+                      {experts.map((t) => (
+                        <option key={t.id} value={t.id}>
+                          {t.name}, {t.role}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
               </div>
             </div>
           </StepCard>
@@ -632,7 +693,7 @@ function Confirmation({
     { Icon: Car, label: 'Vehicle', value: `${vehicle}${form.vin ? ` (VIN ${form.vin})` : ''}` },
     { Icon: CalendarCheck, label: 'Requested time', value: `${formatLongDate(form.date)}, ${formatSlot(form.time)}` },
     { Icon: User, label: 'Expert', value: expertName ?? 'Any available expert' },
-    { Icon: Wrench, label: 'Services', value: services.map((s) => s.name).join(', ') },
+    { Icon: Wrench, label: 'Services', value: services.length ? services.map((s) => s.name).join(', ') : 'As described in your notes' },
   ];
   return (
     <>
@@ -673,7 +734,7 @@ function Confirmation({
             <div className="flex items-baseline justify-between gap-3 p-4">
               <dt className="text-sm font-semibold text-fg">Estimated total</dt>
               <dd className="font-display text-lg font-bold tabular-nums text-fg">
-                {formatMoneyWhole(low)} to {formatMoneyWhole(high)}
+                {services.length ? `${formatMoneyWhole(low)} to ${formatMoneyWhole(high)}` : 'Quoted after inspection'}
               </dd>
             </div>
           </dl>

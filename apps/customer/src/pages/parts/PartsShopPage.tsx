@@ -16,10 +16,12 @@ import {
   Truck,
   X,
 } from 'lucide-react';
+import { PART_QUALITIES as QUALITIES } from '@eurowerken/shared';
+import { useParts } from '@/api/catalogue';
+import type { Part, Quality } from '@/api/catalogue';
 import { Photo } from '@/components/Photo';
-import { PageHero, Stars } from '@/components/ui';
-import { PARTS, PART_CATEGORIES, QUALITIES, VEHICLE_MAKES, VEHICLE_YEARS } from '@/data/catalog';
-import type { Part, Quality } from '@/data/catalog';
+import { EmptyCatalogue, LoadError, PageHero, SkeletonGrid, Stars } from '@/components/ui';
+import { VEHICLE_MAKES, VEHICLE_YEARS } from '@/data/catalog';
 import { useCart } from '@/cart/CartContext';
 import { formatMoney } from '@/lib/format';
 import { sitePath, useSite } from '@/site/SiteContext';
@@ -33,7 +35,6 @@ const SORTS = [
   { id: 'recommended', label: 'Recommended' },
   { id: 'price-asc', label: 'Price: low to high' },
   { id: 'price-desc', label: 'Price: high to low' },
-  { id: 'rating', label: 'Rating' },
 ] as const;
 type SortId = (typeof SORTS)[number]['id'];
 
@@ -52,7 +53,7 @@ function readFilters(params: URLSearchParams): Filters {
   return {
     q: params.get('q') ?? '',
     categories: params.getAll('cat'),
-    qualities: params.getAll('quality').filter((q): q is Quality => (QUALITIES as string[]).includes(q)),
+    qualities: params.getAll('quality').filter((q): q is Quality => (QUALITIES as readonly string[]).includes(q)),
     min: params.get('min') ?? '',
     max: params.get('max') ?? '',
     sort: SORTS.some((s) => s.id === sort) ? (sort as SortId) : 'recommended',
@@ -73,15 +74,24 @@ function applyFilters(parts: Part[], f: Filters): Part[] {
   );
   if (f.sort === 'price-asc') out.sort((a, b) => a.price - b.price);
   else if (f.sort === 'price-desc') out.sort((a, b) => b.price - a.price);
-  else if (f.sort === 'rating') out.sort((a, b) => b.rating - a.rating || b.reviewCount - a.reviewCount);
   return out;
 }
+
+/** Categories the workshop's parts use, alphabetically. */
+function categoriesOf(parts: Part[]): string[] {
+  return [...new Set(parts.map((p) => p.category).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+}
+
+const NO_PARTS: Part[] = [];
 
 export function PartsShopPage() {
   const [params, setParams] = useSearchParams();
   const filters = readFilters(params);
   const vehicle = readVehicle(params);
-  const results = useMemo(() => applyFilters(PARTS, readFilters(params)), [params]);
+  const catalogue = useParts();
+  const parts = catalogue.data ?? NO_PARTS;
+  const categories = useMemo(() => categoriesOf(parts), [parts]);
+  const results = useMemo(() => applyFilters(parts, readFilters(params)), [parts, params]);
   const pageCount = Math.max(1, Math.ceil(results.length / PAGE_SIZE));
   const page = Math.min(pageCount, Math.max(1, Number(params.get('page')) || 1));
   const shown = results.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
@@ -136,94 +146,106 @@ export function PartsShopPage() {
       </PageHero>
 
       <div className="container-site py-10 sm:py-14">
-        <div className="grid gap-8 lg:grid-cols-[260px_1fr]">
-          <aside aria-label="Filters" className="hidden lg:block">
-            <div className="glass sticky top-24 rounded-2xl p-5">
-              <FilterControls idPrefix="side" filters={filters} update={update} />
-            </div>
-          </aside>
+        {catalogue.loading ? (
+          <SkeletonGrid label="Loading parts" className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3" card="h-80" />
+        ) : catalogue.error ? (
+          <LoadError what="parts catalogue" onRetry={catalogue.retry} />
+        ) : parts.length === 0 ? (
+          <EmptyCatalogue
+            Icon={PackageSearch}
+            title="The parts shop is not open yet"
+            text="This workshop has not listed its parts online yet. Call us or visit the workshop and we will find the right part for your car."
+          />
+        ) : (
+          <div className="grid gap-8 lg:grid-cols-[260px_1fr]">
+            <aside aria-label="Filters" className="hidden lg:block">
+              <div className="glass sticky top-24 rounded-2xl p-5">
+                <FilterControls idPrefix="side" filters={filters} categories={categories} update={update} />
+              </div>
+            </aside>
 
-          <div ref={resultsRef} className="min-w-0 scroll-mt-24">
-            <div className="glass flex flex-col gap-3 rounded-2xl p-4 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex min-w-0 items-center gap-3">
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent/10 text-accent">
-                  <Car className="h-5 w-5" aria-hidden />
-                </span>
-                <div className="min-w-0">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-accent">Viewing parts for</p>
-                  <p className="truncate text-sm font-semibold text-fg">{vehicle ? vehicleLabel(vehicle) : 'All vehicles (select yours above)'}</p>
+            <div ref={resultsRef} className="min-w-0 scroll-mt-24">
+              <div className="glass flex flex-col gap-3 rounded-2xl p-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex min-w-0 items-center gap-3">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent/10 text-accent">
+                    <Car className="h-5 w-5" aria-hidden />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-accent">Viewing parts for</p>
+                    <p className="truncate text-sm font-semibold text-fg">{vehicle ? vehicleLabel(vehicle) : 'All vehicles (select yours above)'}</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={changeVehicle}
+                  className="self-start text-sm font-semibold text-accent hover:underline sm:self-auto coarse:min-h-11"
+                >
+                  {vehicle ? 'Change vehicle' : 'Select vehicle'}
+                </button>
+              </div>
+
+              <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
+                <p className="text-sm text-fg2" aria-live="polite">
+                  Showing <span className="font-semibold text-fg">{results.length}</span> {results.length === 1 ? 'result' : 'results'}
+                </p>
+                <div className="flex items-center gap-2">
+                  <button
+                    ref={filterToggleRef}
+                    type="button"
+                    onClick={() => setPanelOpen((o) => !o)}
+                    aria-expanded={panelOpen}
+                    aria-controls="filter-panel"
+                    className="btn-outline px-3.5 py-2 lg:hidden"
+                  >
+                    <SlidersHorizontal className="h-4 w-4" aria-hidden />
+                    Filters
+                    {activeFilterCount(filters) > 0 && (
+                      <span className="rounded-full bg-accent/15 px-1.5 text-[11px] text-accent">{activeFilterCount(filters)}</span>
+                    )}
+                  </button>
+                  <label htmlFor="sort" className="sr-only">
+                    Sort by
+                  </label>
+                  <select
+                    id="sort"
+                    value={filters.sort}
+                    onChange={(e) => update((p) => (e.target.value === 'recommended' ? p.delete('sort') : p.set('sort', e.target.value)))}
+                    className="input w-auto py-2 pr-8"
+                  >
+                    {SORTS.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        Sort: {s.label}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={changeVehicle}
-                className="self-start text-sm font-semibold text-accent hover:underline sm:self-auto coarse:min-h-11"
-              >
-                {vehicle ? 'Change vehicle' : 'Select vehicle'}
-              </button>
-            </div>
 
-            <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
-              <p className="text-sm text-fg2" aria-live="polite">
-                Showing <span className="font-semibold text-fg">{results.length}</span> {results.length === 1 ? 'result' : 'results'}
-              </p>
-              <div className="flex items-center gap-2">
-                <button
-                  ref={filterToggleRef}
-                  type="button"
-                  onClick={() => setPanelOpen((o) => !o)}
-                  aria-expanded={panelOpen}
-                  aria-controls="filter-panel"
-                  className="btn-outline px-3.5 py-2 lg:hidden"
-                >
-                  <SlidersHorizontal className="h-4 w-4" aria-hidden />
-                  Filters
-                  {activeFilterCount(filters) > 0 && (
-                    <span className="rounded-full bg-accent/15 px-1.5 text-[11px] text-accent">{activeFilterCount(filters)}</span>
-                  )}
-                </button>
-                <label htmlFor="sort" className="sr-only">
-                  Sort by
-                </label>
-                <select
-                  id="sort"
-                  value={filters.sort}
-                  onChange={(e) => update((p) => (e.target.value === 'recommended' ? p.delete('sort') : p.set('sort', e.target.value)))}
-                  className="input w-auto py-2 pr-8"
-                >
-                  {SORTS.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      Sort: {s.label}
-                    </option>
+              {panelOpen && <FilterPanel filters={filters} categories={categories} update={update} onClose={closePanel} />}
+
+              {shown.length === 0 ? (
+                <div className="glass mt-6 rounded-2xl px-6 py-14 text-center">
+                  <PackageSearch className="mx-auto h-10 w-10 text-fg3" aria-hidden />
+                  <p className="mt-4 font-semibold text-fg">No parts match these filters</p>
+                  <p className="mt-1 text-sm text-fg2">Try a different search, or reset the filters.</p>
+                  <button type="button" onClick={() => update(clearFilters)} className="btn-outline mt-6">
+                    Reset all filters
+                  </button>
+                </div>
+              ) : (
+                <ul className="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
+                  {shown.map((p) => (
+                    <li key={p.id}>
+                      <PartCard part={p} vehicle={vehicle} />
+                    </li>
                   ))}
-                </select>
-              </div>
+                </ul>
+              )}
+
+              {pageCount > 1 && <Pagination page={page} pageCount={pageCount} onPage={goToPage} />}
             </div>
-
-            {panelOpen && <FilterPanel filters={filters} update={update} onClose={closePanel} />}
-
-            {shown.length === 0 ? (
-              <div className="glass mt-6 rounded-2xl px-6 py-14 text-center">
-                <PackageSearch className="mx-auto h-10 w-10 text-fg3" aria-hidden />
-                <p className="mt-4 font-semibold text-fg">No parts match these filters</p>
-                <p className="mt-1 text-sm text-fg2">Try a different search, or reset the filters.</p>
-                <button type="button" onClick={() => update(clearFilters)} className="btn-outline mt-6">
-                  Reset all filters
-                </button>
-              </div>
-            ) : (
-              <ul className="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
-                {shown.map((p) => (
-                  <li key={p.id}>
-                    <PartCard part={p} vehicle={vehicle} />
-                  </li>
-                ))}
-              </ul>
-            )}
-
-            {pageCount > 1 && <Pagination page={page} pageCount={pageCount} onPage={goToPage} />}
           </div>
-        </div>
+        )}
       </div>
 
       <TrustRow />
@@ -349,7 +371,17 @@ function setOrDelete(p: URLSearchParams, key: string, value: string) {
   else p.delete(key);
 }
 
-function FilterControls({ idPrefix, filters, update }: { idPrefix: string; filters: Filters; update: Update }) {
+function FilterControls({
+  idPrefix,
+  filters,
+  categories,
+  update,
+}: {
+  idPrefix: string;
+  filters: Filters;
+  categories: string[];
+  update: Update;
+}) {
   const id = (s: string) => `${idPrefix}-${s}`;
   return (
     <div className="space-y-6">
@@ -376,22 +408,24 @@ function FilterControls({ idPrefix, filters, update }: { idPrefix: string; filte
         />
       </div>
 
-      <fieldset>
-        <legend className="text-xs font-semibold uppercase tracking-wide text-fg">Category</legend>
-        <div className="mt-3 space-y-1">
-          {PART_CATEGORIES.map((c) => (
-            <label key={c} className="flex cursor-pointer items-center gap-2.5 py-1 text-sm text-fg2 hover:text-fg coarse:min-h-11">
-              <input
-                type="checkbox"
-                checked={filters.categories.includes(c)}
-                onChange={() => update((p) => toggleValue(p, 'cat', c))}
-                className="h-4 w-4 rounded border-line accent-accent"
-              />
-              {c}
-            </label>
-          ))}
-        </div>
-      </fieldset>
+      {categories.length > 0 && (
+        <fieldset>
+          <legend className="text-xs font-semibold uppercase tracking-wide text-fg">Category</legend>
+          <div className="mt-3 space-y-1">
+            {categories.map((c) => (
+              <label key={c} className="flex cursor-pointer items-center gap-2.5 py-1 text-sm text-fg2 hover:text-fg coarse:min-h-11">
+                <input
+                  type="checkbox"
+                  checked={filters.categories.includes(c)}
+                  onChange={() => update((p) => toggleValue(p, 'cat', c))}
+                  className="h-4 w-4 rounded border-line accent-accent"
+                />
+                {c}
+              </label>
+            ))}
+          </div>
+        </fieldset>
+      )}
 
       <fieldset>
         <legend className="text-xs font-semibold uppercase tracking-wide text-fg">Quality</legend>
@@ -454,7 +488,17 @@ function FilterControls({ idPrefix, filters, update }: { idPrefix: string; filte
 }
 
 /** Phones and tablets: the filters open in a panel under the toolbar. */
-function FilterPanel({ filters, update, onClose }: { filters: Filters; update: Update; onClose: () => void }) {
+function FilterPanel({
+  filters,
+  categories,
+  update,
+  onClose,
+}: {
+  filters: Filters;
+  categories: string[];
+  update: Update;
+  onClose: () => void;
+}) {
   const panelRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
@@ -473,7 +517,7 @@ function FilterPanel({ filters, update, onClose }: { filters: Filters; update: U
 
   return (
     <div id="filter-panel" ref={panelRef} role="region" aria-label="Filters" className="glass-strong relative mt-4 rounded-2xl p-5 lg:hidden">
-      <FilterControls idPrefix="panel" filters={filters} update={update} />
+      <FilterControls idPrefix="panel" filters={filters} categories={categories} update={update} />
       <div className="mt-6 flex justify-end border-t border-line pt-4">
         <button type="button" onClick={onClose} className="btn-ink px-4 py-2">
           <X className="h-4 w-4" aria-hidden />
@@ -504,10 +548,9 @@ function PartCard({ part, vehicle }: { part: Part; vehicle: Vehicle | null }) {
       <div className="relative overflow-hidden rounded-xl bg-surface2">
         <Link to={href} tabIndex={-1} aria-hidden>
           <Photo
-            name={part.image}
+            src={part.image}
             alt=""
             icon={PackageSearch}
-            label={`${part.image}.png`}
             fit="contain"
             className="aspect-[4/3] w-full transition duration-500 group-hover:scale-105"
           />
@@ -531,20 +574,20 @@ function PartCard({ part, vehicle }: { part: Part; vehicle: Vehicle | null }) {
       </div>
 
       <div className="flex flex-1 flex-col px-1 pb-1 pt-3">
-        <p className="text-[11px] text-fg3">
-          {part.quality} &middot; {part.category}
-        </p>
+        <p className="text-[11px] text-fg3">{[part.quality, part.category].filter(Boolean).join(' \u00b7 ')}</p>
         <h3 className="mt-1 font-display text-sm font-semibold leading-snug text-fg sm:text-base">
           <Link to={href} className="hover:text-accent">
             {part.name}
           </Link>
         </h3>
-        <div className="mt-1.5 flex items-center gap-1.5 text-[11px] text-fg3">
-          <Stars rating={part.rating} />
-          <span>
-            {part.rating} ({part.reviewCount} reviews)
-          </span>
-        </div>
+        {part.rating !== undefined && (
+          <div className="mt-1.5 flex items-center gap-1.5 text-[11px] text-fg3">
+            <Stars rating={part.rating} />
+            <span>
+              {part.rating} ({part.reviewCount ?? 0} reviews)
+            </span>
+          </div>
+        )}
         <div className="mt-auto flex items-end justify-between gap-2 pt-4">
           <div>
             {part.compareAt && (
