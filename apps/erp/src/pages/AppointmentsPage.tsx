@@ -3,6 +3,7 @@ import { CalendarCheck, CalendarClock, CalendarX, ChevronLeft, ChevronRight, Plu
 import type { ServiceRow } from '@eurowerken/shared';
 import {
   APPOINTMENT_STATUSES,
+  bookableSlots,
   countByStatus,
   dayInfo,
   dayKeyOf,
@@ -10,17 +11,20 @@ import {
   formatDayKey,
   formatRange,
   formatTimeRange,
+  servicesLabel,
+  vehicleLabel,
   getAppointment,
   getBookingContext,
   getSiteSlug,
   groupByDay,
   listAppointments,
+  listAwaitingConfirmation,
   listTechnicians,
   matchesSearch,
   shiftAnchor,
-  timelineWindow,
   todayKey,
   visibleDays,
+  visibleWindow,
 } from '@/api/appointments';
 import type { Appointment, AppointmentStatus, BookingContext, CalendarView, SiteSlug, Technician } from '@/api/appointments';
 import { listServices } from '@/api/catalogue';
@@ -56,7 +60,8 @@ export function AppointmentsPage() {
   const [services, setServices] = useState<ServiceRow[]>([]);
   const [site, setSite] = useState<SiteSlug | null>(null);
 
-  const [view, setView] = useState<CalendarView>('day');
+  // Week first: upcoming bookings are visible straight away (a single day is often empty or closed).
+  const [view, setView] = useState<CalendarView>('week');
   const [anchor, setAnchor] = useState<string | null>(null);
   const [filter, setFilter] = useState<Filter>('all');
   const [search, setSearch] = useState('');
@@ -68,6 +73,8 @@ export function AppointmentsPage() {
   const { appointmentsVersion, appointmentOpened } = useNotifications();
   const [params, setParams] = useSearchParams();
   const [creating, setCreating] = useState(false);
+  /** Set when the form was opened from an empty calendar slot. */
+  const [createAt, setCreateAt] = useState<{ day: string; time: string } | null>(null);
   const [live, setLive] = useState('');
   const [now, setNow] = useState(() => new Date());
 
@@ -130,6 +137,20 @@ export function AppointmentsPage() {
     void loadAppointments();
   }, [loadAppointments]);
 
+  // Bookings waiting to be confirmed, on any day (the Requested count and the list above the calendar).
+  const [awaiting, setAwaiting] = useState<Appointment[]>([]);
+  const loadAwaiting = useCallback(async () => {
+    if (!workshopId) return;
+    try {
+      setAwaiting(await listAwaitingConfirmation(workshopId));
+    } catch {
+      // The calendar shows its own load errors; this list just stays as it was.
+    }
+  }, [workshopId]);
+  useEffect(() => {
+    void loadAwaiting();
+  }, [loadAwaiting, appointmentsVersion]);
+
   // Real time: a booking was created or changed anywhere in the workshop, so reload the visible days.
   const firstVersion = useRef(appointmentsVersion);
   useEffect(() => {
@@ -143,7 +164,14 @@ export function AppointmentsPage() {
   const counts = useMemo(() => countByStatus(appts), [appts]);
   const byDay = useMemo(() => groupByDay(visible, tz), [visible, tz]);
   const infos = useMemo(() => (ctx ? days.map((d) => dayInfo(d, ctx)) : []), [days, ctx]);
-  const timeWindow = useMemo(() => timelineWindow(ctx?.hours ?? [], visible, tz), [ctx, visible, tz]);
+  const timeWindow = useMemo(() => visibleWindow(infos, ctx?.hours ?? [], visible, tz), [infos, ctx, visible, tz]);
+  // Empty slots inside opening hours that a click books from (staff who can book only).
+  const slots = useMemo(() => {
+    const map = new Map<string, string[]>();
+    if (!ctx || !canEdit) return map;
+    for (const d of days) map.set(d, bookableSlots(d, ctx, now));
+    return map;
+  }, [ctx, canEdit, days, now]);
   const today = todayKey(tz);
   const selected = appts.find((a) => a.id === selectedId) ?? null;
 
@@ -231,7 +259,23 @@ export function AppointmentsPage() {
       </div>
     );
   } else {
-    const gridProps = { days: infos, byDay, window: timeWindow, today, now, tz, onOpen: open };
+    const gridProps = {
+      days: infos,
+      byDay,
+      window: timeWindow,
+      today,
+      now,
+      tz,
+      onOpen: open,
+      slots,
+      slotMinutes: ctx.settings.slot_minutes,
+      onSlot: canEdit
+        ? (day: string, time: string) => {
+            setCreateAt({ day, time });
+            setCreating(true);
+          }
+        : undefined,
+    };
     body = (
       <>
         {loading && (
@@ -245,8 +289,8 @@ export function AppointmentsPage() {
               ? 'No appointments match the filter.'
               : view === 'day'
                 ? 'No appointments on this day.'
-                : 'No appointments this week.'}
-            {!filtered && canEdit && ' Use New appointment to add one.'}
+                : 'No appointments in these 7 days.'}
+            {!filtered && canEdit && ' Use New appointment, or click an open time in the calendar, to add one.'}
           </p>
         )}
         <div className="md:hidden">
@@ -292,7 +336,13 @@ export function AppointmentsPage() {
           {formatRange(days)}
         </h2>
         {canEdit && (
-          <Button onClick={() => setCreating(true)} className="w-full sm:w-auto">
+          <Button
+            onClick={() => {
+              setCreateAt(null);
+              setCreating(true);
+            }}
+            className="w-full sm:w-auto"
+          >
             <Plus className="h-4 w-4" aria-hidden />
             New appointment
           </Button>
@@ -300,11 +350,43 @@ export function AppointmentsPage() {
       </div>
 
       <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-        <KpiCard icon={CalendarClock} label="Requested" value={String(counts.requested)} caption="need confirming" />
-        <KpiCard icon={CalendarCheck} label="Confirmed" value={String(counts.confirmed)} caption={view === 'day' ? 'on this day' : 'this week'} />
+        <KpiCard icon={CalendarClock} label="Requested" value={String(awaiting.length)} caption="upcoming, need confirming" />
+        <KpiCard icon={CalendarCheck} label="Confirmed" value={String(counts.confirmed)} caption={view === 'day' ? 'on this day' : 'these 7 days'} />
         <KpiCard icon={UserCheck} label="Checked in" value={String(counts.checked_in)} caption="in the workshop" />
-        <KpiCard icon={CalendarX} label="Cancelled" value={String(counts.cancelled)} caption={view === 'day' ? 'on this day' : 'this week'} />
+        <KpiCard icon={CalendarX} label="Cancelled" value={String(counts.cancelled)} caption={view === 'day' ? 'on this day' : 'these 7 days'} />
       </div>
+
+      {awaiting.length > 0 && (
+        <Card className="p-4 sm:p-5">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <h2 className="font-display text-sm font-semibold text-fg">
+              Needs confirming <span className="ml-1 rounded-full bg-warn/15 px-2 py-0.5 text-[11px] font-bold text-warn">{awaiting.length}</span>
+            </h2>
+            <p className="text-[11px] text-fg3">Online requests on any upcoming day</p>
+          </div>
+          <ul className="divide-y divide-line/60">
+            {awaiting.slice(0, 6).map((a) => (
+              <li key={a.id} className="flex flex-wrap items-center gap-x-4 gap-y-1 py-2.5">
+                <span className="w-40 shrink-0 text-xs font-semibold text-fg">
+                  {formatDayKey(dayKeyOf(a.starts_at, tz), 'medium')}, {formatTimeRange(a, tz)}
+                </span>
+                <span className="min-w-0 flex-1 truncate text-xs text-fg2">
+                  {a.contact_name} · {vehicleLabel(a.vehicle) || 'Car not given'} · {servicesLabel(a) || 'Described problem'}
+                </span>
+                <Button size="sm" variant="ghost" onClick={() => {
+                  setView('day');
+                  setAnchor(dayKeyOf(a.starts_at, tz));
+                  setAppts((list) => (list.some((x) => x.id === a.id) ? list : [...list, a]));
+                  open(a);
+                }}>
+                  Open
+                </Button>
+              </li>
+            ))}
+          </ul>
+          {awaiting.length > 6 && <p className="mt-2 text-[11px] text-fg3">And {awaiting.length - 6} more. Use the Requested filter in Week view.</p>}
+        </Card>
+      )}
 
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div role="group" aria-label="Filter by status" className="flex flex-wrap gap-1.5">
@@ -355,7 +437,8 @@ export function AppointmentsPage() {
           site={site}
           services={services}
           technicians={technicians}
-          day={anchor < today ? today : anchor}
+          day={createAt?.day ?? (anchor < today ? today : anchor)}
+          time={createAt?.time}
           onClose={() => setCreating(false)}
           onCreated={onCreated}
         />

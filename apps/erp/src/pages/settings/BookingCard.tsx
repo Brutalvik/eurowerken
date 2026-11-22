@@ -1,14 +1,19 @@
-import { useCallback, useEffect, useId, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
-import { Trash2 } from 'lucide-react';
+import { CalendarPlus, Trash2 } from 'lucide-react';
 import {
   COMMON_TIME_ZONES,
+  HALF_HOUR_TIMES,
+  HOURS_STEP,
   SLOT_MINUTES,
   WEEKDAY_NAMES,
   addClosure,
+  addClosures,
   errorMessage,
+  formatClock,
   formatDayKey,
   getBookingContext,
+  holidayChoices,
   removeClosure,
   saveBookingSettings,
   saveHours,
@@ -22,7 +27,9 @@ import type { BookingContext, Closure, SettingsDraft, WorkshopHours } from '@/ap
 import { useAuth } from '@/auth/AuthContext';
 import { Button } from '@/components/ui/Button';
 import { Card, CardHeader } from '@/components/ui/Card';
-import { CheckRow, ErrorNote, Labeled, inputClass } from '../inventory/PartForm';
+import { HOLIDAY_REGIONS, HOLIDAY_REGION_NAMES, isHolidayRegion } from '@/lib/holidays';
+import type { HolidayRegion } from '@/lib/holidays';
+import { CheckRow, Dialog, ErrorNote, Labeled, inputClass } from '../inventory/PartForm';
 
 /** Monday first, as a workshop reads its week. */
 const WEEK_ORDER = [1, 2, 3, 4, 5, 6, 0];
@@ -97,6 +104,7 @@ export function BookingCard() {
         workshopId={workshopId}
         closures={ctx.closures}
         tz={ctx.settings.time_zone}
+        region={ctx.settings.holiday_region}
         canEdit={canEdit}
         onChange={(closures) => setCtx((c) => (c ? { ...c, closures } : c))}
       />
@@ -206,6 +214,38 @@ function SettingsForm({
                 className={inputClass}
               />
             </Labeled>
+            <Labeled id={`${id}-rate`} label="Standard hourly labour rate (CAD)" hint="0 to 1000, up to two decimals, for example 145.00.">
+              <input
+                id={`${id}-rate`}
+                inputMode="decimal"
+                value={draft.labour_rate}
+                onChange={(e) => set({ labour_rate: e.target.value })}
+                onBlur={() => {
+                  const n = Number(draft.labour_rate.trim().replace(/^\$\s*/, ''));
+                  if (draft.labour_rate.trim() !== '' && Number.isFinite(n) && n >= 0 && n <= 1000 && /^\$?\s*\d{1,4}(\.\d{0,2})?$/.test(draft.labour_rate.trim())) {
+                    set({ labour_rate: n.toFixed(2) });
+                  }
+                }}
+                className={inputClass}
+                placeholder="0.00"
+              />
+            </Labeled>
+            <Labeled id={`${id}-region`} label="Holiday region" hint="Which public holidays the calendar labels and the holiday picker offers.">
+              <select
+                id={`${id}-region`}
+                value={draft.holiday_region}
+                onChange={(e) => {
+                  if (isHolidayRegion(e.target.value)) set({ holiday_region: e.target.value });
+                }}
+                className={inputClass}
+              >
+                {HOLIDAY_REGIONS.map((r) => (
+                  <option key={r} value={r}>
+                    {HOLIDAY_REGION_NAMES[r]}
+                  </option>
+                ))}
+              </select>
+            </Labeled>
           </div>
           <CheckRow
             id={`${id}-auto`}
@@ -285,7 +325,10 @@ function HoursForm({
   return (
     <form onSubmit={(e) => void submit(e)} noValidate>
       <Card className="p-4 sm:p-5">
-        <CardHeader title="Opening hours" subtitle="Customers can book within these hours" />
+        <CardHeader
+          title="Opening hours"
+          subtitle={`Customers and staff can book only within these hours, in ${HOURS_STEP}-minute steps from opening`}
+        />
         <fieldset disabled={!canEdit}>
           <legend className="sr-only">Opening hours per weekday</legend>
           <ul className="divide-y divide-line">
@@ -293,6 +336,7 @@ function HoursForm({
               const r = rows.find((x) => x.weekday === wd)!;
               const name = WEEKDAY_NAMES[wd];
               const invalid = !r.closed && r.opens && r.closes && r.opens >= r.closes;
+              const offGrid = !r.closed && [r.opens, r.closes].some((t) => t && !HALF_HOUR_TIMES.includes(t));
               return (
                 <li key={wd} className="grid grid-cols-[6.5rem_1fr] items-center gap-x-3 gap-y-2 py-2.5 sm:grid-cols-[7rem_7rem_1fr]">
                   <span className="text-xs font-semibold text-fg">{name}</span>
@@ -313,14 +357,11 @@ function HoursForm({
                       <label htmlFor={`${id}-opens-${wd}`} className="sr-only">
                         {name} opens
                       </label>
-                      <input
+                      <HalfHourSelect
                         id={`${id}-opens-${wd}`}
-                        type="time"
-                        step={900}
-                        value={r.opens ?? ''}
-                        onChange={(e) => update(wd, { opens: e.target.value || null })}
-                        aria-invalid={invalid || undefined}
-                        className={`${inputClass} !w-32`}
+                        value={r.opens}
+                        invalid={Boolean(invalid || offGrid)}
+                        onChange={(v) => update(wd, { opens: v })}
                       />
                       <span className="text-[11px] text-fg3" aria-hidden>
                         to
@@ -328,16 +369,14 @@ function HoursForm({
                       <label htmlFor={`${id}-closes-${wd}`} className="sr-only">
                         {name} closes
                       </label>
-                      <input
+                      <HalfHourSelect
                         id={`${id}-closes-${wd}`}
-                        type="time"
-                        step={900}
-                        value={r.closes ?? ''}
-                        onChange={(e) => update(wd, { closes: e.target.value || null })}
-                        aria-invalid={invalid || undefined}
-                        className={`${inputClass} !w-32`}
+                        value={r.closes}
+                        invalid={Boolean(invalid || offGrid)}
+                        onChange={(v) => update(wd, { closes: v })}
                       />
                       {invalid && <span className="text-[11px] text-bad">Opens must be before closes.</span>}
+                      {offGrid && <span className="text-[11px] text-bad">Use the hour or half hour.</span>}
                     </div>
                   )}
                 </li>
@@ -361,16 +400,40 @@ function HoursForm({
   );
 }
 
+/** An opening or closing time on the hour or half hour. An older off-grid value stays visible so it can be fixed. */
+function HalfHourSelect({ id, value, invalid, onChange }: { id: string; value: string | null; invalid: boolean; onChange: (v: string | null) => void }) {
+  const offGrid = value !== null && !HALF_HOUR_TIMES.includes(value);
+  return (
+    <select
+      id={id}
+      value={value ?? ''}
+      onChange={(e) => onChange(e.target.value || null)}
+      aria-invalid={invalid || undefined}
+      className={`${inputClass} !w-32`}
+    >
+      {value === null && <option value="">Choose</option>}
+      {offGrid && <option value={value}>{formatClock(value)} (change it)</option>}
+      {HALF_HOUR_TIMES.map((t) => (
+        <option key={t} value={t}>
+          {formatClock(t)}
+        </option>
+      ))}
+    </select>
+  );
+}
+
 function ClosuresCard({
   workshopId,
   closures,
   tz,
+  region,
   canEdit,
   onChange,
 }: {
   workshopId: string;
   closures: Closure[];
   tz: string;
+  region: HolidayRegion;
   canEdit: boolean;
   onChange: (c: Closure[]) => void;
 }) {
@@ -380,6 +443,7 @@ function ClosuresCard({
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [saved, setSaved] = useState<string | null>(null);
+  const [picking, setPicking] = useState(false);
   const list = upcomingClosures(closures, tz);
 
   async function add(e: FormEvent) {
@@ -463,10 +527,186 @@ function ClosuresCard({
           </Button>
         </form>
       )}
+      {canEdit && (
+        <div className="mt-3">
+          <Button variant="ghost" onClick={() => setPicking(true)} disabled={busy !== null} aria-haspopup="dialog">
+            <CalendarPlus className="h-4 w-4" aria-hidden />
+            Add Canadian holidays
+          </Button>
+        </div>
+      )}
+      {picking && (
+        <HolidayDialog
+          workshopId={workshopId}
+          closures={closures}
+          tz={tz}
+          region={region}
+          onClose={() => setPicking(false)}
+          onAdded={(added) => {
+            onChange([...closures, ...added]);
+            setPicking(false);
+            setError(null);
+            setSaved(
+              added.length === 0
+                ? 'No new dates added. They were already closed.'
+                : `${added.length} ${added.length === 1 ? 'holiday' : 'holidays'} added to the closed dates.`,
+            );
+          }}
+        />
+      )}
       <div className="mt-3 space-y-2">
         <ErrorNote errors={error} />
         <Saved text={saved} />
       </div>
     </Card>
+  );
+}
+
+/**
+ * Picks Canadian public holidays to add as closed dates. Statutory ones are
+ * ticked to start with; dates already closed or in the past cannot be ticked.
+ */
+function HolidayDialog({
+  workshopId,
+  closures,
+  tz,
+  region: savedRegion,
+  onClose,
+  onAdded,
+}: {
+  workshopId: string;
+  closures: Closure[];
+  tz: string;
+  region: HolidayRegion;
+  onClose: () => void;
+  onAdded: (added: Closure[]) => void;
+}) {
+  const id = useId();
+  const today = todayKey(tz);
+  const thisYear = Number(today.slice(0, 4));
+  const [year, setYear] = useState(thisYear);
+  const [region, setRegion] = useState<HolidayRegion>(savedRegion);
+  const choices = useMemo(() => holidayChoices(year, region, closures), [year, region, closures]);
+  const defaults = useCallback(
+    (list: typeof choices) => new Set(list.filter((h) => h.statutory && !h.added && h.date >= today).map((h) => h.date)),
+    [today],
+  );
+  const [picked, setPicked] = useState<Set<string>>(() => defaults(choices));
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // A different year or region starts again from its statutory holidays.
+  useEffect(() => {
+    setPicked(defaults(choices));
+  }, [choices, defaults]);
+
+  function toggle(date: string, on: boolean) {
+    setPicked((s) => {
+      const next = new Set(s);
+      if (on) next.add(date);
+      else next.delete(date);
+      return next;
+    });
+  }
+
+  async function add() {
+    setError(null);
+    setSaving(true);
+    try {
+      const items = choices.filter((h) => picked.has(h.date) && !h.added).map((h) => ({ day: h.date, reason: h.name }));
+      onAdded(await addClosures(workshopId, items, closures));
+    } catch (err) {
+      setError(errorMessage(err, 'The holidays were not added.'));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const count = choices.filter((h) => picked.has(h.date) && !h.added).length;
+
+  return (
+    <Dialog
+      open
+      size="sm"
+      title="Add Canadian holidays"
+      onClose={onClose}
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose} disabled={saving}>
+            Cancel
+          </Button>
+          <Button onClick={() => void add()} disabled={saving || count === 0}>
+            {saving ? 'Adding...' : `Add selected (${count})`}
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-4 text-xs">
+        <div className="grid grid-cols-2 gap-3">
+          <Labeled id={`${id}-year`} label="Year">
+            <select id={`${id}-year`} value={year} onChange={(e) => setYear(Number(e.target.value))} className={inputClass}>
+              {[thisYear, thisYear + 1].map((y) => (
+                <option key={y} value={y}>
+                  {y}
+                </option>
+              ))}
+            </select>
+          </Labeled>
+          <Labeled id={`${id}-region`} label="Region">
+            <select
+              id={`${id}-region`}
+              value={region}
+              onChange={(e) => {
+                if (isHolidayRegion(e.target.value)) setRegion(e.target.value);
+              }}
+              className={inputClass}
+            >
+              {HOLIDAY_REGIONS.map((r) => (
+                <option key={r} value={r}>
+                  {HOLIDAY_REGION_NAMES[r]}
+                </option>
+              ))}
+            </select>
+          </Labeled>
+        </div>
+        <fieldset>
+          <legend className="mb-2 text-[10px] font-medium uppercase tracking-wider text-fg3">
+            Holidays in {HOLIDAY_REGION_NAMES[region]}, {year}
+          </legend>
+          <ul className="divide-y divide-line rounded-lg border border-line/70">
+            {choices.map((h) => {
+              const checkId = `${id}-h-${h.date}`;
+              const past = h.date < today;
+              const locked = h.added || past;
+              return (
+                <li key={h.date} className="flex items-center gap-3 px-3 py-2 coarse:min-h-11">
+                  <input
+                    id={checkId}
+                    type="checkbox"
+                    checked={h.added || picked.has(h.date)}
+                    disabled={locked || saving}
+                    onChange={(e) => toggle(h.date, e.target.checked)}
+                    className="h-4 w-4 shrink-0 accent-[rgb(var(--accent))] coarse:h-5 coarse:w-5"
+                  />
+                  <label htmlFor={checkId} className={`flex min-w-0 flex-1 flex-wrap items-baseline justify-between gap-x-3 ${locked ? 'text-fg3' : 'text-fg'}`}>
+                    <span className="min-w-0 break-words">
+                      <span className="font-semibold">{h.name}</span>
+                      <span className="block text-[11px] text-fg2">{formatDayKey(h.date, 'long')}</span>
+                    </span>
+                    <span className="shrink-0 text-[11px] text-fg3">
+                      {h.added ? 'Added' : past ? 'Past' : h.statutory ? 'Statutory' : 'Not statutory'}
+                    </span>
+                  </label>
+                </li>
+              );
+            })}
+          </ul>
+        </fieldset>
+        <p className="text-[11px] text-fg3">
+          A convenience list. Rules differ by province and employer, so check your province's official list of statutory holidays.
+        </p>
+        <ErrorNote errors={error} />
+      </div>
+    </Dialog>
   );
 }

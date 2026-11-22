@@ -1,5 +1,5 @@
 import type { CSSProperties } from 'react';
-import { formatDayKey, formatTime, formatTimeRange, layoutDay, minutesOfDay, servicesLabel, vehicleLabel } from '@/api/appointments';
+import { formatClock, formatDayKey, formatTime, formatTimeRange, layoutDay, minutesOfDay, servicesLabel, vehicleLabel } from '@/api/appointments';
 import type { Appointment, DayInfo, TimeWindow } from '@/api/appointments';
 import { Badge } from '@/components/ui/Badge';
 import { APPOINTMENT_BLOCK, APPOINTMENT_STATUS_LABEL, APPOINTMENT_TONE } from '@/lib/status';
@@ -61,6 +61,58 @@ function ClosedShade({ info, window, ppm }: { info: DayInfo; window: TimeWindow;
   );
 }
 
+/** What a day header says besides the date: a closure, a public holiday, or a weekly closed day. */
+function dayNote(info: DayInfo): { text: string; title: string } | null {
+  if (info.closure) {
+    const text = info.closure.reason || 'Closed';
+    return { text, title: `Closed: ${text}` };
+  }
+  if (info.holiday) {
+    const kind = info.holiday.statutory ? 'Statutory holiday' : 'Holiday, not statutory';
+    return { text: info.holiday.name, title: `${kind}: ${info.holiday.name}${info.closed ? ' (closed)' : ' (open, not in closed dates)'}` };
+  }
+  if (info.closed) return { text: 'Closed', title: 'Closed this weekday' };
+  return null;
+}
+
+function hoursText(info: DayInfo): string {
+  if (info.closed || !info.hours.opens || !info.hours.closes) return 'Closed';
+  return `Open ${formatClock(info.hours.opens)} to ${formatClock(info.hours.closes)}`;
+}
+
+interface SlotProps {
+  /** Empty start times a click books from, per day key (only for staff who can book). */
+  slots?: Map<string, string[]>;
+  slotMinutes?: number;
+  onSlot?: (day: string, time: string) => void;
+}
+
+/** Clickable empty slots inside opening hours; under the appointment blocks. */
+function SlotButtons({ info, times, slotMinutes, window, ppm, onSlot }: { info: DayInfo; times: string[]; slotMinutes: number; window: TimeWindow; ppm: number; onSlot: (day: string, time: string) => void }) {
+  return (
+    <>
+      {times.map((t) => {
+        const m = timeToMinutes(t) ?? 0;
+        if (m < window.start || m + slotMinutes > window.end) return null;
+        const label = `New appointment on ${formatDayKey(info.key, 'medium')} at ${formatClock(t)}`;
+        return (
+          <button
+            key={t}
+            type="button"
+            // The New appointment button is the keyboard path; these are a pointer shortcut, so they stay out of the tab order.
+            tabIndex={-1}
+            aria-label={label}
+            title={label}
+            onClick={() => onSlot(info.key, t)}
+            className="absolute inset-x-0 z-[5] cursor-pointer rounded-sm transition hover:bg-accent/10 focus-visible:bg-accent/10"
+            style={{ top: (m - window.start) * ppm, height: slotMinutes * ppm }}
+          />
+        );
+      })}
+    </>
+  );
+}
+
 function NowLine({ nowMinutes, window, ppm, label }: { nowMinutes: number; window: TimeWindow; ppm: number; label: boolean }) {
   if (nowMinutes < window.start || nowMinutes > window.end) return null;
   return (
@@ -75,7 +127,7 @@ function NowLine({ nowMinutes, window, ppm, label }: { nowMinutes: number; windo
   );
 }
 
-interface ColumnProps extends CommonProps {
+interface ColumnProps extends CommonProps, SlotProps {
   info: DayInfo;
   appts: Appointment[];
   window: TimeWindow;
@@ -84,15 +136,19 @@ interface ColumnProps extends CommonProps {
   nowMinutes: number | null;
 }
 
-function DayColumn({ info, appts, window, ppm, compact, nowMinutes, tz, onOpen }: ColumnProps) {
+function DayColumn({ info, appts, window, ppm, compact, nowMinutes, tz, onOpen, slots, slotMinutes, onSlot }: ColumnProps) {
   const height = (window.end - window.start) * ppm;
   const placed = layoutDay(appts, tz, window);
+  const times = slots?.get(info.key) ?? [];
   return (
     <div className="relative min-w-0 border-l border-line" style={{ height }}>
       <ClosedShade info={info} window={window} ppm={ppm} />
       {hoursOf(window).map((m) => (
         <div key={m} aria-hidden className="absolute inset-x-0 border-t border-line/60" style={{ top: (m - window.start) * ppm }} />
       ))}
+      {onSlot && slotMinutes && times.length > 0 && (
+        <SlotButtons info={info} times={times} slotMinutes={slotMinutes} window={window} ppm={ppm} onSlot={onSlot} />
+      )}
       {info.closed && (
         <p className="absolute inset-x-1 top-2 z-10 text-center text-[10px] font-medium text-fg3">
           {info.closure ? `Closed${info.closure.reason ? `: ${info.closure.reason}` : ''}` : 'Closed'}
@@ -151,7 +207,7 @@ function HourGutter({ window, ppm }: { window: TimeWindow; ppm: number }) {
   );
 }
 
-interface GridProps extends CommonProps {
+interface GridProps extends CommonProps, SlotProps {
   days: DayInfo[];
   byDay: Map<string, Appointment[]>;
   window: TimeWindow;
@@ -161,47 +217,65 @@ interface GridProps extends CommonProps {
 }
 
 /** One day as a timeline from opening to closing (tablets and up). */
-export function DayTimeline({ days, byDay, window, today, now, tz, onOpen }: GridProps) {
+export function DayTimeline({ days, byDay, window, today, now, tz, onOpen, slots, slotMinutes, onSlot }: GridProps) {
   const info = days[0];
   const ppm = 1.2;
+  const note = dayNote(info);
   return (
-    <div className="grid grid-cols-[3.5rem_minmax(0,1fr)] py-3 pr-3">
-      <HourGutter window={window} ppm={ppm} />
-      <DayColumn
-        info={info}
-        appts={byDay.get(info.key) ?? []}
-        window={window}
-        ppm={ppm}
-        compact={false}
-        nowMinutes={info.key === today ? minutesOfDay(now, tz) : null}
-        tz={tz}
-        onOpen={onOpen}
-      />
+    <div className="pb-3 pr-3">
+      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 border-b border-line px-4 py-2 text-[11px]">
+        <span className="font-semibold text-fg">{hoursText(info)}</span>
+        {note && (info.closure || info.holiday) && (
+          <span className="min-w-0 break-words text-fg3" title={note.title}>
+            {note.title}
+          </span>
+        )}
+      </div>
+      <div className="grid grid-cols-[3.5rem_minmax(0,1fr)] pt-3">
+        <HourGutter window={window} ppm={ppm} />
+        <DayColumn
+          info={info}
+          appts={byDay.get(info.key) ?? []}
+          window={window}
+          ppm={ppm}
+          compact={false}
+          nowMinutes={info.key === today ? minutesOfDay(now, tz) : null}
+          tz={tz}
+          onOpen={onOpen}
+          slots={slots}
+          slotMinutes={slotMinutes}
+          onSlot={onSlot}
+        />
+      </div>
     </div>
   );
 }
 
 /** Seven day columns with compact blocks (tablets and up). */
-export function WeekGrid({ days, byDay, window, today, now, tz, onOpen }: GridProps) {
+export function WeekGrid({ days, byDay, window, today, now, tz, onOpen, slots, slotMinutes, onSlot }: GridProps) {
   const ppm = 0.8;
   const cols = 'grid grid-cols-[2.75rem_repeat(7,minmax(0,1fr))]';
   return (
     <div className="pb-3 pr-2">
       <div className={`${cols} sticky top-0 z-30 border-b border-line bg-surface/80 backdrop-blur`}>
         <span />
-        {days.map((d) => (
-          <div
-            key={d.key}
-            className={`min-w-0 border-l border-line px-1 py-2 text-center text-[11px] ${d.key === today ? 'font-semibold text-accent' : 'text-fg2'} ${d.closed ? 'bg-fg3/[0.06]' : ''}`}
-          >
-            <span className="block truncate">{formatDayKey(d.key, 'short')}</span>
-            {d.closure && (
-              <span className="block truncate text-[9px] font-normal text-fg3" title={d.closure.reason ?? 'Closed'}>
-                {d.closure.reason || 'Closed'}
+        {days.map((d) => {
+          const note = dayNote(d);
+          return (
+            <div
+              key={d.key}
+              title={note ? `${formatDayKey(d.key, 'medium')}. ${note.title}. ${hoursText(d)}.` : `${formatDayKey(d.key, 'medium')}. ${hoursText(d)}.`}
+              className={`min-w-0 border-l border-line px-1 py-2 text-center text-[11px] ${d.key === today ? 'font-semibold text-accent' : 'text-fg2'} ${d.closed ? 'bg-fg3/[0.06]' : ''}`}
+            >
+              <span className="block truncate">{formatDayKey(d.key, 'short')}</span>
+              {note && <span className="block truncate text-[9px] font-normal text-fg3">{note.text}</span>}
+              <span className="sr-only">
+                {note ? `${note.title}. ` : ''}
+                {hoursText(d)}
               </span>
-            )}
-          </div>
-        ))}
+            </div>
+          );
+        })}
       </div>
       <div className={`${cols} pt-2`}>
         <HourGutter window={window} ppm={ppm} />
@@ -216,6 +290,9 @@ export function WeekGrid({ days, byDay, window, today, now, tz, onOpen }: GridPr
             nowMinutes={d.key === today ? minutesOfDay(now, tz) : null}
             tz={tz}
             onOpen={onOpen}
+            slots={slots}
+            slotMinutes={slotMinutes}
+            onSlot={onSlot}
           />
         ))}
       </div>
@@ -224,7 +301,7 @@ export function WeekGrid({ days, byDay, window, today, now, tz, onOpen }: GridPr
 }
 
 /** Phones: a list grouped by day instead of the grid. */
-export function AgendaList({ days, byDay, today, tz, onOpen }: Omit<GridProps, 'window' | 'now'>) {
+export function AgendaList({ days, byDay, today, tz, onOpen }: Omit<GridProps, 'window' | 'now' | keyof SlotProps>) {
   return (
     <div className="divide-y divide-line">
       {days.map((d) => {
@@ -242,6 +319,7 @@ export function AgendaList({ days, byDay, today, tz, onOpen }: Omit<GridProps, '
                   {d.closure ? `Closed${d.closure.reason ? `: ${d.closure.reason}` : ''}` : 'Closed'}
                 </span>
               )}
+              {!d.closure && d.holiday && <span className="text-[11px] font-normal text-fg3">{d.holiday.name}</span>}
             </h3>
             {list.length === 0 ? (
               <p className="mt-1.5 text-[11px] text-fg3">No appointments.</p>

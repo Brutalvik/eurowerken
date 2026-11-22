@@ -4,7 +4,9 @@ import type { ServiceRow } from '@eurowerken/shared';
 import {
   createStaffBooking,
   errorMessage,
+  firstStartTime,
   newBookingDraft,
+  startTimeProblem,
   suggestedDuration,
   validateStaffBooking,
 } from '@/api/appointments';
@@ -24,6 +26,8 @@ interface NewAppointmentDialogProps {
   technicians: Technician[];
   /** The day the form starts on (the day shown in the calendar). */
   day: string;
+  /** A start time to begin with ('HH:MM', from clicking an empty slot); otherwise the day's first valid time. */
+  time?: string;
   onClose: () => void;
   onCreated: (appt: Appointment) => void;
 }
@@ -34,10 +38,13 @@ export function NewAppointmentDialog(props: NewAppointmentDialogProps) {
   return <BookingForm {...props} />;
 }
 
-function BookingForm({ workshopId, userId, ctx, site, services, technicians, day, onClose, onCreated }: NewAppointmentDialogProps) {
+function BookingForm({ workshopId, userId, ctx, site, services, technicians, day, time, onClose, onCreated }: NewAppointmentDialogProps) {
   const id = useId();
   const formId = `${id}-form`;
-  const [draft, setDraft] = useState<StaffBookingDraft>(() => newBookingDraft(day, ctx.settings.slot_minutes));
+  const [draft, setDraft] = useState<StaffBookingDraft>(() => {
+    const d = newBookingDraft(day, ctx.settings.slot_minutes);
+    return { ...d, time: time || firstStartTime(day, ctx, Number(d.duration)) || d.time };
+  });
   const [errors, setErrors] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [warnings, setWarnings] = useState<string[]>([]);
@@ -49,13 +56,16 @@ function BookingForm({ workshopId, userId, ctx, site, services, technicians, day
     setDraft((d) => {
       const ids = on ? [...d.service_ids, serviceId] : d.service_ids.filter((x) => x !== serviceId);
       const duration = d.durationEdited ? d.duration : String(Math.max(30, suggestedDuration(ids.length, ctx.settings.slot_minutes)));
-      return { ...d, service_ids: ids, duration };
+      // A longer booking may no longer fit before closing: move to the first time that does.
+      const fits = startTimeProblem(d.day, d.time, Number(duration), ctx) === null;
+      const time = fits ? d.time : firstStartTime(d.day, ctx, Number(duration)) || d.time;
+      return { ...d, service_ids: ids, duration, time };
     });
   }
 
   async function submit(e: FormEvent) {
     e.preventDefault();
-    const result = validateStaffBooking(draft, services, ctx.settings.time_zone);
+    const result = validateStaffBooking(draft, services, ctx.settings.time_zone, ctx);
     if (!result.ok) {
       setErrors(result.errors);
       return;

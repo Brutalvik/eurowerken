@@ -1,9 +1,11 @@
 import { useEffect, useId, useState } from 'react';
 import type { ReactNode } from 'react';
+import { Link } from 'react-router-dom';
 import { Car, ClipboardList, Mail, Phone } from 'lucide-react';
 import {
   assignTechnician,
   canReschedule,
+  checkInAppointment,
   dayKeyOf,
   errorMessage,
   formatDateTime,
@@ -14,6 +16,7 @@ import {
   isTimeText,
   rescheduleAppointment,
   saveStaffNotes,
+  startTimeProblem,
   statusActions,
   telHref,
   timeInputOf,
@@ -91,6 +94,8 @@ function Details({ appt, workshopId, ctx, site, technicians, canEdit, onChanged,
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  /** The repair order made at check-in, linked from the notice. */
+  const [repairOrder, setRepairOrder] = useState<{ id: string; number: string } | null>(null);
 
   // Status change that needs a reason (cancel or decline).
   const [asking, setAsking] = useState<StatusAction | null>(null);
@@ -116,6 +121,7 @@ function Details({ appt, workshopId, ctx, site, technicians, canEdit, onChanged,
     setBusy(label);
     setError(null);
     setNotice(null);
+    setRepairOrder(null);
     try {
       const updated = await work();
       onChanged(updated);
@@ -137,7 +143,26 @@ function Details({ appt, workshopId, ctx, site, technicians, canEdit, onChanged,
       setReason('');
       return;
     }
+    if (action.to === 'checked_in') {
+      void checkIn();
+      return;
+    }
     void run(action.label, () => updateAppointmentStatus(appt, action.to), (a) => `Booking ${a.reference} is now ${APPOINTMENT_STATUS_LABEL[a.status].toLowerCase()}.`);
+  }
+
+  /** Check-in creates (or finds) the repair order. A technician is optional and can be assigned later. */
+  async function checkIn() {
+    let ro: { id: string; number: string } | null = null;
+    const ok = await run(
+      'Check in',
+      async () => {
+        const { result, appt: fresh } = await checkInAppointment(appt, appt.technician_id);
+        ro = { id: result.repair_order_id, number: result.repair_order_number };
+        return fresh;
+      },
+      () => `Checked in. Repair order ${ro?.number ?? ''} created.`,
+    );
+    if (ok && ro) setRepairOrder(ro);
   }
 
   async function confirmReason() {
@@ -149,6 +174,11 @@ function Details({ appt, workshopId, ctx, site, technicians, canEdit, onChanged,
   function saveMove() {
     if (!isDayKey(day) || !isTimeText(time)) {
       setError('Choose a date and a start time.');
+      return;
+    }
+    const problem = startTimeProblem(day, time, Number(duration), ctx);
+    if (problem) {
+      setError(problem);
       return;
     }
     void run(
@@ -183,7 +213,19 @@ function Details({ appt, workshopId, ctx, site, technicians, canEdit, onChanged,
       </div>
 
       <div aria-live="polite" role="status">
-        {notice && <p className="rounded-lg border border-ok/30 bg-ok/10 px-3 py-2 text-ok">{notice}</p>}
+        {notice && repairOrder ? (
+          <p className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-ok/30 bg-ok/10 px-3 py-2 text-ok">
+            <span>Repair order {repairOrder.number} created</span>
+            <Link
+              to={`/repair-orders?open=${encodeURIComponent(repairOrder.id)}`}
+              className="inline-flex items-center rounded font-semibold text-accent underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent coarse:min-h-11"
+            >
+              Open repair order {repairOrder.number}
+            </Link>
+          </p>
+        ) : (
+          notice && <p className="rounded-lg border border-ok/30 bg-ok/10 px-3 py-2 text-ok">{notice}</p>
+        )}
       </div>
       <ErrorNote errors={error} />
 

@@ -11,6 +11,8 @@
 import type { ServiceRow } from '@eurowerken/shared';
 import { supabase } from '@/lib/supabase';
 import { APPOINTMENT_STATUS_LABEL } from '@/lib/status';
+import { canadianHolidays, isHolidayRegion } from '@/lib/holidays';
+import type { Holiday, HolidayRegion } from '@/lib/holidays';
 import { friendlyError } from './catalogue';
 import type { Validated } from './catalogue';
 
@@ -76,6 +78,10 @@ export interface BookingSettings {
   min_notice_hours: number;
   max_days_ahead: number;
   auto_confirm: boolean;
+  /** The standard hourly labour rate in CAD (migration 011). */
+  labour_rate: number;
+  /** Province or territory for the holiday list (CA: federal only). */
+  holiday_region: HolidayRegion;
 }
 
 /** One weekday's opening hours. weekday 0 = Sunday. Times are 'HH:MM'. */
@@ -119,6 +125,8 @@ export const DEFAULT_SETTINGS: BookingSettings = {
   min_notice_hours: 2,
   max_days_ahead: 90,
   auto_confirm: false,
+  labour_rate: 0,
+  holiday_region: 'AB',
 };
 
 export const SLOT_MINUTES = [15, 20, 30, 45, 60] as const;
@@ -158,6 +166,11 @@ interface DbError {
 
 function fail(err: DbError): never {
   const text = `${err.message} ${err.details ?? ''}`;
+  // Raised by a database trigger (for example a booking outside opening hours): its message names the problem.
+  if (err.code === 'P0001') throw new Error(err.message);
+  if (err.code === 'PGRST204' || /column .*(labour_rate|holiday_region)|(labour_rate|holiday_region).*column/i.test(text)) {
+    throw new Error('The database does not have the labour rate and holiday settings yet. Apply migration 011 (npm run db:migrate).');
+  }
   if (
     err.code === '42P01' ||
     err.code === 'PGRST205' ||
@@ -439,11 +452,26 @@ function fillHours(rows: { weekday: number; closed: boolean; opens: string | nul
   });
 }
 
+/** A settings row, with defaults for columns an older database does not have yet. */
+function normalizeSettings(row: Record<string, unknown>): BookingSettings {
+  const rate = num(row.labour_rate);
+  return {
+    time_zone: safeTimeZone(row.time_zone as string | null),
+    slot_minutes: num(row.slot_minutes) || DEFAULT_SETTINGS.slot_minutes,
+    bays: num(row.bays) || DEFAULT_SETTINGS.bays,
+    min_notice_hours: num(row.min_notice_hours),
+    max_days_ahead: num(row.max_days_ahead) || DEFAULT_SETTINGS.max_days_ahead,
+    auto_confirm: Boolean(row.auto_confirm),
+    labour_rate: Number.isFinite(rate) ? rate : 0,
+    holiday_region: isHolidayRegion(row.holiday_region) ? row.holiday_region : DEFAULT_SETTINGS.holiday_region,
+  };
+}
+
 export async function getBookingContext(workshopId: string): Promise<BookingContext> {
   const [s, h, c] = await Promise.all([
     supabase
       .from('booking_settings')
-      .select('time_zone, slot_minutes, bays, min_notice_hours, max_days_ahead, auto_confirm')
+      .select('*')
       .eq('workshop_id', workshopId)
       .maybeSingle(),
     supabase.from('workshop_hours').select('weekday, closed, opens, closes').eq('workshop_id', workshopId),
@@ -452,9 +480,9 @@ export async function getBookingContext(workshopId: string): Promise<BookingCont
   if (s.error) fail(s.error);
   if (h.error) fail(h.error);
   if (c.error) fail(c.error);
-  const row = s.data as BookingSettings | null;
+  const row = s.data as Record<string, unknown> | null;
   return {
-    settings: row ? { ...row, time_zone: safeTimeZone(row.time_zone) } : DEFAULT_SETTINGS,
+    settings: row ? normalizeSettings(row) : DEFAULT_SETTINGS,
     settingsSaved: Boolean(row),
     hours: fillHours((h.data ?? []) as WorkshopHours[]),
     closures: (c.data ?? []) as Closure[],
@@ -477,6 +505,8 @@ export interface SettingsDraft {
   min_notice_hours: string;
   max_days_ahead: string;
   auto_confirm: boolean;
+  labour_rate: string;
+  holiday_region: HolidayRegion;
 }
 
 export function settingsDraft(s: BookingSettings): SettingsDraft {
@@ -489,6 +519,8 @@ export function settingsDraft(s: BookingSettings): SettingsDraft {
     min_notice_hours: String(s.min_notice_hours),
     max_days_ahead: String(s.max_days_ahead),
     auto_confirm: s.auto_confirm,
+    labour_rate: s.labour_rate.toFixed(2),
+    holiday_region: s.holiday_region,
   };
 }
 
@@ -514,18 +546,44 @@ export function validateSettings(d: SettingsDraft): Validated<BookingSettings> {
     min_notice_hours: wholeNumber('Minimum notice', d.min_notice_hours, 0, 168, errors),
     max_days_ahead: wholeNumber('Booking window', d.max_days_ahead, 1, 365, errors),
     auto_confirm: d.auto_confirm,
+    labour_rate: labourRate(d.labour_rate, errors),
+    holiday_region: d.holiday_region,
   };
+  if (!isHolidayRegion(d.holiday_region)) errors.push('Choose a province or territory for the holiday list.');
   return errors.length > 0 ? { ok: false, errors } : { ok: true, value };
+}
+
+/** CAD with at most two decimals, 0 to 1000. A leading dollar sign and spaces are ignored. */
+function labourRate(text: string, errors: string[]): number {
+  const t = text.trim().replace(/^\$\s*/, '');
+  const n = /^\d{1,4}(\.\d{1,2})?$/.test(t) ? Number(t) : Number.NaN;
+  if (Number.isNaN(n) || n < 0 || n > 1000) {
+    errors.push('Standard hourly labour rate must be an amount from 0 to 1000, with at most two decimals (for example 145.00).');
+  }
+  return Math.round(n * 100) / 100;
 }
 
 export async function saveBookingSettings(workshopId: string, s: BookingSettings): Promise<BookingSettings> {
   const { data, error } = await supabase
     .from('booking_settings')
     .upsert({ workshop_id: workshopId, ...s }, { onConflict: 'workshop_id' })
-    .select('time_zone, slot_minutes, bays, min_notice_hours, max_days_ahead, auto_confirm')
+    .select('*')
     .single();
   if (error) fail(error);
-  return data as BookingSettings;
+  return normalizeSettings(data as Record<string, unknown>);
+}
+
+/** Opening and closing times are on the hour or the half hour. */
+export const HOURS_STEP = 30;
+
+/** '00:00', '00:30' ... '23:30', for the opening hours selects. */
+export const HALF_HOUR_TIMES: string[] = Array.from({ length: 48 }, (_, i) => `${pad(Math.floor(i / 2))}:${i % 2 ? '30' : '00'}`);
+
+/** 'HH:MM' as 9:30 a.m. (no time zone involved). */
+export function formatClock(time: string): string {
+  const [h, m] = time.split(':').map(Number);
+  const twelve = h % 12 === 0 ? 12 : h % 12;
+  return `${twelve}:${pad(m)} ${h < 12 ? 'a.m.' : 'p.m.'}`;
 }
 
 export function validateHours(rows: WorkshopHours[]): Validated<WorkshopHours[]> {
@@ -536,7 +594,9 @@ export function validateHours(rows: WorkshopHours[]): Validated<WorkshopHours[]>
     const closes = r.closes && isTimeText(r.closes) ? r.closes : null;
     if (!r.closed) {
       if (!opens || !closes) errors.push(`${name}: enter an opening and a closing time, or mark the day closed.`);
-      else if (timeToMinutes(opens) >= timeToMinutes(closes)) errors.push(`${name}: the opening time must be before the closing time.`);
+      else if (timeToMinutes(opens) % HOURS_STEP !== 0 || timeToMinutes(closes) % HOURS_STEP !== 0) {
+        errors.push(`${name}: use times on the hour or half hour (for example 08:00 or 17:30).`);
+      } else if (timeToMinutes(opens) >= timeToMinutes(closes)) errors.push(`${name}: the opening time must be before the closing time.`);
     }
     return { weekday: r.weekday, closed: r.closed, opens, closes };
   });
@@ -569,6 +629,30 @@ export async function addClosure(workshopId: string, day: string, reason: string
   return data as Closure;
 }
 
+/**
+ * Adds several closed dates at once (the holiday picker), skipping dates
+ * that are already closed. Returns the rows added.
+ */
+export async function addClosures(workshopId: string, items: { day: string; reason: string }[], existing: Closure[]): Promise<Closure[]> {
+  const taken = new Set(existing.map((c) => c.day));
+  const rows = items
+    .filter((i) => isDayKey(i.day) && !taken.has(i.day) && (taken.add(i.day), true))
+    .map((i) => ({ workshop_id: workshopId, day: i.day, reason: i.reason.trim().slice(0, 80) || null }));
+  if (rows.length === 0) return [];
+  const { data, error } = await supabase
+    .from('workshop_closures')
+    .upsert(rows, { onConflict: 'workshop_id,day', ignoreDuplicates: true })
+    .select('id, day, reason');
+  if (error) fail(error);
+  return (data ?? []) as Closure[];
+}
+
+/** A year's holidays for the picker, each marked when its date is already closed. */
+export function holidayChoices(year: number, region: HolidayRegion, closures: Closure[]): (Holiday & { added: boolean })[] {
+  const closed = new Set(closures.map((c) => c.day));
+  return canadianHolidays(year, region).map((h) => ({ ...h, added: closed.has(h.date) }));
+}
+
 export async function removeClosure(id: string): Promise<void> {
   const { data, error } = await supabase.from('workshop_closures').delete().eq('id', id).select('id');
   if (error) fail(error);
@@ -585,10 +669,13 @@ export function upcomingClosures(closures: Closure[], tz: string): Closure[] {
 
 export type CalendarView = 'day' | 'week';
 
+/**
+ * Week view is a rolling seven days starting at the anchor (today by default), so upcoming bookings are always on
+ * screen, even late in a calendar week.
+ */
 export function visibleDays(view: CalendarView, anchor: string): string[] {
   if (view === 'day') return [anchor];
-  const start = weekStart(anchor);
-  return [0, 1, 2, 3, 4, 5, 6].map((i) => addDays(start, i));
+  return [0, 1, 2, 3, 4, 5, 6].map((i) => addDays(anchor, i));
 }
 
 export function shiftAnchor(view: CalendarView, anchor: string, direction: -1 | 1): string {
@@ -599,14 +686,75 @@ export interface DayInfo {
   key: string;
   hours: WorkshopHours;
   closure: Closure | null;
+  /** A public holiday in the workshop's region that day (shown as a label; only a closure closes the day). */
+  holiday: Holiday | null;
   /** Closed by the weekly hours or by a closure. */
   closed: boolean;
 }
 
-export function dayInfo(key: string, ctx: Pick<BookingContext, 'hours' | 'closures'>): DayInfo {
+const holidayCache = new Map<string, Holiday[]>();
+
+/** The public holiday on a day in the region, if any. */
+export function holidayOn(key: string, region: HolidayRegion): Holiday | null {
+  const year = Number(key.slice(0, 4));
+  const k = `${year}|${region}`;
+  let list = holidayCache.get(k);
+  if (!list) {
+    list = canadianHolidays(year, region);
+    holidayCache.set(k, list);
+  }
+  return list.find((h) => h.date === key) ?? null;
+}
+
+export function dayInfo(key: string, ctx: Pick<BookingContext, 'hours' | 'closures'> & { settings?: Pick<BookingSettings, 'holiday_region'> }): DayInfo {
   const hours = ctx.hours[weekdayOf(key)] ?? { weekday: weekdayOf(key), closed: true, opens: null, closes: null };
   const closure = ctx.closures.find((c) => c.day === key) ?? null;
-  return { key, hours, closure, closed: hours.closed || closure !== null };
+  const holiday = ctx.settings ? holidayOn(key, ctx.settings.holiday_region) : null;
+  return { key, hours, closure, holiday, closed: hours.closed || closure !== null };
+}
+
+/** Why a day is closed, in words: the closure's reason, or the weekday. */
+export function closedReason(info: DayInfo): string {
+  if (info.closure) return info.closure.reason || 'closed date';
+  return `closed on ${WEEKDAY_NAMES[info.hours.weekday]}s`;
+}
+
+export type StartTimes = { closed: true; reason: string } | { closed: false; times: string[] };
+
+/**
+ * The start times staff may choose on a day ('HH:MM', workshop time): every
+ * slot_minutes from opening, as long as the booking ends by closing. Closed
+ * days and closures have none. Day keys and times are in the workshop's
+ * time zone, which is how the database checks them too.
+ */
+export function validStartTimes(dayKey: string, ctx: Pick<BookingContext, 'hours' | 'closures' | 'settings'>, durationMinutes: number): StartTimes {
+  if (!isDayKey(dayKey)) return { closed: false, times: [] };
+  const info = dayInfo(dayKey, ctx);
+  if (info.closed || !info.hours.opens || !info.hours.closes) return { closed: true, reason: closedReason(info) };
+  const opens = timeToMinutes(info.hours.opens);
+  const closes = timeToMinutes(info.hours.closes);
+  const step = ctx.settings.slot_minutes > 0 ? ctx.settings.slot_minutes : 30;
+  const length = Number.isFinite(durationMinutes) && durationMinutes > 0 ? durationMinutes : step;
+  const times: string[] = [];
+  for (let m = opens; m + length <= closes; m += step) times.push(`${pad(Math.floor(m / 60))}:${pad(m % 60)}`);
+  return { closed: false, times };
+}
+
+/**
+ * The empty slots of a day a click can book from (the calendar): the valid
+ * start times for one slot length, from now on.
+ */
+export function bookableSlots(dayKey: string, ctx: Pick<BookingContext, 'hours' | 'closures' | 'settings'>, now: Date): string[] {
+  const r = validStartTimes(dayKey, ctx, ctx.settings.slot_minutes);
+  if (r.closed) return [];
+  const tz = ctx.settings.time_zone;
+  return r.times.filter((t) => zonedToUtc(dayKey, t, tz).getTime() > now.getTime());
+}
+
+/** The first start time on a day, or '' when there is none. */
+export function firstStartTime(dayKey: string, ctx: Pick<BookingContext, 'hours' | 'closures' | 'settings'>, durationMinutes: number): string {
+  const r = validStartTimes(dayKey, ctx, durationMinutes);
+  return r.closed ? '' : (r.times[0] ?? '');
 }
 
 export interface TimeWindow {
@@ -632,6 +780,17 @@ export function timelineWindow(hours: WorkshopHours[], appts: Appointment[], tz:
   start = Math.floor(start / 60) * 60;
   end = Math.max(start + 60, Math.ceil(end / 60) * 60);
   return { start, end };
+}
+
+/**
+ * The hours the calendar shows: from the earliest opening to the latest
+ * closing among the visible days that are open (the whole week's hours when
+ * none is), widened to whole hours and to fit any appointment booked outside
+ * opening hours before the database refused those.
+ */
+export function visibleWindow(days: DayInfo[], weekHours: WorkshopHours[], appts: Appointment[], tz: string): TimeWindow {
+  const fromDays = days.filter((d) => !d.closed && d.hours.opens && d.hours.closes).map((d) => d.hours);
+  return timelineWindow(fromDays.length > 0 ? fromDays : weekHours, appts, tz);
 }
 
 export interface PlacedAppointment {
@@ -739,6 +898,20 @@ export async function listAppointments(
   return ((data ?? []) as Record<string, unknown>[]).map(normalize);
 }
 
+/** Every upcoming booking still waiting to be confirmed (any day), soonest first. */
+export async function listAwaitingConfirmation(workshopId: string): Promise<Appointment[]> {
+  const { data, error } = await supabase
+    .from('appointments')
+    .select('*')
+    .eq('workshop_id', workshopId)
+    .eq('status', 'requested')
+    .gte('starts_at', new Date().toISOString())
+    .order('starts_at')
+    .limit(50);
+  if (error) fail(error);
+  return ((data ?? []) as Record<string, unknown>[]).map(normalize);
+}
+
 export async function getAppointment(id: string): Promise<Appointment | null> {
   const { data, error } = await supabase.from('appointments').select('*').eq('id', id).maybeSingle();
   if (error) fail(error);
@@ -834,6 +1007,41 @@ export async function updateAppointmentStatus(appt: Appointment, to: Appointment
   return updateWhere(appt.id, [appt.status], patch);
 }
 
+export interface CheckInResult {
+  appointment_id: string;
+  repair_order_id: string;
+  repair_order_number: string;
+}
+
+/**
+ * Checks a confirmed booking in through the database (migration 012): the
+ * appointment becomes checked in and a repair order is created from it, or
+ * the existing one is returned when it was created already. The technician
+ * is optional and can be set later. Returns the result and the fresh booking.
+ */
+export async function checkInAppointment(appt: Appointment, technicianId: string | null): Promise<{ result: CheckInResult; appt: Appointment }> {
+  if (!statusActions(appt.status).some((a) => a.to === 'checked_in')) {
+    throw new Error(`A booking that is ${APPOINTMENT_STATUS_LABEL[appt.status].toLowerCase()} cannot be checked in.`);
+  }
+  const { data, error } = await supabase.rpc('check_in_appointment', { p_id: appt.id, p_technician_id: technicianId || null });
+  if (error) {
+    const text = `${error.message} ${error.details ?? ''}`;
+    if (error.code === 'PGRST202' || error.code === '42883' || /could not find the function|check_in_appointment.*does not exist/i.test(text)) {
+      throw new Error(
+        'Check-in could not run: the database does not have the check-in function yet (it comes with migration 012, repair orders). Apply it with npm run db:migrate and try again.',
+      );
+    }
+    fail(error);
+  }
+  const row = (Array.isArray(data) ? data[0] : data) as CheckInResult | null | undefined;
+  if (!row || !row.repair_order_id) throw new Error('Check-in did not return a repair order. Reload the page and look at the booking again.');
+  const fresh = await getAppointment(appt.id);
+  return {
+    result: { appointment_id: String(row.appointment_id), repair_order_id: String(row.repair_order_id), repair_order_number: String(row.repair_order_number) },
+    appt: fresh ?? { ...appt, status: 'checked_in' },
+  };
+}
+
 export function validateDuration(minutes: number): string | null {
   if (!Number.isInteger(minutes) || minutes < 15 || minutes > 600) return 'Duration must be from 15 to 600 minutes.';
   return null;
@@ -860,12 +1068,27 @@ export async function saveStaffNotes(appt: Appointment, notes: string): Promise<
   return updateWhere(appt.id, [...APPOINTMENT_STATUSES], { staff_notes: t || null });
 }
 
+/** Why a start time cannot be booked (closed, or not one of the valid start times), or null when it can. */
+export function startTimeProblem(
+  dayKey: string,
+  time: string,
+  durationMinutes: number,
+  ctx: Pick<BookingContext, 'hours' | 'closures' | 'settings'>,
+): string | null {
+  const r = validStartTimes(dayKey, ctx, durationMinutes);
+  if (r.closed) return `The workshop is closed that day (${r.reason}). Choose another date.`;
+  if (r.times.length === 0) return `No start time that day leaves room for ${formatDuration(durationMinutes)} before closing. Choose another date or a shorter duration.`;
+  if (!r.times.includes(time)) return 'Choose one of the start times offered for that day.';
+  return null;
+}
+
 // Checking a time ---------------------------------------------------------------------------------
 
 /**
- * Warnings for booking a time: outside opening hours, a closed day, in the
- * past, or more overlapping bookings than the workshop has bays. Staff may
- * still go ahead; the warnings only inform.
+ * Warnings for booking a valid start time: in the past, or more overlapping
+ * bookings than the workshop has bays. Staff may still go ahead; the
+ * warnings only inform. Times outside opening hours are not offered at all
+ * (validStartTimes), and the database refuses them.
  */
 export async function checkTime(args: {
   workshopId: string;
@@ -875,23 +1098,12 @@ export async function checkTime(args: {
   ctx: BookingContext;
 }): Promise<string[]> {
   const { workshopId, startsAt, durationMinutes, excludeId, ctx } = args;
-  const tz = ctx.settings.time_zone;
   const warnings: string[] = [];
   if (Number.isNaN(startsAt.getTime())) return warnings;
   const start = startsAt.getTime();
   const end = start + durationMinutes * 60_000;
 
   if (start < Date.now()) warnings.push('This time is in the past.');
-  const key = dayKeyOf(startsAt, tz);
-  const info = dayInfo(key, ctx);
-  if (info.closure) warnings.push(`The workshop is closed that day${info.closure.reason ? ` (${info.closure.reason})` : ''}.`);
-  else if (info.hours.closed) warnings.push(`The workshop is closed on ${WEEKDAY_NAMES[info.hours.weekday]}s.`);
-  else if (info.hours.opens && info.hours.closes) {
-    const s = minutesOfDay(startsAt, tz);
-    if (s < timeToMinutes(info.hours.opens) || s + durationMinutes > timeToMinutes(info.hours.closes)) {
-      warnings.push(`This is outside opening hours (${info.hours.opens} to ${info.hours.closes}).`);
-    }
-  }
 
   // Others that overlap: anything starting before the end and up to 10 hours (the longest booking) before the start.
   const { data, error } = await supabase
@@ -1011,7 +1223,7 @@ export function suggestedDuration(serviceCount: number, slotMinutes: number): nu
   return slotMinutes * Math.max(1, Math.min(8, serviceCount));
 }
 
-export function newBookingDraft(day: string, slotMinutes: number): StaffBookingDraft {
+export function newBookingDraft(day: string, slotMinutes: number, time = '09:00'): StaffBookingDraft {
   return {
     contact_name: '',
     contact_email: '',
@@ -1022,7 +1234,7 @@ export function newBookingDraft(day: string, slotMinutes: number): StaffBookingD
     plate: '',
     service_ids: [],
     day,
-    time: '09:00',
+    time,
     duration: String(Math.max(60, slotMinutes)),
     durationEdited: false,
     technician_id: '',
@@ -1038,7 +1250,12 @@ function text(label: string, value: string, max: number, errors: string[], min =
   return t;
 }
 
-export function validateStaffBooking(d: StaffBookingDraft, services: ServiceRow[], tz: string): Validated<StaffBookingInput> {
+export function validateStaffBooking(
+  d: StaffBookingDraft,
+  services: ServiceRow[],
+  tz: string,
+  ctx?: Pick<BookingContext, 'hours' | 'closures' | 'settings'>,
+): Validated<StaffBookingInput> {
   const errors: string[] = [];
   const contact_name = text('Name', d.contact_name, 120, errors, 1);
   const contact_email = d.contact_email.trim().toLowerCase();
@@ -1064,6 +1281,10 @@ export function validateStaffBooking(d: StaffBookingDraft, services: ServiceRow[
   const duration = Number(d.duration);
   const badDuration = validateDuration(duration);
   if (badDuration) errors.push(badDuration);
+  if (ctx && starts && !badDuration) {
+    const bad = startTimeProblem(d.day, d.time, duration, ctx);
+    if (bad) errors.push(bad);
+  }
   if (errors.length > 0 || !starts) return { ok: false, errors };
   const low = chosen.reduce((sum, s) => sum + s.price_from, 0);
   return {
