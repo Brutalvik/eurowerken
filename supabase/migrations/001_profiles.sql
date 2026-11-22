@@ -1,5 +1,5 @@
 -- EuroWerken ERP: staff profiles and roles on top of Supabase Auth.
--- Run once in the Supabase SQL editor. Safe to re-run.
+-- Safe to re-run. Apply all migrations with: npm run db:migrate
 --
 -- Model
 --   auth.users          Supabase-managed accounts (email + password).

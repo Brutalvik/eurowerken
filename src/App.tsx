@@ -13,6 +13,7 @@ import { SalesPage } from '@/pages/SalesPage';
 import { SettingsPage } from '@/pages/SettingsPage';
 import { UsersPage } from '@/pages/UsersPage';
 import { LoginPage } from '@/pages/auth/LoginPage';
+import { RegisterPage } from '@/pages/auth/RegisterPage';
 import { ResetPasswordPage } from '@/pages/auth/ResetPasswordPage';
 import { SetupRequiredPage } from '@/pages/auth/SetupRequiredPage';
 import { supabaseConfigured } from '@/lib/supabase';
@@ -28,6 +29,7 @@ export default function App() {
   return (
     <Routes>
       <Route path="login" element={<LoginPage />} />
+      <Route path="register" element={<RegisterPage />} />
       <Route path="reset-password" element={<ResetPasswordPage />} />
       <Route
         element={

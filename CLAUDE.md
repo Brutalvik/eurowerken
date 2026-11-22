@@ -6,7 +6,8 @@ Internal staff platform for an auto repair workshop (European specialist, servic
 
 ```bash
 npm install
-cp .env.example .env.local   # then fill in the Supabase URL and anon key
+cp .env.example .env.local   # then fill in the Supabase URL, publishable key, DATABASE_URL
+npm run db:migrate           # apply supabase/migrations to the database
 npm run dev        # http://localhost:5174
 npm run typecheck
 npm run build      # typecheck + production build
@@ -39,9 +40,11 @@ src/
   config/      brand.ts
   data/        types.ts, mock.ts (static mock data, one export per future API resource)
   lib/         format.ts (CAD currency), status.ts (status to badge tone maps), supabase.ts (client)
-  pages/       one file per module; pages/auth/ holds login, reset password and setup screens
+  pages/       one file per module; pages/auth/ holds login, register, reset password and setup screens
 supabase/
-  schema.sql   profiles table, staff_role enum, triggers, row level security (run in the SQL editor)
+  migrations/  001 profiles and roles, 002 registration and role_permissions (RBAC); all re-runnable
+scripts/
+  db-migrate.sh  applies the migrations with psql
   theme/       ThemeProvider (light/dark, persisted), chartPalette (hex values per mode for recharts)
 ```
 
@@ -68,19 +71,24 @@ supabase/
 | Users & Roles | full | none | none | none |
 | Settings | full | none | none | none |
 
-## Authentication
+## Authentication and access control
 
-- Supabase Auth, email and password. No public sign-up: staff are added from the Supabase dashboard (Authentication, Users, Add user, with a temporary password or Invite user). To set or change a password, staff use "Forgot your password?" on the sign-in page; the reset email links to `/reset-password`.
-- Each account has a row in `public.profiles` (created by a trigger). The role lives there and starts as null; a Manager assigns it on the Users and Roles page. A user with no role, or a deactivated one, can sign in but sees no modules.
-- Only Managers can change role, active, email or department (enforced by RLS and a trigger in `supabase/schema.sql`). Managers cannot change their own role or status. Staff read only their own profile; Managers read all.
-- First Manager: create your account in the Supabase dashboard, then run the `update public.profiles set role = 'Manager'` snippet at the bottom of `schema.sql`.
-- Supabase dashboard settings: Authentication, URL Configuration: set Site URL to the app URL and add `http://localhost:5174/reset-password` (and the production equivalent) to Redirect URLs. Turn off "Allow new users to sign up".
-- Only the anon key belongs in the frontend. Never the service_role key.
+- Supabase Auth: email and password, and Google. Anyone can register at `/register` (or "Continue with Google" on `/login`). Email sign-ups must confirm their address first (Supabase "Confirm email" is on).
+- Each account has a row in `public.profiles` (created by a trigger, with name and picture from Google when available). A new account has no role: it can sign in but sees a "Waiting for approval" screen until someone with full Users & Roles access assigns a role.
+- Bootstrap: while there is no active Manager, the next account created becomes Manager. Register yourself first.
+- Permissions live in `public.role_permissions` (role x module x none/view/full), seeded with the defaults in `src/auth/rbac.ts`. AuthContext loads it after sign-in; `rbac.ts` ACCESS is only the fallback. Managers edit it on the Users & Roles page; the Manager role itself is fixed at full.
+- Database enforcement: `public.has_access(module, level)` for RLS policies. Every new table must enable RLS and use it, for example `using (public.has_access('inventory', 'view'))` for select and `'full'` for writes.
+- Profile rules (trigger + RLS): only users with Users & Roles full access change role, active, email or department; nobody changes their own role or status; only a Manager grants or removes the Manager role.
+- Migrations: `supabase/migrations/*.sql`, all re-runnable. Apply with `npm run db:migrate` (needs `DATABASE_URL` in `.env.local` and `psql`).
+- Keys: the browser uses only the publishable key (`VITE_SUPABASE_PUBLISHABLE_KEY`). Never put the secret key (`sb_secret_...`) in the frontend or the repo. `DATABASE_URL` is read by the migration script only; Vite never exposes non-`VITE_` variables.
+- Supabase dashboard setup:
+  - Authentication, URL Configuration: Site URL = app URL; Redirect URLs include `http://localhost:5174/**` and the production URL.
+  - Authentication, Providers, Google: enable with a Google Cloud OAuth client (Web application) whose authorised redirect URI is `https://<project-ref>.supabase.co/auth/v1/callback`.
 - Without `.env.local` the app shows a setup screen instead of failing.
 
 ## Current state
 
-Real sign-in through Supabase; the Users and Roles team list reads `profiles` and lets Managers change roles and deactivate accounts. Every other module still uses mock data: Dashboard, Inventory, Repair Orders, Sales, Invoices, Reports, Settings. Action buttons (Add part, New invoice, Invite member, and so on) render but are not wired to anything.
+Real registration and sign-in through Supabase (email and Google), with database-backed RBAC. The Users and Roles page lists real accounts (awaiting approval first), assigns roles, deactivates accounts, and lets Managers edit the permission matrix. Every other module still uses mock data: Dashboard, Inventory, Repair Orders, Sales, Invoices, Reports, Settings. Action buttons (Add part, New invoice, and so on) render but are not wired to anything.
 
 ## Next steps
 
@@ -90,7 +98,7 @@ Real sign-in through Supabase; the Users and Roles team list reads `profiles` an
 4. Part detail page (history, reorder) and add/edit part forms.
 5. Repair order detail page linked to customer bookings and tracking IDs.
 6. Notifications centre: low stock, overdue invoices, repair status changes.
-7. In-app staff invites (needs a server-side function with the service role key, for example a Supabase Edge Function), and a profile page to change your own name and password.
+7. Profile page to change your own name and password; email notification to managers when someone registers.
 8. API client layer in `src/api/`, replace `data/mock.ts` imports with data fetching (TanStack Query recommended), add loading and error states.
 9. Settings persistence, tax and invoice numbering.
 

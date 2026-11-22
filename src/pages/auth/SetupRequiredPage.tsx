@@ -10,10 +10,10 @@ export function SetupRequiredPage() {
           <code className="rounded bg-surface2 px-1 text-fg">.env.local</code> in the project folder.
         </li>
         <li>
-          Fill in the project URL and the anon public key from Supabase, under Project Settings, API.
+          Fill in the project URL and the publishable key from Supabase, under Project Settings, API Keys.
         </li>
         <li>
-          Run <code className="rounded bg-surface2 px-1 text-fg">supabase/schema.sql</code> in the Supabase SQL editor.
+          Add DATABASE_URL and run <code className="rounded bg-surface2 px-1 text-fg">npm run db:migrate</code>.
         </li>
         <li>Restart the dev server.</li>
       </ol>

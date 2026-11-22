@@ -1,14 +1,14 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
-import { Navigate, useLocation } from 'react-router-dom';
+import { Link, Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/auth/AuthContext';
 import { Button } from '@/components/ui/Button';
-import { AuthShell, Field, FormMessage } from './AuthShell';
+import { AuthShell, Field, FormMessage, GoogleButton, OrDivider } from './AuthShell';
 
 type Mode = 'sign-in' | 'forgot';
 
 export function LoginPage() {
-  const { status, signIn, sendPasswordReset } = useAuth();
+  const { status, signIn, signInWithGoogle, sendPasswordReset } = useAuth();
   const location = useLocation();
   const from = (location.state as { from?: string } | null)?.from ?? '/dashboard';
 
@@ -35,6 +35,17 @@ export function LoginPage() {
       else setSent(true);
     }
     setBusy(false);
+  }
+
+  async function onGoogle() {
+    setBusy(true);
+    setError(null);
+    const err = await signInWithGoogle();
+    // On success the page redirects to Google; only an error brings us back here.
+    if (err) {
+      setError(err);
+      setBusy(false);
+    }
   }
 
   function switchMode(next: Mode) {
@@ -81,8 +92,12 @@ export function LoginPage() {
   }
 
   return (
-    <AuthShell title="Sign in" subtitle="Staff access only. Accounts are created by a manager.">
-      <form onSubmit={onSubmit} className="space-y-4">
+    <AuthShell title="Sign in" subtitle="Welcome back. Sign in to the workshop console.">
+      <div className="space-y-4">
+        <GoogleButton onClick={() => void onGoogle()} disabled={busy} label="Continue with Google" />
+        <OrDivider />
+      </div>
+      <form onSubmit={onSubmit} className="mt-4 space-y-4">
         <Field
           id="email"
           label="Work email"
@@ -113,6 +128,12 @@ export function LoginPage() {
         >
           Forgot your password?
         </button>
+        <p className="text-center text-xs text-fg2">
+          New here?{' '}
+          <Link to="/register" className="font-medium text-accent hover:underline">
+            Create an account
+          </Link>
+        </p>
       </form>
     </AuthShell>
   );

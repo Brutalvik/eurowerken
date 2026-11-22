@@ -3,14 +3,15 @@ import type { ReactNode } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase, supabaseConfigured } from '@/lib/supabase';
 import type { ProfileRow } from '@/lib/supabase';
-import { ACCESS } from './rbac';
-import type { Access, ModuleId, Role } from './rbac';
+import { ACCESS, MODULE_ORDER, ROLES } from './rbac';
+import type { Access, ModuleId, PermissionMatrix, Role } from './rbac';
 
 export interface AuthUser {
   id: string;
   name: string;
   email: string;
   initials: string;
+  avatarUrl: string | null;
   /** Null until a manager assigns a role. A user with no role can sign in but sees no modules. */
   role: Role | null;
   active: boolean;
@@ -30,10 +31,20 @@ interface AuthContextValue {
   /** Set when the profile could not be loaded, for example the profiles table is missing. */
   profileError: string | null;
   signIn: (email: string, password: string) => Promise<string | null>;
+  /** needsConfirmation is true when Supabase sent a confirmation email instead of signing the user in. */
+  signUp: (
+    fullName: string,
+    email: string,
+    password: string,
+  ) => Promise<{ error: string | null; needsConfirmation: boolean }>;
+  signInWithGoogle: () => Promise<string | null>;
   signOut: () => Promise<void>;
   sendPasswordReset: (email: string) => Promise<string | null>;
   updatePassword: (password: string) => Promise<string | null>;
   reloadProfile: () => Promise<void>;
+  /** Role permission matrix from public.role_permissions (falls back to the defaults in rbac.ts). */
+  permissions: PermissionMatrix;
+  reloadPermissions: () => Promise<void>;
   accessFor: (module: ModuleId) => Access;
   /** True when the current role has at least the requested level on the module. */
   can: (module: ModuleId, level: 'view' | 'full') => boolean;
@@ -58,6 +69,7 @@ function toAuthUser(session: Session, profile: ProfileRow | null): AuthUser {
     name,
     email,
     initials: initialsOf(name),
+    avatarUrl: profile?.avatar_url ?? null,
     role: profile?.active === false ? null : (profile?.role ?? null),
     active: profile?.active ?? true,
   };
@@ -68,6 +80,10 @@ function friendly(message: string): string {
   if (/invalid login credentials/i.test(message)) return 'Email or password is incorrect.';
   if (/failed to fetch|network|load failed/i.test(message)) {
     return 'Could not reach the sign-in server. Check your connection and try again.';
+  }
+  if (/already registered|already exists/i.test(message)) return 'An account with this email already exists. Sign in instead.';
+  if (/provider is not enabled|unsupported provider/i.test(message)) {
+    return 'Google sign-in is not switched on yet in Supabase (Authentication, Providers, Google).';
   }
   if (/email not confirmed/i.test(message)) return 'Confirm your email address first, using the link we sent you.';
   return message;
@@ -80,6 +96,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [sessionChecked, setSessionChecked] = useState(!supabaseConfigured);
   const [profileLoading, setProfileLoading] = useState(false);
   const [recovery, setRecovery] = useState(false);
+  const [permissions, setPermissions] = useState<PermissionMatrix>(ACCESS);
 
   // Session: read the stored one, then follow sign-in, sign-out, token refresh and recovery events.
   useEffect(() => {
@@ -121,15 +138,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setProfileLoading(false);
   }, []);
 
-  // Profile (name and role) for whoever is signed in. Only refetch when the user changes, not on token refresh.
+  const loadPermissions = useCallback(async () => {
+    const { data, error } = await supabase.from('role_permissions').select('role, module, access');
+    if (error || !data || data.length === 0) {
+      // Table missing (migration 002 not applied yet) or unreadable: keep the built-in defaults.
+      if (error) console.warn('Using default permissions:', error.message);
+      setPermissions(ACCESS);
+      return;
+    }
+    const next = Object.fromEntries(
+      ROLES.map((r) => [r, Object.fromEntries(MODULE_ORDER.map((m) => [m, 'none' as Access]))]),
+    ) as PermissionMatrix;
+    for (const row of data as { role: Role; module: ModuleId; access: Access }[]) {
+      if (next[row.role] && MODULE_ORDER.includes(row.module)) next[row.role][row.module] = row.access;
+    }
+    setPermissions(next);
+  }, []);
+
+  // Profile (name and role) and the permission matrix for whoever is signed in.
+  // Only refetch when the user changes, not on token refresh.
   useEffect(() => {
     if (!userId) {
       setProfile(null);
       setProfileError(null);
+      setPermissions(ACCESS);
       return;
     }
     void loadProfile(userId);
-  }, [userId, loadProfile]);
+    void loadPermissions();
+  }, [userId, loadProfile, loadPermissions]);
 
   const user = useMemo(() => (session ? toAuthUser(session, profile) : null), [session, profile]);
   const role = user?.role ?? null;
@@ -140,20 +177,50 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   else if (recovery) status = 'recovery';
   else status = 'signed-in';
 
-  const accessFor = useCallback((module: ModuleId): Access => (role ? ACCESS[role][module] : 'none'), [role]);
+  const accessFor = useCallback(
+    (module: ModuleId): Access => (role ? permissions[role][module] : 'none'),
+    [role, permissions],
+  );
 
   const can = useCallback(
     (module: ModuleId, level: 'view' | 'full'): boolean => {
       if (!role) return false;
-      const access = ACCESS[role][module];
+      const access = permissions[role][module];
       if (level === 'full') return access === 'full';
       return access === 'view' || access === 'full';
     },
-    [role],
+    [role, permissions],
   );
 
   const signIn = useCallback(async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+    return error ? friendly(error.message) : null;
+  }, []);
+
+  const signUp = useCallback(async (fullName: string, email: string, password: string) => {
+    const { data, error } = await supabase.auth.signUp({
+      email: email.trim(),
+      password,
+      options: {
+        data: { full_name: fullName.trim() },
+        emailRedirectTo: `${window.location.origin}/dashboard`,
+      },
+    });
+    if (error) return { error: friendly(error.message), needsConfirmation: false };
+    // With "Confirm email" on, Supabase returns a user but no session. With an
+    // existing address it also returns no session and an empty identities list.
+    if (!data.session && data.user && data.user.identities?.length === 0) {
+      return { error: 'An account with this email already exists. Sign in instead.', needsConfirmation: false };
+    }
+    return { error: null, needsConfirmation: !data.session };
+  }, []);
+
+  const signInWithGoogle = useCallback(async () => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: `${window.location.origin}/dashboard` },
+    });
+    // On success the browser leaves for Google, so only errors come back here.
     return error ? friendly(error.message) : null;
   }, []);
 
@@ -185,14 +252,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user,
       profileError,
       signIn,
+      signUp,
+      signInWithGoogle,
       signOut,
       sendPasswordReset,
       updatePassword,
       reloadProfile,
+      permissions,
+      reloadPermissions: loadPermissions,
       accessFor,
       can,
     }),
-    [status, user, profileError, signIn, signOut, sendPasswordReset, updatePassword, reloadProfile, accessFor, can],
+    [
+      status,
+      user,
+      profileError,
+      signIn,
+      signUp,
+      signInWithGoogle,
+      signOut,
+      sendPasswordReset,
+      updatePassword,
+      reloadProfile,
+      permissions,
+      loadPermissions,
+      accessFor,
+      can,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

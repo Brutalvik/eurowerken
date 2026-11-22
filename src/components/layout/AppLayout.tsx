@@ -32,14 +32,21 @@ export function AppLayout() {
 }
 
 function NoRoleNotice({ active, error }: { active: boolean; error: string | null }) {
-  let message = 'Your account is signed in but has no role yet. Ask a manager to assign one.';
-  if (!active) message = 'Your account has been deactivated. Ask a manager if you think this is a mistake.';
-  if (error) message = `Your profile could not be loaded: ${error}`;
+  let title = 'Waiting for approval';
+  let message = 'Your account is set up. A manager needs to approve it and assign your role before you can use the console.';
+  if (!active) {
+    title = 'Account deactivated';
+    message = 'Your account has been deactivated. Ask a manager if you think this is a mistake.';
+  }
+  if (error) {
+    title = 'Something went wrong';
+    message = `Your profile could not be loaded: ${error}`;
+  }
 
   return (
     <div className="flex h-72 flex-col items-center justify-center gap-3 text-center">
       <UserX className="h-8 w-8 text-fg3" aria-hidden />
-      <h2 className="font-display text-base font-semibold">No access yet</h2>
+      <h2 className="font-display text-base font-semibold">{title}</h2>
       <p className="max-w-sm text-sm text-fg2">{message}</p>
     </div>
   );

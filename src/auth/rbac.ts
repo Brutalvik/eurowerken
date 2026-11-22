@@ -37,11 +37,15 @@ export const MODULE_ORDER: ModuleId[] = [
   'settings',
 ];
 
+export type PermissionMatrix = Record<Role, Record<ModuleId, Access>>;
+
 /**
- * Role permission matrix. This is a UI-side mirror for navigation and
- * button visibility only. The backend must enforce the same rules.
+ * Default role permission matrix. The live matrix is in the database
+ * (public.role_permissions, seeded with these same values by
+ * supabase/migrations/002) and is loaded by AuthContext; this is the
+ * fallback when it cannot be read. RLS enforces the database copy.
  */
-export const ACCESS: Record<Role, Record<ModuleId, Access>> = {
+export const ACCESS: PermissionMatrix = {
   Manager: {
     dashboard: 'full',
     inventory: 'full',

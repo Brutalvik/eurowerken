@@ -78,12 +78,21 @@ export function Sidebar({ open, onNavigate }: SidebarProps) {
       </nav>
 
       <div className="flex items-center gap-2.5 border-t border-white/10 px-4 py-3">
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent/25 text-[10px] font-bold text-white">
-          {user.initials}
-        </span>
+        {user.avatarUrl ? (
+          <img
+            src={user.avatarUrl}
+            alt=""
+            referrerPolicy="no-referrer"
+            className="h-8 w-8 shrink-0 rounded-full object-cover"
+          />
+        ) : (
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent/25 text-[10px] font-bold text-white">
+            {user.initials}
+          </span>
+        )}
         <div className="min-w-0 flex-1">
           <div className="truncate text-xs font-semibold">{user.name}</div>
-          <div className="truncate text-[10px] text-white/50">{user.role ?? 'No role assigned'}</div>
+          <div className="truncate text-[10px] text-white/50">{user.role ?? 'Awaiting approval'}</div>
         </div>
         <button
           type="button"

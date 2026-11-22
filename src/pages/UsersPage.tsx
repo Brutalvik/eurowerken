@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Plus } from 'lucide-react';
 import { useAuth } from '@/auth/AuthContext';
-import { ACCESS, MODULE_LABELS, MODULE_ORDER, ROLES } from '@/auth/rbac';
-import type { Access, Role } from '@/auth/rbac';
+import { MODULE_LABELS, MODULE_ORDER, ROLES } from '@/auth/rbac';
+import type { Access, ModuleId, Role } from '@/auth/rbac';
 import { Badge } from '@/components/ui/Badge';
 import type { Tone } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -29,8 +28,10 @@ function initialsOf(p: ProfileRow): string {
 }
 
 export function UsersPage() {
-  const { can, user, reloadProfile } = useAuth();
+  const { can, user, reloadProfile, permissions, reloadPermissions } = useAuth();
   const canManage = can('users', 'full');
+  const isManager = user?.role === 'Manager';
+  const [savingCell, setSavingCell] = useState<string | null>(null);
   const [profiles, setProfiles] = useState<ProfileRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -63,6 +64,18 @@ export function UsersPage() {
     if (id === user?.id) await reloadProfile();
   }
 
+  async function setAccess(role: Role, module: ModuleId, access: Access) {
+    const key = `${role}:${module}`;
+    setSavingCell(key);
+    // RLS lets only a Manager change the matrix, and never the Manager row.
+    const { error: err } = await supabase.from('role_permissions').update({ access }).eq('role', role).eq('module', module);
+    setSavingCell(null);
+    if (err) setError(err.message);
+    else await reloadPermissions();
+  }
+
+  const pending = profiles.filter((p) => p.active && !p.role).length;
+
   const columns: Column<ProfileRow>[] = [
     {
       header: 'Member',
@@ -87,9 +100,9 @@ export function UsersPage() {
             onChange={(e) => void update(m.id, { role: (e.target.value || null) as Role | null })}
             className="rounded-md border border-line bg-surface2 px-2 py-1 text-xs text-fg outline-none focus:border-accent"
           >
-            <option value="">No role</option>
-            {ROLES.map((r) => (
-              <option key={r} value={r}>
+            <option value="">Awaiting approval</option>
+            {ROLES.filter((r) => isManager || r !== 'Manager' || m.role === 'Manager').map((r) => (
+              <option key={r} value={r} disabled={!isManager && r === 'Manager'}>
                 {r}
               </option>
             ))}
@@ -97,7 +110,7 @@ export function UsersPage() {
         ) : m.role ? (
           <Badge tone={ROLE_TONE[m.role]}>{m.role}</Badge>
         ) : (
-          <Badge>No role</Badge>
+          <Badge tone="warn">Awaiting approval</Badge>
         ),
     },
     { header: 'Department', cell: (m) => m.department ?? '-' },
@@ -128,14 +141,10 @@ export function UsersPage() {
         <div className="p-5 pb-3">
           <CardHeader
             title="Team"
-            subtitle={loading ? 'Loading...' : `${profiles.length} members, ${ROLES.length} roles`}
-            action={
-              canManage && (
-                <Button size="sm" title="Invite new staff from the Supabase dashboard: Authentication, Users, Invite user">
-                  <Plus className="h-3.5 w-3.5" aria-hidden />
-                  Invite member
-                </Button>
-              )
+            subtitle={
+              loading
+                ? 'Loading...'
+                : `${profiles.length} members, ${ROLES.length} roles${pending ? `, ${pending} awaiting approval` : ''}`
             }
           />
           {error && (
@@ -146,14 +155,21 @@ export function UsersPage() {
         </div>
         <DataTable
           columns={columns}
-          rows={profiles}
+          rows={[...profiles].sort((a, b) => Number(Boolean(a.role)) - Number(Boolean(b.role)))}
           getKey={(m) => m.id}
           emptyMessage={loading ? 'Loading team...' : 'No team members yet.'}
         />
       </Card>
 
       <Card className="p-5">
-        <CardHeader title="Role permissions" subtitle="Access level each role has per module" />
+        <CardHeader
+          title="Role permissions"
+          subtitle={
+            isManager
+              ? 'Access level each role has per module. Changes apply the next time each person loads the app. Manager is always full.'
+              : 'Access level each role has per module'
+          }
+        />
         <div className="overflow-x-auto">
           <table className="w-full min-w-[560px] border-collapse text-xs">
             <thead>
@@ -179,10 +195,27 @@ export function UsersPage() {
                     {MODULE_LABELS[module]}
                   </th>
                   {ROLES.map((role) => {
-                    const access = ACCESS[role][module];
+                    const access = permissions[role][module];
+                    const editable = isManager && role !== 'Manager';
                     return (
                       <td key={role} className="px-3 py-2.5">
-                        <Badge tone={ACCESS_TONE[access]}>{ACCESS_LABEL[access]}</Badge>
+                        {editable ? (
+                          <select
+                            aria-label={`${role} access to ${MODULE_LABELS[module]}`}
+                            value={access}
+                            disabled={savingCell === `${role}:${module}`}
+                            onChange={(e) => void setAccess(role, module, e.target.value as Access)}
+                            className="rounded-md border border-line bg-surface2 px-2 py-1 text-xs text-fg outline-none focus:border-accent"
+                          >
+                            {(['none', 'view', 'full'] as Access[]).map((a) => (
+                              <option key={a} value={a}>
+                                {ACCESS_LABEL[a]}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <Badge tone={ACCESS_TONE[access]}>{ACCESS_LABEL[access]}</Badge>
+                        )}
                       </td>
                     );
                   })}
