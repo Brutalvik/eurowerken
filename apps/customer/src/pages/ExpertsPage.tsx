@@ -5,6 +5,7 @@ import { useTeam } from '@/api/catalogue';
 import type { Technician } from '@/api/catalogue';
 import { Photo } from '@/components/Photo';
 import { EmptyCatalogue, LoadError, PageHero, SkeletonGrid, Stars } from '@/components/ui';
+import { ServicesExpertsSwitch } from '@/components/ui/SectionSwitch';
 import { sitePath, useSite } from '@/site/SiteContext';
 import {
   EMPTY_FILTERS,
@@ -29,6 +30,7 @@ export function ExpertsPage() {
         title="Meet Our Experts"
         subtitle={`Factory-trained specialists at ${site.display_name}. Find the technician who knows your make, speaks your language, and has solved your problem before.`}
       />
+      <ServicesExpertsSwitch />
 
       <section aria-label="Technician directory" className="container-site py-10 sm:py-14">
         {loading ? (

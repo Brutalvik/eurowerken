@@ -1,10 +1,12 @@
 import { Outlet, useParams } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
+import { CustomerAuthProvider } from '@/auth/CustomerAuthContext';
 import { CartProvider } from '@/cart/CartContext';
 import { SiteProvider, useSiteLoader } from '@/site/SiteContext';
 import { SiteNotFound } from '@/pages/SiteNotFound';
 import { SiteFooter } from './SiteFooter';
 import { SiteHeader } from './SiteHeader';
+import { SiteTabBar } from './SiteTabBar';
 
 /** Every page under /:slug: loads the workshop's published site, then header, page, footer. */
 export function SiteLayout() {
@@ -24,6 +26,7 @@ export function SiteLayout() {
 
   return (
     <SiteProvider site={state.site}>
+      <CustomerAuthProvider slug={state.site.slug}>
       <CartProvider siteSlug={state.site.slug}>
       <div className="flex min-h-[100dvh] flex-col">
         <a
@@ -33,12 +36,29 @@ export function SiteLayout() {
           Skip to content
         </a>
         <SiteHeader />
-        <main id="main" className="flex-1">
+        <main
+          id="main"
+          className={
+            state.site.nav_style !== 'classic'
+              ? // The floating header overlaps the top of the page: the first section gets a transparent top border of the
+                // header's height, so its own background runs up behind the pill and its content starts below it.
+                'flex-1 [&>*:first-child]:border-solid [&>*:first-child]:border-transparent [&>*:first-child]:border-t-[calc(4.25rem+env(safe-area-inset-top))] xl:[&>*:first-child]:border-t-[calc(4.5rem+env(safe-area-inset-top))]'
+              : 'flex-1'
+          }
+        >
           <Outlet />
         </main>
         <SiteFooter />
+        {state.site.nav_style !== 'classic' && (
+          <>
+            {/* Room under the footer so the docked tab bar never covers it. */}
+            <div aria-hidden className="h-[calc(112px+env(safe-area-inset-bottom))] bg-sidebar sm:h-[150px]" />
+            <SiteTabBar />
+          </>
+        )}
       </div>
       </CartProvider>
+      </CustomerAuthProvider>
     </SiteProvider>
   );
 }

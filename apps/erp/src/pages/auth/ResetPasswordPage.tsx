@@ -2,14 +2,14 @@ import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/auth/AuthContext';
-import { Button } from '@/components/ui/Button';
-import { AuthShell, Field, FormMessage, FullScreenLoader } from './AuthShell';
+import { AuthAlert, AuthField, AuthLoader, AuthShell, PrimaryButton, authButtonClass } from './AuthUI';
 
 const MIN_LENGTH = 8;
 
 /**
- * Reached from the reset (or invite) email link. Supabase signs the user in
- * from the link and fires PASSWORD_RECOVERY; the user then sets a password.
+ * Reached from the reset (or invite) email link, or after the 6-digit reset
+ * code on the sign-in page. Either way the user is signed in in recovery
+ * mode and sets a password here.
  * A signed-in user can also use this page to change their password.
  */
 export function ResetPasswordPage() {
@@ -20,13 +20,13 @@ export function ResetPasswordPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  if (status === 'loading') return <FullScreenLoader />;
+  if (status === 'loading') return <AuthLoader />;
 
   if (status === 'signed-out') {
     return (
-      <AuthShell title="Link expired or invalid" subtitle="Password links work once and expire after a short time.">
-        <Link to="/login" className="text-sm font-medium text-accent hover:underline">
-          Back to sign in to request a new link
+      <AuthShell title="Link expired or invalid" subtitle="Password links and codes work once and expire after a short time.">
+        <Link to="/login" className={authButtonClass.primary}>
+          Back to sign in
         </Link>
       </AuthShell>
     );
@@ -53,7 +53,7 @@ export function ResetPasswordPage() {
   return (
     <AuthShell title="Set a new password" subtitle={`At least ${MIN_LENGTH} characters.`}>
       <form onSubmit={onSubmit} className="space-y-4">
-        <Field
+        <AuthField
           id="new-password"
           label="New password"
           type="password"
@@ -63,7 +63,7 @@ export function ResetPasswordPage() {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
         />
-        <Field
+        <AuthField
           id="confirm-password"
           label="Confirm new password"
           type="password"
@@ -72,10 +72,10 @@ export function ResetPasswordPage() {
           value={confirm}
           onChange={(e) => setConfirm(e.target.value)}
         />
-        {error && <FormMessage tone="error">{error}</FormMessage>}
-        <Button type="submit" disabled={busy} className="w-full">
-          {busy ? 'Saving...' : 'Save password'}
-        </Button>
+        {error && <AuthAlert>{error}</AuthAlert>}
+        <PrimaryButton busy={busy} busyLabel="Saving...">
+          Save password
+        </PrimaryButton>
       </form>
     </AuthShell>
   );

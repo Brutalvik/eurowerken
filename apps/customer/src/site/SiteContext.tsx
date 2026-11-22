@@ -1,9 +1,8 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
-import { hexToRgbTriplet, lightenTriplet, readableOn } from '@eurowerken/shared';
+import { brightenForDark, hexToRgbTriplet, readableOn } from '@eurowerken/shared';
 import type { WorkshopSite } from '@eurowerken/shared';
 import { supabase, supabaseConfigured } from '@/lib/supabase';
-import { useTheme } from '@/theme/ThemeProvider';
 
 type SiteState =
   | { status: 'loading' }
@@ -16,7 +15,6 @@ const SiteContext = createContext<WorkshopSite | null>(null);
 /** Loads the published site for /:slug and applies the workshop's brand colour. */
 export function useSiteLoader(slug: string | undefined): SiteState {
   const [state, setState] = useState<SiteState>({ status: 'loading' });
-  const { mode } = useTheme();
 
   useEffect(() => {
     if (!slug || !supabaseConfigured) {
@@ -44,23 +42,23 @@ export function useSiteLoader(slug: string | undefined): SiteState {
 
   const site = state.status === 'ready' ? state.site : null;
 
-  // Brand colour: the workshop's colour, lifted in dark mode so it stays readable.
+  // Brand colour: the workshop's colour, and a brightened version for dark areas (dark mode, or a dark section such
+  // as the sign-in screens or the classic glass header). index.css maps --accent to whichever applies.
   useEffect(() => {
     const root = document.documentElement;
+    const names = ['--brand-accent', '--brand-accent-fg', '--brand-accent-dark', '--brand-accent-fg-dark'];
     const triplet = hexToRgbTriplet(site?.accent_color);
     if (triplet) {
-      const accent = mode === 'dark' ? lightenTriplet(triplet, 0.3) : triplet;
-      root.style.setProperty('--accent', accent);
-      root.style.setProperty('--accent-fg', readableOn(accent));
+      const dark = brightenForDark(triplet);
+      root.style.setProperty('--brand-accent', triplet);
+      root.style.setProperty('--brand-accent-fg', readableOn(triplet));
+      root.style.setProperty('--brand-accent-dark', dark);
+      root.style.setProperty('--brand-accent-fg-dark', readableOn(dark));
     } else {
-      root.style.removeProperty('--accent');
-      root.style.removeProperty('--accent-fg');
+      names.forEach((n) => root.style.removeProperty(n));
     }
-    return () => {
-      root.style.removeProperty('--accent');
-      root.style.removeProperty('--accent-fg');
-    };
-  }, [site?.accent_color, mode]);
+    return () => names.forEach((n) => root.style.removeProperty(n));
+  }, [site?.accent_color]);
 
   useEffect(() => {
     if (site) document.title = `${site.display_name}${site.tagline ? ` | ${site.tagline}` : ''}`;

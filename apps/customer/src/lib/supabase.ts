@@ -9,7 +9,9 @@ export const supabaseConfigured = Boolean(url && key);
 
 /**
  * Browser client with the publishable key. Signed-out visitors can only read
- * what RLS allows them (published workshop sites). Customer sign-in comes later.
+ * what RLS allows them (published workshop sites and their catalogue). Signed-in
+ * customers (src/auth/CustomerAuthContext) also read and edit their own account
+ * and vehicles. The session is stored apart from the staff app's.
  */
 export const supabase = createClient(url ?? 'http://localhost', key ?? 'missing-key', {
   auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, storageKey: 'ew-customer-auth' },

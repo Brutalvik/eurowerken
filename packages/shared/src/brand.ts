@@ -15,6 +15,26 @@ export function readableOn(triplet: string): string {
   return (1.05 / (luminance + 0.05)) >= ((luminance + 0.05) / 0.0127) ? '255 255 255' : '10 22 40';
 }
 
+/** Relative luminance (WCAG) of a colour triplet "r g b", 0 to 1. */
+export function luminance(triplet: string): number {
+  const [r, g, b] = triplet.split(' ').map((v) => Number(v) / 255) as [number, number, number];
+  const lin = (c: number) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+  return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+}
+
+/**
+ * The brand colour for dark backgrounds: brightened (towards white) just enough to read on near-black, at least
+ * 30% brighter, keeping the hue. Very dark brand colours get lifted further.
+ */
+export function brightenForDark(triplet: string): string {
+  for (let amount = 0.3; amount < 0.95; amount += 0.05) {
+    const t = lightenTriplet(triplet, amount);
+    // Contrast against a near-black background (luminance about 0.01) of at least 6:1.
+    if ((luminance(t) + 0.05) / 0.06 >= 6) return t;
+  }
+  return lightenTriplet(triplet, 0.95);
+}
+
 /** Brighter version of a colour for dark backgrounds, so the accent stays readable. */
 export function lightenTriplet(triplet: string, amount = 0.25): string {
   return triplet

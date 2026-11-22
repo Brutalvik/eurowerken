@@ -4,13 +4,14 @@
 
 :root {
   color-scheme: light;
-  --bg: 237 242 248;
-  --surface: 255 255 255;
-  --surface2: 245 248 252;
-  --line: 221 228 238;
-  --fg: 10 22 40;
-  --fg2: 74 96 128;
-  --fg3: 112 132 160;
+  /* Soft light: grey page, off-white cards, slightly softened text (easier on the eyes than pure white). */
+  --bg: 230 234 240;
+  --surface: 245 247 250;
+  --surface2: 236 240 245;
+  --line: 210 217 228;
+  --fg: 20 31 49;
+  --fg2: 79 97 122;
+  --fg3: 114 131 155;
   --accent: 29 111 240;
   --accent-fg: 255 255 255;
   --ok: 5 150 105;

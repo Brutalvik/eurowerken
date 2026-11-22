@@ -24,6 +24,7 @@ import type { Service } from '@/api/catalogue';
 import { Photo } from '@/components/Photo';
 import { SERVICE_ICON_COMPONENTS } from '@/components/serviceIcons';
 import { EmptyCatalogue, LoadError, PageHero, Pill, SkeletonGrid } from '@/components/ui';
+import { ServicesExpertsSwitch } from '@/components/ui/SectionSwitch';
 import { SERVICE_FAQ, VEHICLE_MAKES } from '@/data/catalog';
 import { formatMoney } from '@/lib/format';
 import { sitePath, useSite } from '@/site/SiteContext';
@@ -97,6 +98,7 @@ export function ServicesPage() {
           </button>
         </div>
       </PageHero>
+      <ServicesExpertsSwitch />
       <SpecializedMakes />
       <ServiceCatalogue />
       <FaqAndGuarantee />

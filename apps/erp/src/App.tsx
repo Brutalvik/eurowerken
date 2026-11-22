@@ -3,6 +3,7 @@ import { RequireAccess } from '@/auth/RequireAccess';
 import { RequireAuth } from '@/auth/RequireAuth';
 import type { ModuleId } from '@/auth/rbac';
 import { AppLayout } from '@/components/layout/AppLayout';
+import { CustomersPage } from '@/pages/CustomersPage';
 import { DashboardPage } from '@/pages/DashboardPage';
 import { InventoryPage } from '@/pages/InventoryPage';
 import { InvoicesPage } from '@/pages/InvoicesPage';
@@ -69,6 +70,7 @@ export default function App() {
         <Route path="dashboard" element={guarded('dashboard', <DashboardPage />)} />
         <Route path="inventory" element={guarded('inventory', <InventoryPage />)} />
         <Route path="repair-orders" element={guarded('repair-orders', <RepairOrdersPage />)} />
+        <Route path="customers" element={guarded('customers', <CustomersPage />)} />
         <Route path="sales" element={guarded('sales', <SalesPage />)} />
         <Route path="invoices" element={guarded('invoices', <InvoicesPage />)} />
         <Route path="reports" element={guarded('reports', <ReportsPage />)} />

@@ -96,6 +96,7 @@ scripts/db-migrate.sh  applies unapplied migrations with psql
 | Dashboard | full | view | view | view |
 | Parts Inventory | full | none | full | view |
 | Repair Orders | full | full | view | view |
+| Customers (read-only list) | full | full | view | view |
 | Sales | full | view | view | full |
 | Invoices | full | full | none | full |
 | Reports | full | none | none | full |

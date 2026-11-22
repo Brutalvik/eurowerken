@@ -1,12 +1,23 @@
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
-import { Link, Navigate, useSearchParams } from 'react-router-dom';
+import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/auth/AuthContext';
-import { Button } from '@/components/ui/Button';
 import { fetchInvitePreview } from '@/lib/invites';
 import type { InvitePreview } from '@/lib/invites';
 import { writePendingInvite } from '@/lib/supabase';
-import { AuthShell, Field, FormMessage, GoogleButton, OrDivider } from './AuthShell';
+import {
+  AuthAlert,
+  AuthField,
+  AuthScreen,
+  AuthSegmented,
+  AuthShell,
+  CodeStep,
+  GoogleButton,
+  OrDivider,
+  PrimaryButton,
+  textLinkClass,
+} from './AuthUI';
+import { WelcomeStep } from './Welcome';
 
 const MIN_LENGTH = 8;
 
@@ -19,9 +30,11 @@ type WorkshopChoice = 'join' | 'create';
  * the workshop and role come from the invite and the email is fixed.
  */
 export function RegisterPage() {
-  const { status, signUp, signInWithGoogle, workshopNumberExists } = useAuth();
+  const { status, signUp, signInWithGoogle, workshopNumberExists, verifyCode, resendSignupCode } = useAuth();
+  const navigate = useNavigate();
   const [params] = useSearchParams();
   const inviteToken = params.get('invite');
+  const destination = inviteToken ? `/invite/${inviteToken}` : '/dashboard';
 
   const [invite, setInvite] = useState<InvitePreview | null>(null);
   const [choice, setChoice] = useState<WorkshopChoice>('join');
@@ -33,7 +46,9 @@ export function RegisterPage() {
   const [confirm, setConfirm] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [checkEmail, setCheckEmail] = useState(false);
+  const [step, setStep] = useState<'form' | 'code' | 'welcome'>('form');
+  // A sign-up started on this page: show the welcome step instead of redirecting at once.
+  const [entering, setEntering] = useState(false);
 
   useEffect(() => {
     if (!inviteToken) return;
@@ -46,7 +61,17 @@ export function RegisterPage() {
     });
   }, [inviteToken]);
 
-  if (status === 'signed-in') return <Navigate to={inviteToken ? `/invite/${inviteToken}` : '/dashboard'} replace />;
+  // Where the confirmation email returns to; also used for a resent code.
+  const returnTo = inviteToken && invite ? `/invite/${inviteToken}` : '/dashboard';
+
+  if (step === 'welcome') {
+    return (
+      <AuthScreen>
+        <WelcomeStep isNew email={email} onDone={() => navigate(destination, { replace: true })} />
+      </AuthScreen>
+    );
+  }
+  if (status === 'signed-in' && !entering) return <Navigate to={destination} replace />;
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -71,7 +96,9 @@ export function RegisterPage() {
     }
 
     setBusy(true);
+    setEntering(true);
     if (!invite && choice === 'join' && !(await workshopNumberExists(workshopNumber))) {
+      setEntering(false);
       setBusy(false);
       setError('No workshop has that number. Check it with your manager.');
       return;
@@ -85,12 +112,30 @@ export function RegisterPage() {
         : choice === 'join'
           ? { action: 'join', number: workshopNumber }
           : { action: 'create', name: workshopName },
-      returnTo: inviteToken && invite ? `/invite/${inviteToken}` : '/dashboard',
+      returnTo,
     });
     setBusy(false);
-    if (result.error) setError(result.error);
-    else if (result.needsConfirmation) setCheckEmail(true);
-    // Otherwise Supabase signed the user in and the redirect above takes over.
+    if (result.error) {
+      setEntering(false);
+      setError(result.error);
+    } else if (result.needsConfirmation) {
+      setEntering(false);
+      setStep('code');
+    } else {
+      // Supabase signed the user in straight away (email confirmation is off).
+      setStep('welcome');
+    }
+  }
+
+  async function onVerify(code: string) {
+    setEntering(true);
+    const err = await verifyCode(email, code, 'signup');
+    if (err) {
+      setEntering(false);
+      return err;
+    }
+    setStep('welcome');
+    return null;
   }
 
   async function onGoogle() {
@@ -104,18 +149,17 @@ export function RegisterPage() {
     }
   }
 
-  if (checkEmail) {
+  if (step === 'code') {
     return (
-      <AuthShell title="Check your email" subtitle="One more step before you can sign in.">
-        <div className="space-y-4">
-          <FormMessage tone="success">
-            We sent a confirmation link to {email.trim()}. Open it to activate your account.
-          </FormMessage>
-          <Link to="/login" className="block text-center text-xs font-medium text-accent hover:underline">
-            Back to sign in
-          </Link>
-        </div>
-      </AuthShell>
+      <AuthScreen>
+        <CodeStep
+          email={email.trim()}
+          purpose="signup"
+          onVerify={onVerify}
+          onResend={() => resendSignupCode(email, returnTo)}
+          onBack={() => setStep('form')}
+        />
+      </AuthScreen>
     );
   }
 
@@ -124,45 +168,36 @@ export function RegisterPage() {
     : 'Join your workshop with its number, or create a new workshop.';
 
   return (
-    <AuthShell title="Create an account" subtitle={subtitle}>
-      <div className="space-y-4">
-        <GoogleButton
-          onClick={() => void onGoogle()}
-          disabled={busy}
-          label={invite ? 'Continue with Google' : 'Sign up with Google, choose workshop after'}
-        />
-        <OrDivider />
-      </div>
-      <form onSubmit={onSubmit} className="mt-4 space-y-4">
+    <AuthShell
+      title="Create an account"
+      subtitle={subtitle}
+      footer={
+        <>
+          Already have an account?{' '}
+          <Link to="/login" state={inviteToken ? { from: `/invite/${inviteToken}` } : undefined} className={textLinkClass}>
+            Sign in
+          </Link>
+        </>
+      }
+    >
+      <form onSubmit={onSubmit} className="space-y-4">
         {!invite && (
           <fieldset className="space-y-3">
-            <legend className="mb-1.5 text-xs font-medium text-fg2">Workshop</legend>
-            <div className="grid grid-cols-2 gap-1 rounded-lg border border-line bg-surface2 p-1" role="radiogroup">
-              {(
-                [
-                  ['join', 'Join existing'],
-                  ['create', 'Create new'],
-                ] as const
-              ).map(([value, label]) => (
-                <button
-                  key={value}
-                  type="button"
-                  role="radio"
-                  aria-checked={choice === value}
-                  onClick={() => {
-                    setChoice(value);
-                    setError(null);
-                  }}
-                  className={`rounded-md px-2 py-1.5 text-xs font-semibold transition ${
-                    choice === value ? 'bg-surface text-fg shadow-sm' : 'text-fg2 hover:text-fg'
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
+            <legend className="mb-2 px-1 text-xs font-medium text-fg2">Workshop</legend>
+            <AuthSegmented
+              label="Workshop"
+              value={choice}
+              options={[
+                ['join', 'Join existing'],
+                ['create', 'Create new'],
+              ]}
+              onChange={(value) => {
+                setChoice(value);
+                setError(null);
+              }}
+            />
             {choice === 'join' ? (
-              <Field
+              <AuthField
                 id="workshop-number"
                 label="Workshop number"
                 inputMode="numeric"
@@ -170,28 +205,25 @@ export function RegisterPage() {
                 maxLength={6}
                 required
                 value={workshopNumber}
+                hint="The workshop manager approves your request and assigns your role."
                 onChange={(e) => setWorkshopNumber(e.target.value.replace(/\D/g, ''))}
               />
             ) : (
-              <Field
+              <AuthField
                 id="workshop-name"
                 label="Workshop name"
                 placeholder="For example, Bravo Motors"
                 maxLength={80}
                 required
                 value={workshopName}
+                hint="You become the Manager of the new workshop."
                 onChange={(e) => setWorkshopName(e.target.value)}
               />
             )}
-            <p className="text-[11px] text-fg3">
-              {choice === 'join'
-                ? 'The workshop manager approves your request and assigns your role.'
-                : 'You become the Manager of the new workshop.'}
-            </p>
           </fieldset>
         )}
 
-        <Field
+        <AuthField
           id="full-name"
           label="Full name"
           autoComplete="name"
@@ -199,26 +231,28 @@ export function RegisterPage() {
           value={fullName}
           onChange={(e) => setFullName(e.target.value)}
         />
-        <Field
+        <AuthField
           id="email"
           label="Work email"
           type="email"
           autoComplete="email"
+          inputMode="email"
           required
           readOnly={Boolean(invite)}
           value={email}
           onChange={(e) => setEmail(e.target.value)}
         />
-        <Field
+        <AuthField
           id="password"
           label="Password"
           type="password"
           autoComplete="new-password"
           required
+          hint={`At least ${MIN_LENGTH} characters.`}
           value={password}
           onChange={(e) => setPassword(e.target.value)}
         />
-        <Field
+        <AuthField
           id="confirm-password"
           label="Confirm password"
           type="password"
@@ -227,8 +261,8 @@ export function RegisterPage() {
           value={confirm}
           onChange={(e) => setConfirm(e.target.value)}
         />
-        {error && <FormMessage tone="error">{error}</FormMessage>}
-        <p className="text-[11px] leading-relaxed text-fg3">
+        {error && <AuthAlert>{error}</AuthAlert>}
+        <p className="px-1 text-xs leading-relaxed text-fg3">
           By creating an account you agree to the{' '}
           <Link to="/terms" target="_blank" className="font-medium text-accent hover:underline">
             Terms and Conditions
@@ -239,20 +273,13 @@ export function RegisterPage() {
           </Link>
           .
         </p>
-        <Button type="submit" disabled={busy} className="w-full">
-          {busy ? 'Creating account...' : 'Create account'}
-        </Button>
-        <p className="text-center text-xs text-fg2">
-          Already have an account?{' '}
-          <Link
-            to="/login"
-            state={inviteToken ? { from: `/invite/${inviteToken}` } : undefined}
-            className="font-medium text-accent hover:underline"
-          >
-            Sign in
-          </Link>
-        </p>
+        <PrimaryButton busy={busy} busyLabel="Creating account...">
+          Create account
+        </PrimaryButton>
       </form>
+      <OrDivider />
+      <GoogleButton onClick={() => void onGoogle()} disabled={busy} />
+      {!invite && <p className="mt-2 px-1 text-center text-xs text-fg3">With Google, you choose your workshop after signing in.</p>}
     </AuthShell>
   );
 }

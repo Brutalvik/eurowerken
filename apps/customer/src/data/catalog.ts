@@ -1,8 +1,8 @@
 /**
  * Sample data for the parts of the customer site that are not connected yet,
- * one export per future database table or API resource: reviews, repair
- * cases and the customer garage (later phases replace these with calls in
- * src/api/). Services, team and parts already come from src/api/catalogue.
+ * one export per future database table or API resource: reviews and repair
+ * cases (later phases replace these with calls in src/api/). Services, team
+ * and parts come from src/api/catalogue; the garage from src/api/vehicles.
  * The vehicle lists and the service FAQ are fixed content.
  *
  * Image names refer to public/images/<name>.(png|jpg|webp); missing files
@@ -143,15 +143,3 @@ export function findRepairCase(trackingId: string): RepairCase | undefined {
   return REPAIR_CASES.find((c) => c.trackingId === id);
 }
 
-// Garage --------------------------------------------------------------------------
-
-export const GARAGE_VEHICLES = [
-  { id: 'v-1', name: '2024 BMW M3 Competition', plate: 'XYZ 1234', vin: 'WBS43AY0XRFR12345', image: 'garage-car', mileage: '18,420 km', nextService: 'Oil service in 2,400 km', health: 'Repair in progress', activeCase: 'EW-82734-615' },
-  { id: 'v-2', name: '2019 Porsche Macan S', plate: 'ABC 9876', vin: 'WP1AB2A57KLB34567', image: 'garage-car-2', mileage: '64,100 km', nextService: 'Brake fluid due Jan 2027', health: 'Healthy', activeCase: null },
-];
-
-export const GARAGE_HISTORY = [
-  { date: 'Oct 18, 2026', vehicle: '2024 BMW M3 Competition', service: 'Front brakes, diagnostics', total: 800, invoice: 'INV-2026-0438', status: 'In progress' },
-  { date: 'May 02, 2026', vehicle: '2024 BMW M3 Competition', service: 'Synthetic oil service', total: 129.99, invoice: 'INV-2026-0211', status: 'Paid' },
-  { date: 'Mar 14, 2026', vehicle: '2019 Porsche Macan S', service: 'Milestone service 60k', total: 1240, invoice: 'INV-2026-0145', status: 'Paid' },
-];

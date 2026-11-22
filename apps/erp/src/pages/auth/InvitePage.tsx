@@ -1,11 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '@/auth/AuthContext';
-import { Button } from '@/components/ui/Button';
 import { fetchInvitePreview } from '@/lib/invites';
 import type { InvitePreview } from '@/lib/invites';
 import { writePendingInvite } from '@/lib/supabase';
-import { AuthShell, FormMessage, FullScreenLoader } from './AuthShell';
+import { AuthAlert, AuthLoader, AuthShell, PrimaryButton, TextButton, authButtonClass } from './AuthUI';
 
 /**
  * /invite/:token. Shows who invited you and as what. Signed out: create an
@@ -27,7 +26,7 @@ export function InvitePage() {
     });
   }, [token]);
 
-  if (preview === undefined || status === 'loading') return <FullScreenLoader />;
+  if (preview === undefined || status === 'loading') return <AuthLoader />;
 
   if (!preview || preview.status !== 'valid') {
     const reason =
@@ -38,7 +37,7 @@ export function InvitePage() {
           : 'This invite link is not valid. Check that you copied all of it.';
     return (
       <AuthShell title="Invite unavailable" subtitle={reason}>
-        <Link to="/dashboard" className="text-sm font-medium text-accent hover:underline">
+        <Link to="/dashboard" className={authButtonClass.primary}>
           Continue to the app
         </Link>
       </AuthShell>
@@ -54,14 +53,14 @@ export function InvitePage() {
         <div className="space-y-3">
           <Link
             to={`/register?invite=${token}`}
-            className="flex w-full items-center justify-center rounded-lg bg-accent px-3.5 py-2 text-xs font-semibold text-white hover:opacity-90"
+            className={authButtonClass.primary}
           >
             Create an account
           </Link>
           <Link
             to="/login"
             state={{ from: `/invite/${token}` }}
-            className="flex w-full items-center justify-center rounded-lg border border-line px-3.5 py-2 text-xs font-semibold text-fg2 hover:bg-surface2 hover:text-fg"
+            className={authButtonClass.secondary}
           >
             I already have an account
           </Link>
@@ -95,33 +94,31 @@ export function InvitePage() {
       <div className="space-y-3">
         {wrongEmail ? (
           <>
-            <FormMessage tone="error">
+            <AuthAlert>
               You are signed in as {user.email}. Sign out and sign in as {preview.email} to accept.
-            </FormMessage>
-            <Button className="w-full" onClick={() => void signOut()}>
+            </AuthAlert>
+            <PrimaryButton type="button" onClick={() => void signOut()}>
               Sign out
-            </Button>
+            </PrimaryButton>
           </>
         ) : (
           <>
             {user.workshop && user.workshop.name !== preview.workshopName && (
-              <FormMessage tone="error">
+              <AuthAlert>
                 You already belong to {user.workshop.name}. An account can belong to one workshop.
-              </FormMessage>
+              </AuthAlert>
             )}
-            {error && <FormMessage tone="error">{error}</FormMessage>}
-            <Button className="w-full" disabled={busy} onClick={() => void onAccept()}>
-              {busy ? 'Joining...' : `Accept and join as ${preview.role}`}
-            </Button>
+            {error && <AuthAlert>{error}</AuthAlert>}
+            <PrimaryButton type="button" busy={busy} busyLabel="Joining..." onClick={() => void onAccept()}>
+              {`Accept and join as ${preview.role}`}
+            </PrimaryButton>
           </>
         )}
-        <button
-          type="button"
-          onClick={() => void onDecline()}
-          className="block w-full text-center text-xs font-medium text-fg2 hover:text-fg"
-        >
-          Not now
-        </button>
+        <div className="flex justify-center">
+          <TextButton onClick={() => void onDecline()} className="text-sm text-fg2 hover:text-fg">
+            Not now
+          </TextButton>
+        </div>
       </div>
     </AuthShell>
   );

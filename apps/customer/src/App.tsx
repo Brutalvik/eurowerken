@@ -1,6 +1,11 @@
 import { Route, Routes } from 'react-router-dom';
 import { PRIVACY, TERMS } from '@eurowerken/shared';
+import { RequireCustomer } from '@/auth/RequireCustomer';
 import { SiteLayout } from '@/components/layout/SiteLayout';
+import { AccountPage } from '@/pages/account/AccountPage';
+import { LoginPage } from '@/pages/account/LoginPage';
+import { RegisterPage } from '@/pages/account/RegisterPage';
+import { ResetPasswordPage } from '@/pages/account/ResetPasswordPage';
 import { BookPage } from '@/pages/BookPage';
 import { CartPage } from '@/pages/CartPage';
 import { ComingSoonPage } from '@/pages/ComingSoonPage';
@@ -36,7 +41,25 @@ export default function App() {
         <Route path="track" element={<TrackPage />} />
         <Route path="track/:caseId" element={<CaseDetailsPage />} />
         <Route path="reviews" element={<ReviewsPage />} />
-        <Route path="garage" element={<GaragePage />} />
+        <Route
+          path="garage"
+          element={
+            <RequireCustomer>
+              <GaragePage />
+            </RequireCustomer>
+          }
+        />
+        <Route
+          path="account"
+          element={
+            <RequireCustomer>
+              <AccountPage />
+            </RequireCustomer>
+          }
+        />
+        <Route path="login" element={<LoginPage />} />
+        <Route path="register" element={<RegisterPage />} />
+        <Route path="reset-password" element={<ResetPasswordPage />} />
         <Route path="terms" element={<LegalPage doc={TERMS} />} />
         <Route path="privacy" element={<LegalPage doc={PRIVACY} />} />
         <Route path="*" element={<ComingSoonPage title="Page not found" />} />

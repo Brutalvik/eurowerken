@@ -97,6 +97,9 @@ export interface CustomerAccountRow {
   full_name: string | null;
   phone: string | null;
   avatar_url: string | null;
+  /** Added in migration 006. */
+  notify_email?: boolean;
+  notify_sms?: boolean;
   created_at: string;
 }
 

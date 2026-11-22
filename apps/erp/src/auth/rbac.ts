@@ -4,6 +4,7 @@ export type ModuleId =
   | 'dashboard'
   | 'inventory'
   | 'repair-orders'
+  | 'customers'
   | 'sales'
   | 'invoices'
   | 'reports'
@@ -19,6 +20,7 @@ export const MODULE_LABELS: Record<ModuleId, string> = {
   dashboard: 'Dashboard',
   inventory: 'Parts Inventory',
   'repair-orders': 'Repair Orders',
+  customers: 'Customers',
   sales: 'Sales',
   invoices: 'Invoices',
   reports: 'Reports & Analytics',
@@ -30,6 +32,7 @@ export const MODULE_ORDER: ModuleId[] = [
   'dashboard',
   'inventory',
   'repair-orders',
+  'customers',
   'sales',
   'invoices',
   'reports',
@@ -42,7 +45,7 @@ export type PermissionMatrix = Record<Role, Record<ModuleId, Access>>;
 /**
  * Default role permission matrix. The live matrix is in the database
  * (public.role_permissions, seeded with these same values by
- * supabase/migrations/002) and is loaded by AuthContext; this is the
+ * supabase/migrations/002, customers added by 006) and is loaded by AuthContext; this is the
  * fallback when it cannot be read. RLS enforces the database copy.
  */
 export const ACCESS: PermissionMatrix = {
@@ -50,6 +53,7 @@ export const ACCESS: PermissionMatrix = {
     dashboard: 'full',
     inventory: 'full',
     'repair-orders': 'full',
+    customers: 'full',
     sales: 'full',
     invoices: 'full',
     reports: 'full',
@@ -60,6 +64,7 @@ export const ACCESS: PermissionMatrix = {
     dashboard: 'view',
     inventory: 'none',
     'repair-orders': 'full',
+    customers: 'full',
     sales: 'view',
     invoices: 'full',
     reports: 'none',
@@ -70,6 +75,7 @@ export const ACCESS: PermissionMatrix = {
     dashboard: 'view',
     inventory: 'full',
     'repair-orders': 'view',
+    customers: 'view',
     sales: 'view',
     invoices: 'none',
     reports: 'none',
@@ -80,6 +86,7 @@ export const ACCESS: PermissionMatrix = {
     dashboard: 'view',
     inventory: 'view',
     'repair-orders': 'view',
+    customers: 'view',
     sales: 'full',
     invoices: 'full',
     reports: 'full',

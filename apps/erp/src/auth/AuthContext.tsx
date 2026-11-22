@@ -38,6 +38,14 @@ interface AuthContextValue {
   signInWithGoogle: () => Promise<string | null>;
   signOut: () => Promise<void>;
   sendPasswordReset: (email: string) => Promise<string | null>;
+  /**
+   * Checks a 6-digit code from a sign-up or password reset email. On success
+   * Supabase signs the user in; a recovery code also puts the app in recovery
+   * so the user sets a new password next.
+   */
+  verifyCode: (email: string, code: string, type: 'signup' | 'recovery') => Promise<string | null>;
+  /** Sends the sign-up confirmation email (with a new code) again. */
+  resendSignupCode: (email: string, returnTo?: string) => Promise<string | null>;
   updatePassword: (password: string) => Promise<string | null>;
   reloadProfile: () => Promise<void>;
   /** Workshop membership. Each returns an error message, or null on success. */
@@ -49,6 +57,8 @@ interface AuthContextValue {
   /** Role permission matrix from public.role_permissions (falls back to the defaults in rbac.ts). */
   permissions: PermissionMatrix;
   reloadPermissions: () => Promise<void>;
+  /** True once the permission matrix for the current workshop has loaded (or the defaults apply). */
+  permissionsReady: boolean;
   accessFor: (module: ModuleId) => Access;
   /** True when the current role has at least the requested level on the module. */
   can: (module: ModuleId, level: 'view' | 'full') => boolean;
@@ -90,6 +100,9 @@ function toAuthUser(session: Session, profile: ProfileRow | null): AuthUser {
   };
 }
 
+/** Shown when someone signs in before confirming their email. The sign-in page compares against it. */
+export const EMAIL_NOT_CONFIRMED = 'Confirm your email address first. Enter the code we sent you, or open the link in the email.';
+
 /** Supabase returns English messages; keep them, but make the common one friendlier. */
 function friendly(message: string): string {
   if (/invalid login credentials/i.test(message)) return 'Email or password is incorrect.';
@@ -100,7 +113,13 @@ function friendly(message: string): string {
   if (/provider is not enabled|unsupported provider/i.test(message)) {
     return 'Google sign-in is not switched on yet in Supabase (Authentication, Providers, Google).';
   }
-  if (/email not confirmed/i.test(message)) return 'Confirm your email address first, using the link we sent you.';
+  if (/email not confirmed/i.test(message)) return EMAIL_NOT_CONFIRMED;
+  if (/token has expired or is invalid|otp_expired|otp.*(expired|invalid)/i.test(message)) {
+    return 'That code is wrong or has expired. Check the newest email, or send a new code.';
+  }
+  const wait = /only request this after (\d+) second/i.exec(message);
+  if (wait) return `Wait ${wait[1]} seconds before asking for another code.`;
+  if (/rate limit|too many requests/i.test(message)) return 'Too many attempts. Wait a minute and try again.';
   return message;
 }
 
@@ -112,6 +131,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profileLoading, setProfileLoading] = useState(false);
   const [recovery, setRecovery] = useState(false);
   const [permissions, setPermissions] = useState<PermissionMatrix>(ACCESS);
+  // The workshop the permission matrix was last loaded for (undefined: not yet).
+  const [permissionsFor, setPermissionsFor] = useState<string | null | undefined>(undefined);
 
   // Session: read the stored one, then follow sign-in, sign-out, token refresh and recovery events.
   useEffect(() => {
@@ -189,9 +210,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!workshopId) {
       setPermissions(ACCESS);
+      setPermissionsFor(null);
       return;
     }
-    void loadPermissions();
+    let cancelled = false;
+    void loadPermissions().then(() => {
+      if (!cancelled) setPermissionsFor(workshopId);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [workshopId, loadPermissions]);
 
   const user = useMemo(() => (session ? toAuthUser(session, profile) : null), [session, profile]);
@@ -202,6 +230,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   else if (!session) status = 'signed-out';
   else if (recovery) status = 'recovery';
   else status = 'signed-in';
+
+  const permissionsReady = status === 'signed-in' && permissionsFor === workshopId;
 
   const accessFor = useCallback(
     (module: ModuleId): Access => (role ? permissions[role][module] : 'none'),
@@ -270,6 +300,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return error ? friendly(error.message) : null;
   }, []);
 
+  const verifyCode = useCallback(async (email: string, code: string, type: 'signup' | 'recovery') => {
+    // Set recovery first: verifyOtp signs in before it returns, and the app
+    // must never treat a reset as a normal sign-in.
+    if (type === 'recovery') setRecovery(true);
+    const { error } = await supabase.auth.verifyOtp({ email: email.trim(), token: code, type });
+    if (error) {
+      if (type === 'recovery') setRecovery(false);
+      return friendly(error.message);
+    }
+    return null;
+  }, []);
+
+  const resendSignupCode = useCallback(async (email: string, returnTo?: string) => {
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email: email.trim(),
+      options: { emailRedirectTo: `${window.location.origin}${returnTo ?? '/dashboard'}` },
+    });
+    return error ? friendly(error.message) : null;
+  }, []);
+
   const updatePassword = useCallback(async (password: string) => {
     const { error } = await supabase.auth.updateUser({ password });
     if (error) return friendly(error.message);
@@ -318,6 +369,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signInWithGoogle,
       signOut,
       sendPasswordReset,
+      verifyCode,
+      resendSignupCode,
       updatePassword,
       reloadProfile,
       createWorkshop,
@@ -327,6 +380,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       workshopNumberExists,
       permissions,
       reloadPermissions: loadPermissions,
+      permissionsReady,
       accessFor,
       can,
     }),
@@ -339,6 +393,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signInWithGoogle,
       signOut,
       sendPasswordReset,
+      verifyCode,
+      resendSignupCode,
       updatePassword,
       reloadProfile,
       createWorkshop,
@@ -348,6 +404,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       workshopNumberExists,
       permissions,
       loadPermissions,
+      permissionsReady,
       accessFor,
       can,
     ],

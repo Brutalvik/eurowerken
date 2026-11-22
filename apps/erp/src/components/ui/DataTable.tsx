@@ -28,6 +28,11 @@ interface DataTableProps<T> {
    * which do not fit a portrait tablet beside the navigation rail.
    */
   cardsBelow?: 'md' | 'lg';
+  /**
+   * Mouse shortcut: clicking anywhere on a row calls this. Keyboard users
+   * still need a real button or link inside the row that does the same.
+   */
+  onRowClick?: (row: T) => void;
 }
 
 export function DataTable<T>({
@@ -36,7 +41,9 @@ export function DataTable<T>({
   getKey,
   emptyMessage = 'No records found.',
   cardsBelow = columns.length >= 7 ? 'lg' : 'md',
+  onRowClick,
 }: DataTableProps<T>) {
+  const clickable = onRowClick ? 'cursor-pointer hover:bg-surface2' : '';
   // Written out in full so Tailwind finds the class names.
   const cardsClass = cardsBelow === 'lg' ? 'lg:hidden' : 'md:hidden';
   const tableClass = cardsBelow === 'lg' ? 'hidden overflow-x-auto lg:block' : 'hidden overflow-x-auto md:block';
@@ -58,7 +65,11 @@ export function DataTable<T>({
         ) : (
           <ul className="divide-y divide-line">
             {rows.map((row) => (
-              <li key={getKey(row)} className="space-y-3 px-4 py-3.5 text-xs">
+              <li
+                key={getKey(row)}
+                onClick={onRowClick ? () => onRowClick(row) : undefined}
+                className={`space-y-3 px-4 py-3.5 text-xs ${clickable}`}
+              >
                 <div className="flex items-start justify-between gap-3">
                   <div className={`min-w-0 ${title?.className ?? 'font-semibold text-fg'}`}>{title?.cell(row)}</div>
                   {corner.length > 0 && (
@@ -115,7 +126,11 @@ export function DataTable<T>({
               </tr>
             ) : (
               rows.map((row) => (
-                <tr key={getKey(row)} className="border-b border-line last:border-b-0">
+                <tr
+                  key={getKey(row)}
+                  onClick={onRowClick ? () => onRowClick(row) : undefined}
+                  className={`border-b border-line last:border-b-0 ${clickable}`}
+                >
                   {columns.map((col) => (
                     <td key={col.header} className={`px-4 py-3 ${col.className ?? 'text-fg2'}`}>
                       {col.cell(row)}

@@ -1,91 +1,75 @@
-import { useId, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import {
-  ArrowRight,
-  Bell,
-  CalendarCheck,
-  Car,
-  ClipboardCheck,
-  FileText,
-  Gauge,
-  Mail,
-  MessageSquare,
-  Plus,
-  ScanLine,
-  TriangleAlert,
-  Wrench,
-} from 'lucide-react';
-import { Photo } from '@/components/Photo';
-import { DemoNotice, Pill } from '@/components/ui';
-import { GARAGE_HISTORY, GARAGE_VEHICLES, REPAIR_CASES, findRepairCase } from '@/data/catalog';
-import { formatMoney } from '@/lib/format';
+import type { LucideIcon } from 'lucide-react';
+import { Bell, CalendarCheck, Car, FileText, History, Pencil, Plus, RotateCcw, ScanLine, Settings, Trash2 } from 'lucide-react';
+import type { CustomerVehicleRow } from '@eurowerken/shared';
+import { createVehicle, deleteVehicle, listVehicles, updateVehicle } from '@/api/vehicles';
+import type { VehicleInput } from '@/api/vehicles';
+import { useCustomerAuth } from '@/auth/CustomerAuthContext';
+import type { CustomerAccount } from '@/auth/CustomerAuthContext';
 import { sitePath, useSite } from '@/site/SiteContext';
-import { AddVehicleForm } from '@/pages/garage/AddVehicleForm';
-import type { NewVehicle } from '@/pages/garage/AddVehicleForm';
+import { AccountLoadError, NotificationsCard } from '@/pages/account/AccountPage';
+import { VehicleForm } from '@/pages/garage/VehicleForm';
 
-interface Vehicle {
-  id: string;
-  name: string;
-  plate: string;
-  image: string;
-  mileage: string;
-  nextService: string;
-  health: string;
-  activeCase: string | null;
-}
-
-type Tone = 'ok' | 'accent' | 'warn' | 'neutral';
-
-function healthTone(health: string): Tone {
-  if (health === 'Healthy') return 'ok';
-  if (health === 'Repair in progress') return 'accent';
-  if (health === 'New') return 'neutral';
-  return 'warn';
-}
-
-function statusTone(status: string): Tone {
-  if (status === 'Paid') return 'ok';
-  if (status === 'In progress') return 'accent';
-  if (status === 'Unpaid' || status === 'Due') return 'warn';
-  return 'neutral';
+function vehicleName(v: Pick<CustomerVehicleRow, 'year' | 'make' | 'model'>): string {
+  return [v.year, v.make, v.model].filter(Boolean).join(' ');
 }
 
 export function GaragePage() {
-  const [vehicles, setVehicles] = useState<Vehicle[]>(() => GARAGE_VEHICLES.map((v) => ({ ...v })));
+  const site = useSite();
+  const { account, accountError, reload } = useCustomerAuth();
+
+  useEffect(() => {
+    document.title = `My Garage | ${site.display_name}`;
+  }, [site.display_name]);
+
+  if (!account) {
+    return (
+      <div className="container-site py-8 sm:py-12">
+        <AccountLoadError message={accountError} onRetry={reload} />
+      </div>
+    );
+  }
 
   return (
     <div className="container-site space-y-6 py-8 sm:space-y-8 sm:py-12">
-      <DemoNotice>Customer accounts are coming soon. This is a preview with sample data.</DemoNotice>
-      <Greeting vehicles={vehicles.length} />
+      <Greeting />
 
       <div className="grid gap-6 lg:grid-cols-3 lg:gap-8">
         <div className="min-w-0 lg:col-span-2">
-          <MyVehicles vehicles={vehicles} onAdd={(v) => setVehicles((list) => [...list, v])} />
+          <MyVehicles account={account} />
         </div>
         <div className="min-w-0 space-y-6">
-          <ActionNeeded />
-          <Reminders vehicles={vehicles} />
+          <Reminders account={account} />
         </div>
       </div>
 
-      <ServiceHistory />
+      <div className="grid gap-6 md:grid-cols-2">
+        <EmptySection
+          id="service-history"
+          icon={History}
+          title="Service history"
+          text="No visits yet. Your bookings and repairs will appear here."
+        />
+        <EmptySection id="invoices" icon={FileText} title="Invoices" text="No invoices yet. Invoices from your visits will appear here." />
+      </div>
     </div>
   );
 }
 
-function Greeting({ vehicles }: { vehicles: number }) {
+function Greeting() {
   const site = useSite();
-  const active = REPAIR_CASES.filter((c) => c.status !== 'Ready for Pickup').length;
+  const { displayName } = useCustomerAuth();
+  const first = displayName.split(/\s+/)[0] ?? displayName;
   return (
     <section className="glass-strong relative overflow-hidden rounded-3xl p-6 sm:p-8">
       <div aria-hidden className="pointer-events-none absolute -right-24 -top-24 h-64 w-64 rounded-full bg-accent/10 blur-3xl" />
       <div className="relative flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
-        <div>
-          <p className="eyebrow">Customer Garage</p>
-          <h1 className="mt-2 font-display text-2xl font-bold tracking-tight text-fg sm:text-3xl">Welcome back</h1>
-          <p className="mt-2 text-sm text-fg2">
-            {vehicles} vehicle{vehicles === 1 ? '' : 's'} in your garage, {active} active repair{active === 1 ? '' : 's'} at {site.display_name}.
-          </p>
+        <div className="min-w-0">
+          <p className="eyebrow">My Garage</p>
+          <h1 className="mt-2 break-words font-display text-2xl font-bold tracking-tight text-fg sm:text-3xl">Welcome back, {first}</h1>
+          <p className="mt-2 text-sm text-fg2">Your vehicles, visits and reminders at {site.display_name}.</p>
         </div>
         <div className="flex flex-col gap-3 sm:flex-row">
           <Link to={sitePath(site, 'book')} className="btn-ink">
@@ -102,27 +86,55 @@ function Greeting({ vehicles }: { vehicles: number }) {
   );
 }
 
-function MyVehicles({ vehicles, onAdd }: { vehicles: Vehicle[]; onAdd: (v: Vehicle) => void }) {
-  const [adding, setAdding] = useState(false);
+type LoadState = { status: 'loading' } | { status: 'error'; message: string } | { status: 'ready'; vehicles: CustomerVehicleRow[] };
+
+function MyVehicles({ account }: { account: CustomerAccount }) {
+  const [state, setState] = useState<LoadState>({ status: 'loading' });
+  const [formFor, setFormFor] = useState<'new' | CustomerVehicleRow | null>(null);
   const [announce, setAnnounce] = useState('');
   const addRef = useRef<HTMLButtonElement>(null);
   const formId = useId();
 
-  function add(v: NewVehicle) {
-    const name = `${v.year} ${v.make} ${v.model}`;
-    onAdd({
-      id: `v-${Date.now()}`,
-      name,
-      plate: v.plate,
-      image: 'garage-car-new',
-      mileage: 'Not recorded yet',
-      nextService: 'Set at your first visit',
-      health: 'New',
-      activeCase: null,
-    });
-    setAnnounce(`${name} added to your garage.`);
-    setAdding(false);
-    addRef.current?.focus();
+  const load = useCallback(async () => {
+    setState({ status: 'loading' });
+    const { data, error } = await listVehicles(account.id);
+    setState(error !== null ? { status: 'error', message: error } : { status: 'ready', vehicles: data });
+  }, [account.id]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  function closeForm() {
+    setFormFor(null);
+    requestAnimationFrame(() => addRef.current?.focus());
+  }
+
+  async function save(input: VehicleInput): Promise<string | null> {
+    if (state.status !== 'ready') return 'Your vehicles are still loading.';
+    if (formFor === 'new') {
+      const { data, error } = await createVehicle(account.id, input);
+      if (error !== null) return error;
+      setState({ status: 'ready', vehicles: [...state.vehicles, data] });
+      setAnnounce(`${vehicleName(data)} added to your garage.`);
+    } else if (formFor) {
+      const { data, error } = await updateVehicle(formFor.id, input);
+      if (error !== null) return error;
+      setState({ status: 'ready', vehicles: state.vehicles.map((v) => (v.id === data.id ? data : v)) });
+      setAnnounce(`${vehicleName(data)} saved.`);
+    }
+    closeForm();
+    return null;
+  }
+
+  async function remove(vehicle: CustomerVehicleRow): Promise<string | null> {
+    const err = await deleteVehicle(vehicle.id);
+    if (err) return err;
+    setState((s) => (s.status === 'ready' ? { status: 'ready', vehicles: s.vehicles.filter((v) => v.id !== vehicle.id) } : s));
+    setAnnounce(`${vehicleName(vehicle)} removed from your garage.`);
+    if (formFor !== 'new' && formFor?.id === vehicle.id) setFormFor(null);
+    requestAnimationFrame(() => addRef.current?.focus());
+    return null;
   }
 
   return (
@@ -134,10 +146,11 @@ function MyVehicles({ vehicles, onAdd }: { vehicles: Vehicle[]; onAdd: (v: Vehic
         <button
           ref={addRef}
           type="button"
-          onClick={() => setAdding((a) => !a)}
-          aria-expanded={adding}
+          onClick={() => setFormFor((f) => (f === 'new' ? null : 'new'))}
+          aria-expanded={formFor === 'new'}
           aria-controls={formId}
-          className="btn-outline px-4 py-2"
+          disabled={state.status !== 'ready'}
+          className="btn-outline px-4 py-2 disabled:opacity-60"
         >
           <Plus className="h-4 w-4" aria-hidden />
           Add vehicle
@@ -148,84 +161,181 @@ function MyVehicles({ vehicles, onAdd }: { vehicles: Vehicle[]; onAdd: (v: Vehic
       </p>
 
       <div id={formId}>
-        {adding && (
-          <AddVehicleForm
-            onAdd={add}
-            onCancel={() => {
-              setAdding(false);
-              addRef.current?.focus();
-            }}
+        {formFor && (
+          <VehicleForm
+            key={formFor === 'new' ? 'new' : formFor.id}
+            initial={formFor === 'new' ? undefined : formFor}
+            onSave={save}
+            onCancel={closeForm}
           />
         )}
       </div>
 
-      <ul className="mt-5 grid gap-5 sm:grid-cols-2">
-        {vehicles.map((v) => (
-          <li key={v.id}>
-            <VehicleCard vehicle={v} />
-          </li>
-        ))}
-      </ul>
+      {state.status === 'loading' && (
+        <div aria-busy="true" className="mt-5">
+          <p className="sr-only" role="status">
+            Loading your vehicles
+          </p>
+          <ul className="grid gap-5 sm:grid-cols-2" aria-hidden>
+            {[0, 1].map((i) => (
+              <li key={i} className="glass h-40 animate-pulse rounded-2xl motion-reduce:animate-none" />
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {state.status === 'error' && (
+        <div role="alert" className="glass mt-5 rounded-2xl border-l-4 border-l-bad p-5">
+          <p className="font-semibold text-fg">We could not load your vehicles.</p>
+          <p className="mt-1 text-sm text-fg2">{state.message}</p>
+          <button type="button" onClick={() => void load()} className="btn-outline mt-4">
+            <RotateCcw className="h-4 w-4" aria-hidden />
+            Try again
+          </button>
+        </div>
+      )}
+
+      {state.status === 'ready' && state.vehicles.length === 0 && !formFor && (
+        <div className="glass mt-5 flex flex-col items-center rounded-2xl p-8 text-center">
+          <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-accent/10 text-accent">
+            <Car className="h-5 w-5" aria-hidden />
+          </span>
+          <p className="mt-4 font-semibold text-fg">No vehicles yet</p>
+          <p className="mt-1 max-w-sm text-sm text-fg2">Add your car so the workshop has its details ready when you book.</p>
+          <button type="button" onClick={() => setFormFor('new')} className="btn-ink mt-5">
+            <Plus className="h-4 w-4" aria-hidden />
+            Add your first vehicle
+          </button>
+        </div>
+      )}
+
+      {state.status === 'ready' && state.vehicles.length > 0 && (
+        <ul className="mt-5 grid gap-5 sm:grid-cols-2">
+          {state.vehicles.map((v) => (
+            <li key={v.id}>
+              <VehicleCard
+                vehicle={v}
+                editing={formFor !== 'new' && formFor?.id === v.id}
+                onEdit={() => {
+                  setFormFor(v);
+                  window.scrollTo({ top: (document.getElementById(formId)?.getBoundingClientRect().top ?? 0) + window.scrollY - 120, behavior: 'smooth' });
+                }}
+                onDelete={() => remove(v)}
+              />
+            </li>
+          ))}
+        </ul>
+      )}
     </section>
   );
 }
 
-function VehicleCard({ vehicle: v }: { vehicle: Vehicle }) {
-  const site = useSite();
-  const repair = v.activeCase ? findRepairCase(v.activeCase) : undefined;
-  return (
-    <article className="glass flex h-full flex-col overflow-hidden rounded-2xl">
-      <Photo name={v.image} alt={v.name} icon={Car} label={v.name} className="aspect-[16/9] w-full" />
-      <div className="flex flex-1 flex-col p-5">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h3 className="font-semibold text-fg">{v.name}</h3>
-            <p className="mt-0.5 font-mono text-xs tracking-wider text-fg3">{v.plate}</p>
-          </div>
-          <Pill tone={healthTone(v.health)} className="shrink-0">
-            {v.health}
-          </Pill>
-        </div>
-        <dl className="mt-4 grid grid-cols-2 gap-3 text-xs">
-          <div className="rounded-xl bg-surface2/70 p-3">
-            <dt className="flex items-center gap-1 text-fg3">
-              <Gauge className="h-3.5 w-3.5" aria-hidden />
-              Mileage
-            </dt>
-            <dd className="mt-1 font-semibold text-fg">{v.mileage}</dd>
-          </div>
-          <div className="rounded-xl bg-surface2/70 p-3">
-            <dt className="flex items-center gap-1 text-fg3">
-              <Wrench className="h-3.5 w-3.5" aria-hidden />
-              Next service
-            </dt>
-            <dd className="mt-1 font-semibold text-fg">{v.nextService}</dd>
-          </div>
-        </dl>
+function VehicleCard({
+  vehicle: v,
+  editing,
+  onEdit,
+  onDelete,
+}: {
+  vehicle: CustomerVehicleRow;
+  editing: boolean;
+  onEdit: () => void;
+  onDelete: () => Promise<string | null>;
+}) {
+  const [confirming, setConfirming] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const deleteRef = useRef<HTMLButtonElement>(null);
+  const cancelRef = useRef<HTMLButtonElement>(null);
+  const name = vehicleName(v);
+  const titleId = useId();
 
-        {repair && (
-          <div className="mt-4 rounded-xl border border-line p-4">
-            <div className="flex items-center justify-between gap-2 text-sm">
-              <p className="font-semibold text-fg">Active repair</p>
-              <span className="text-xs font-semibold text-accent">{repair.progress}%</span>
+  useEffect(() => {
+    if (confirming) cancelRef.current?.focus();
+  }, [confirming]);
+
+  async function confirmDelete() {
+    setBusy(true);
+    setError(null);
+    const err = await onDelete();
+    if (err) {
+      setError(err);
+      setBusy(false);
+    }
+  }
+
+  const smallBtn =
+    'inline-flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-fg transition hover:bg-surface2 disabled:opacity-60 coarse:min-h-11';
+
+  return (
+    <article aria-labelledby={titleId} className={`glass flex h-full flex-col rounded-2xl p-5 ${editing ? 'ring-2 ring-accent/40' : ''}`}>
+      <div className="flex items-start gap-3">
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-accent/10 text-accent">
+          <Car className="h-5 w-5" aria-hidden />
+        </span>
+        <div className="min-w-0">
+          <h3 id={titleId} className="break-words font-semibold text-fg">
+            {v.nickname || name}
+          </h3>
+          {v.nickname && <p className="text-sm text-fg2">{name}</p>}
+        </div>
+      </div>
+
+      <dl className="mt-4 grid grid-cols-2 gap-3 text-xs">
+        <div className="min-w-0 rounded-xl bg-surface2/70 p-3">
+          <dt className="text-fg3">Plate</dt>
+          <dd className="mt-1 truncate font-mono font-semibold tracking-wider text-fg">{v.plate || 'Not set'}</dd>
+        </div>
+        <div className="min-w-0 rounded-xl bg-surface2/70 p-3">
+          <dt className="text-fg3">VIN</dt>
+          <dd className="mt-1 break-all font-mono font-semibold text-fg">{v.vin || 'Not set'}</dd>
+        </div>
+      </dl>
+
+      <div className="mt-auto pt-4">
+        {confirming ? (
+          <div role="group" aria-label={`Delete ${name}?`} className="rounded-xl border border-bad/30 bg-bad/5 p-3">
+            <p className="text-sm font-semibold text-fg">Delete this vehicle?</p>
+            <p className="mt-0.5 text-xs text-fg2">It is removed from your garage. This cannot be undone.</p>
+            {error && (
+              <p role="alert" className="mt-2 text-xs font-medium text-bad">
+                {error}
+              </p>
+            )}
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => void confirmDelete()}
+                disabled={busy}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-bad px-3 py-1.5 text-xs font-semibold text-white transition hover:opacity-90 disabled:opacity-60 coarse:min-h-11"
+              >
+                <Trash2 className="h-3.5 w-3.5" aria-hidden />
+                {busy ? 'Deleting...' : 'Yes, delete'}
+              </button>
+              <button
+                ref={cancelRef}
+                type="button"
+                onClick={() => {
+                  setConfirming(false);
+                  setError(null);
+                  requestAnimationFrame(() => deleteRef.current?.focus());
+                }}
+                disabled={busy}
+                className={smallBtn}
+              >
+                Cancel
+              </button>
             </div>
-            <div
-              role="progressbar"
-              aria-label={`Repair progress for ${v.name}`}
-              aria-valuemin={0}
-              aria-valuemax={100}
-              aria-valuenow={repair.progress}
-              className="mt-2 h-2 overflow-hidden rounded-full bg-surface2"
-            >
-              <div className="h-full rounded-full bg-accent" style={{ width: `${repair.progress}%` }} />
-            </div>
-            <Link
-              to={sitePath(site, `track/${repair.trackingId}`)}
-              className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-accent hover:underline coarse:min-h-11"
-            >
-              View live status
-              <ArrowRight className="h-4 w-4" aria-hidden />
-            </Link>
+          </div>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            <button type="button" onClick={onEdit} className={smallBtn} aria-label={`Edit ${name}`}>
+              <Pencil className="h-3.5 w-3.5" aria-hidden />
+              Edit
+            </button>
+            <button ref={deleteRef} type="button" onClick={() => setConfirming(true)} className={smallBtn} aria-label={`Delete ${name}`}>
+              <Trash2 className="h-3.5 w-3.5" aria-hidden />
+              Delete
+            </button>
           </div>
         )}
       </div>
@@ -233,71 +343,8 @@ function VehicleCard({ vehicle: v }: { vehicle: Vehicle }) {
   );
 }
 
-function ActionNeeded() {
+function Reminders({ account }: { account: CustomerAccount }) {
   const site = useSite();
-  const found = REPAIR_CASES.flatMap((c) => c.lineItems.filter((li) => li.state === 'needs-approval').map((item) => ({ c, item })))[0];
-
-  return (
-    <section aria-labelledby="action-needed" className="glass rounded-2xl border-l-4 border-l-warn p-5">
-      <h2 id="action-needed" className="flex items-center gap-2 font-semibold text-fg">
-        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-warn/12 text-warn">
-          <TriangleAlert className="h-4 w-4" aria-hidden />
-        </span>
-        Action needed
-      </h2>
-      {found ? (
-        <>
-          <p className="mt-4 text-xs text-fg3">
-            {found.c.vehicle} &middot; Work order #{found.c.workOrder}
-          </p>
-          <p className="mt-1 font-semibold text-fg">{found.item.title}</p>
-          <p className="mt-1 text-sm leading-relaxed text-fg2">{found.item.text}</p>
-          <p className="mt-3 text-sm text-fg2">
-            Estimate <span className="font-display text-lg font-bold text-fg">{formatMoney(found.item.price)}</span>
-          </p>
-          <Link to={sitePath(site, `track/${found.c.trackingId}`)} className="btn-ink mt-4 w-full">
-            <ClipboardCheck className="h-4 w-4" aria-hidden />
-            Review estimate
-          </Link>
-        </>
-      ) : (
-        <p className="mt-3 text-sm text-fg2">Nothing waiting on you right now.</p>
-      )}
-    </section>
-  );
-}
-
-function Switch({ label, icon: Icon, checked, onChange }: { label: string; icon: typeof Mail; checked: boolean; onChange: (v: boolean) => void }) {
-  const id = useId();
-  return (
-    <div className="flex items-center justify-between gap-3 py-1 coarse:min-h-11">
-      <span id={id} className="flex items-center gap-2 text-sm text-fg2">
-        <Icon className="h-4 w-4 text-fg3" aria-hidden />
-        {label}
-      </span>
-      <button
-        type="button"
-        role="switch"
-        aria-checked={checked}
-        aria-labelledby={id}
-        onClick={() => onChange(!checked)}
-        className="flex h-11 shrink-0 items-center px-0.5"
-      >
-        <span
-          className={`relative inline-flex h-6 w-11 items-center rounded-full transition ${checked ? 'bg-accent' : 'bg-fg3/40'}`}
-        >
-          <span
-            className={`inline-block h-5 w-5 rounded-full bg-surface shadow transition-transform ${checked ? 'translate-x-[22px]' : 'translate-x-0.5'}`}
-          />
-        </span>
-      </button>
-    </div>
-  );
-}
-
-function Reminders({ vehicles }: { vehicles: Vehicle[] }) {
-  const [email, setEmail] = useState(true);
-  const [sms, setSms] = useState(false);
   return (
     <section aria-labelledby="reminders" className="glass rounded-2xl p-5">
       <h2 id="reminders" className="flex items-center gap-2 font-semibold text-fg">
@@ -306,109 +353,42 @@ function Reminders({ vehicles }: { vehicles: Vehicle[] }) {
         </span>
         Reminders
       </h2>
-      <ul className="mt-4 space-y-3">
-        {vehicles.map((v) => (
-          <li key={v.id} className="flex items-start gap-3 rounded-xl bg-surface2/70 p-3">
-            <CalendarCheck className="mt-0.5 h-4 w-4 shrink-0 text-accent" aria-hidden />
-            <div className="min-w-0">
-              <p className="truncate text-sm font-semibold text-fg">{v.name}</p>
-              <p className="text-xs text-fg2">{v.nextService}</p>
-            </div>
-          </li>
-        ))}
-      </ul>
-      <div className="mt-4 border-t border-line pt-3">
-        <p className="text-xs font-medium text-fg3">Remind me by</p>
-        <Switch label="Email" icon={Mail} checked={email} onChange={setEmail} />
-        <Switch label="Text message (SMS)" icon={MessageSquare} checked={sms} onChange={setSms} />
+      <p className="mt-3 text-sm text-fg2">Service reminders and repair updates from {site.display_name}. Remind me by:</p>
+      <div className="mt-2">
+        <NotificationsCard account={account} compact />
       </div>
+      <Link
+        to={sitePath(site, 'account')}
+        className="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-accent hover:underline coarse:min-h-11"
+      >
+        <Settings className="h-4 w-4" aria-hidden />
+        Account settings
+      </Link>
     </section>
   );
 }
 
-function ServiceHistory() {
-  const [note, setNote] = useState('');
-  const invoiceBtn = 'inline-flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-fg transition hover:bg-surface2 coarse:min-h-11';
-
-  function showNote(invoice: string) {
-    setNote(`${invoice}: invoices will be downloadable once customer accounts are live.`);
-  }
-
+function EmptySection({ id, icon: Icon, title, text }: { id: string; icon: LucideIcon; title: string; text: ReactNode }) {
+  const site = useSite();
   return (
-    <section aria-labelledby="service-history">
-      <h2 id="service-history" className="font-display text-xl font-semibold text-fg">
-        Service history
+    <section aria-labelledby={id} className="glass flex flex-col rounded-2xl p-5 sm:p-6">
+      <h2 id={id} className="flex items-center gap-2 font-display text-lg font-semibold text-fg">
+        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent/10 text-accent">
+          <Icon className="h-4 w-4" aria-hidden />
+        </span>
+        {title}
       </h2>
-      <div aria-live="polite">
-        {note && (
-          <p role="note" className="mt-3 rounded-xl border border-line bg-surface2/70 px-4 py-3 text-xs text-fg2">
-            {note}
-          </p>
-        )}
+      <p className="mt-4 text-sm text-fg2">{text}</p>
+      <div className="mt-5 flex flex-col gap-3 sm:flex-row">
+        <Link to={sitePath(site, 'book')} className="btn-ink">
+          <CalendarCheck className="h-4 w-4" aria-hidden />
+          Book
+        </Link>
+        <Link to={sitePath(site, 'track')} className="btn-outline">
+          <ScanLine className="h-4 w-4" aria-hidden />
+          Track
+        </Link>
       </div>
-
-      {/* Desktop and tablet: table. */}
-      <div className="glass mt-4 hidden overflow-hidden rounded-2xl md:block">
-        <table className="w-full text-left text-sm">
-          <thead className="border-b border-line text-xs uppercase tracking-wide text-fg3">
-            <tr>
-              <th scope="col" className="px-5 py-3 font-semibold">Date</th>
-              <th scope="col" className="px-5 py-3 font-semibold">Vehicle</th>
-              <th scope="col" className="px-5 py-3 font-semibold">Service</th>
-              <th scope="col" className="px-5 py-3 font-semibold">Status</th>
-              <th scope="col" className="px-5 py-3 text-right font-semibold">Total</th>
-              <th scope="col" className="px-5 py-3 text-right font-semibold">
-                <span className="sr-only">Invoice</span>
-              </th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-line">
-            {GARAGE_HISTORY.map((h) => (
-              <tr key={h.invoice}>
-                <td className="whitespace-nowrap px-5 py-4 text-fg2">{h.date}</td>
-                <td className="px-5 py-4 text-fg">{h.vehicle}</td>
-                <td className="px-5 py-4 text-fg2">{h.service}</td>
-                <td className="px-5 py-4">
-                  <Pill tone={statusTone(h.status)}>{h.status}</Pill>
-                </td>
-                <td className="whitespace-nowrap px-5 py-4 text-right font-semibold tabular-nums text-fg">{formatMoney(h.total)}</td>
-                <td className="px-5 py-4 text-right">
-                  <button type="button" onClick={() => showNote(h.invoice)} className={invoiceBtn} aria-label={`Invoice ${h.invoice}`}>
-                    <FileText className="h-3.5 w-3.5" aria-hidden />
-                    Invoice
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Phones: stacked cards. */}
-      <ul className="mt-4 space-y-3 md:hidden">
-        {GARAGE_HISTORY.map((h) => (
-          <li key={h.invoice} className="glass rounded-2xl p-4">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="font-semibold text-fg">{h.service}</p>
-                <p className="mt-0.5 text-xs text-fg3">
-                  {h.date} &middot; {h.vehicle}
-                </p>
-              </div>
-              <Pill tone={statusTone(h.status)} className="shrink-0">
-                {h.status}
-              </Pill>
-            </div>
-            <div className="mt-3 flex items-center justify-between gap-3 border-t border-line pt-3">
-              <p className="font-display text-base font-bold tabular-nums text-fg">{formatMoney(h.total)}</p>
-              <button type="button" onClick={() => showNote(h.invoice)} className={invoiceBtn} aria-label={`Invoice ${h.invoice}`}>
-                <FileText className="h-3.5 w-3.5" aria-hidden />
-                Invoice
-              </button>
-            </div>
-          </li>
-        ))}
-      </ul>
     </section>
   );
 }

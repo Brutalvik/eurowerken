@@ -148,3 +148,4 @@ export function DemoNotice({ children }: { children: ReactNode }) {
 }
 
 export { EmptyCatalogue, LoadError, SkeletonGrid, telHref } from './CatalogueStates';
+export { Switch } from './Switch';

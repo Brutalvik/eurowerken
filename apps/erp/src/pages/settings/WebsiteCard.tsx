@@ -253,6 +253,39 @@ export function WebsiteCard() {
             </Labeled>
           </div>
 
+          <fieldset className="space-y-2 border-t border-line pt-4">
+            <legend className="text-xs font-semibold text-fg">Navigation</legend>
+            <p className="text-[11px] text-fg3">How visitors move around your website.</p>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {(
+                [
+                  ['tabbar', 'Liquid glass tab bar', 'A floating glass bar at the bottom of the screen, with an animated bead on the current page.'],
+                  ['classic', 'Classic header menu', 'All sections listed in the header at the top, with a menu button on phones.'],
+                ] as const
+              ).map(([value, title, text]) => (
+                <label
+                  key={value}
+                  className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition ${
+                    (draft.nav_style ?? 'tabbar') === value ? 'border-accent bg-accent/5' : 'border-line bg-surface2'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="site-nav-style"
+                    value={value}
+                    checked={(draft.nav_style ?? 'tabbar') === value}
+                    onChange={() => set('nav_style', value)}
+                    className="mt-0.5 h-4 w-4 accent-[rgb(var(--accent))]"
+                  />
+                  <span>
+                    <span className="block text-xs font-semibold text-fg">{title}</span>
+                    <span className="block text-[11px] text-fg2">{text}</span>
+                  </span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
+
           <label className="flex items-start gap-3 rounded-lg border border-line bg-surface2 p-3">
             <input
               type="checkbox"

@@ -24,9 +24,13 @@ export interface WorkshopSite {
   instagram_url: string | null;
   facebook_url: string | null;
   youtube_url: string | null;
+  /** Customer site navigation (migration 007): the liquid-glass tab bar or the classic header menu. */
+  nav_style?: NavStyle;
   published: boolean;
   updated_at: string;
 }
+
+export type NavStyle = 'tabbar' | 'classic';
 
 /** Editable fields (everything except keys and timestamps). */
 export type WorkshopSiteInput = Omit<WorkshopSite, 'workshop_id' | 'updated_at'>;
