@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { GST_RATE, itemAmount, postMessage, repairTotals, respondToItems, useTrackedRepair, vehicleName } from '@/api/repairs';
 import type { Decision, RepairItem, RepairMessage, TrackedRepair } from '@/api/repairs';
+import { useCustomerAlerts } from '@/auth/CustomerAlerts';
 import { useCustomerAuth } from '@/auth/CustomerAuthContext';
 import { Photo } from '@/components/Photo';
 import { Breadcrumbs, DemoNotice, telHref } from '@/components/ui';
@@ -204,7 +205,14 @@ function CaseDetails({ tracked, contact, stale, onRetry, onUpdate, headingRef }:
     if (!el) return;
     el.scrollIntoView({ block: 'start' });
     if (target === 'messages') messageInputRef.current?.focus({ preventScroll: true });
-  }, [location.hash]);
+  }, [location.hash, location.key]);
+
+  // Seen: this repair's alerts (approval needed, new messages) are cleared while the page is open.
+  const { forRepair, markRepairRead } = useCustomerAlerts();
+  const unseen = forRepair(repair.id).length;
+  useEffect(() => {
+    if (unseen > 0) void markRepairRead(repair.id);
+  }, [unseen, repair.id, markRepairRead]);
 
   function goToMessages() {
     document.getElementById('messages')?.scrollIntoView({ behavior: 'smooth', block: 'start' });

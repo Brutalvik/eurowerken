@@ -8,6 +8,7 @@ import { PageBoundary } from './PageBoundary';
 import { SiteFooter } from './SiteFooter';
 import { SiteHeader } from './SiteHeader';
 import { SiteTabBar } from './SiteTabBar';
+import { CustomerAlertsProvider } from '@/auth/CustomerAlerts';
 
 /** Every page under /:slug: loads the workshop's published site, then header, page, footer. */
 export function SiteLayout() {
@@ -29,6 +30,7 @@ export function SiteLayout() {
   return (
     <SiteProvider site={state.site}>
       <CustomerAuthProvider slug={state.site.slug}>
+      <CustomerAlertsProvider>
       <CartProvider siteSlug={state.site.slug}>
       <div className="flex min-h-[100dvh] flex-col">
         <a
@@ -62,6 +64,7 @@ export function SiteLayout() {
         )}
       </div>
       </CartProvider>
+      </CustomerAlertsProvider>
       </CustomerAuthProvider>
     </SiteProvider>
   );

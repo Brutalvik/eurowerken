@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Bell, CalendarCheck, CalendarClock, CalendarX, Car, FileText, Pencil, Plus, RotateCcw, Settings, Trash2, User, Wrench } from 'lucide-react';
+import { Bell, BellRing, CalendarCheck, CalendarClock, CalendarX, Car, FileText, ImageOff, MessageSquare, Pencil, Plus, RotateCcw, Settings, Trash2, User, Wrench } from 'lucide-react';
 import type { CustomerVehicleRow } from '@eurowerken/shared';
 import { cancelMyAppointment, formatZonedDateTime, listMyAppointments, useBookingSettings } from '@/api/booking';
 import type { Appointment, AppointmentStatus } from '@/api/booking';
 import { ACTIVE_STATUSES, listMyRepairs, vehicleName as repairVehicleName } from '@/api/repairs';
 import type { MyRepair } from '@/api/repairs';
-import { createVehicle, deleteVehicle, listVehicles, updateVehicle } from '@/api/vehicles';
+import { createVehicle, deleteVehicle, listVehicles, setVehiclePhoto, updateVehicle } from '@/api/vehicles';
+import { customerPhotoUrl, removeCustomerPhoto, uploadCustomerPhoto } from '@/api/photos';
 import type { VehicleInput } from '@/api/vehicles';
 import { useCustomerAuth } from '@/auth/CustomerAuthContext';
 import type { CustomerAccount } from '@/auth/CustomerAuthContext';
@@ -14,6 +15,9 @@ import { Pill } from '@/components/ui';
 import { sitePath, useSite } from '@/site/SiteContext';
 import { AccountLoadError, NotificationsCard } from '@/pages/account/AccountPage';
 import { VehicleForm } from '@/pages/garage/VehicleForm';
+import { PhotoButton, ProfilePhotoEditor } from '@/components/PhotoPicker';
+import { useCustomerAlerts } from '@/auth/CustomerAlerts';
+import { AlertCount } from '@/components/layout/AccountMenu';
 import { ProgressBar, StatusPill } from '@/pages/track/repairUi';
 
 function vehicleName(v: Pick<CustomerVehicleRow, 'year' | 'make' | 'model'>): string {
@@ -71,6 +75,7 @@ function Greeting() {
           <h1 className="mt-2 break-words font-display text-2xl font-bold tracking-tight text-fg sm:text-3xl">Welcome back, {first}</h1>
           <p className="mt-2 text-sm text-fg2">Your vehicles, visits and reminders at {site.display_name}.</p>
         </div>
+        <ProfilePhotoEditor compact />
       </div>
     </section>
   );
@@ -117,9 +122,28 @@ function MyVehicles({ account }: { account: CustomerAccount }) {
     return null;
   }
 
+  async function changePhoto(vehicle: CustomerVehicleRow, file: File | null): Promise<string | null> {
+    let path: string | null = null;
+    if (file) {
+      const up = await uploadCustomerPhoto(account.id, file, 1600);
+      if (up.error !== null) return up.error;
+      path = up.data;
+    }
+    const { data, error } = await setVehiclePhoto(vehicle.id, path);
+    if (error !== null) {
+      void removeCustomerPhoto(path);
+      return error;
+    }
+    void removeCustomerPhoto(vehicle.photo_path);
+    setState((s) => (s.status === 'ready' ? { status: 'ready', vehicles: s.vehicles.map((v) => (v.id === data.id ? data : v)) } : s));
+    setAnnounce(file ? `Photo of ${vehicleName(data)} saved.` : `Photo of ${vehicleName(data)} removed.`);
+    return null;
+  }
+
   async function remove(vehicle: CustomerVehicleRow): Promise<string | null> {
     const err = await deleteVehicle(vehicle.id);
     if (err) return err;
+    void removeCustomerPhoto(vehicle.photo_path);
     setState((s) => (s.status === 'ready' ? { status: 'ready', vehicles: s.vehicles.filter((v) => v.id !== vehicle.id) } : s));
     setAnnounce(`${vehicleName(vehicle)} removed from your garage.`);
     if (formFor !== 'new' && formFor?.id === vehicle.id) setFormFor(null);
@@ -211,6 +235,7 @@ function MyVehicles({ account }: { account: CustomerAccount }) {
                   window.scrollTo({ top: (document.getElementById(formId)?.getBoundingClientRect().top ?? 0) + window.scrollY - 120, behavior: 'smooth' });
                 }}
                 onDelete={() => remove(v)}
+                onPhoto={(file) => changePhoto(v, file)}
               />
             </li>
           ))}
@@ -225,12 +250,19 @@ function VehicleCard({
   editing,
   onEdit,
   onDelete,
+  onPhoto,
 }: {
   vehicle: CustomerVehicleRow;
   editing: boolean;
   onEdit: () => void;
   onDelete: () => Promise<string | null>;
+  /** A new photo, or null to remove it. */
+  onPhoto: (file: File | null) => Promise<string | null>;
 }) {
+  const [photoBusy, setPhotoBusy] = useState(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
+  const [photoBroken, setPhotoBroken] = useState(false);
+  useEffect(() => setPhotoBroken(false), [v.photo_path]);
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -258,10 +290,21 @@ function VehicleCard({
 
   return (
     <article aria-labelledby={titleId} className={`glass flex h-full flex-col rounded-2xl p-5 ${editing ? 'ring-2 ring-accent/40' : ''}`}>
+      {v.photo_path && !photoBroken && (
+        <img
+          src={customerPhotoUrl(v.photo_path)}
+          alt={`Photo of ${v.nickname || name}`}
+          loading="lazy"
+          onError={() => setPhotoBroken(true)}
+          className="-mx-1 -mt-1 mb-4 aspect-[16/9] w-[calc(100%+0.5rem)] rounded-xl bg-surface2 object-cover"
+        />
+      )}
       <div className="flex items-start gap-3">
-        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-accent/10 text-accent">
-          <Car className="h-5 w-5" aria-hidden />
-        </span>
+        {!v.photo_path && (
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-accent/10 text-accent">
+            <Car className="h-5 w-5" aria-hidden />
+          </span>
+        )}
         <div className="min-w-0">
           <h3 id={titleId} className="break-words font-semibold text-fg">
             {v.nickname || name}
@@ -322,10 +365,38 @@ function VehicleCard({
               <Pencil className="h-3.5 w-3.5" aria-hidden />
               Edit
             </button>
+            <PhotoButton
+              label={v.photo_path ? 'Change photo' : 'Add photo'}
+              ariaLabel={v.photo_path ? `Change photo of ${name}` : `Add a photo of ${name}`}
+              onFile={(file) => onPhoto(file)}
+            />
+            {v.photo_path && (
+              <button
+                type="button"
+                disabled={photoBusy}
+                onClick={async () => {
+                  setPhotoBusy(true);
+                  setPhotoError(null);
+                  const err = await onPhoto(null);
+                  setPhotoBusy(false);
+                  setPhotoError(err);
+                }}
+                className={smallBtn}
+                aria-label={`Remove photo of ${name}`}
+              >
+                <ImageOff className="h-3.5 w-3.5" aria-hidden />
+                {photoBusy ? 'Removing...' : 'Remove photo'}
+              </button>
+            )}
             <button ref={deleteRef} type="button" onClick={() => setConfirming(true)} className={smallBtn} aria-label={`Delete ${name}`}>
               <Trash2 className="h-3.5 w-3.5" aria-hidden />
               Delete
             </button>
+            {photoError && (
+              <p role="alert" className="w-full text-xs font-medium text-bad">
+                {photoError}
+              </p>
+            )}
           </div>
         )}
       </div>
@@ -679,15 +750,32 @@ function RepairsInProgress({ account }: { account: CustomerAccount }) {
   const site = useSite();
   const [state, setState] = useState<RepairsState>({ status: 'loading' });
 
-  const load = useCallback(async () => {
-    setState({ status: 'loading' });
-    const { data, error } = await listMyRepairs(account.id, site.workshop_id);
-    setState(error !== null ? { status: 'error', message: error } : { status: 'ready', list: data.filter((r) => ACTIVE_STATUSES.includes(r.status)) });
-  }, [account.id, site.workshop_id]);
+  const { alerts, forRepair } = useCustomerAlerts();
+
+  const load = useCallback(
+    async (quiet = false) => {
+      if (!quiet) setState({ status: 'loading' });
+      const { data, error } = await listMyRepairs(account.id, site.workshop_id);
+      if (quiet && error !== null) return;
+      setState(error !== null ? { status: 'error', message: error } : { status: 'ready', list: data.filter((r) => ACTIVE_STATUSES.includes(r.status)) });
+    },
+    [account.id, site.workshop_id],
+  );
 
   useEffect(() => {
     void load();
   }, [load]);
+
+  // A new alert usually means the repair changed (sent for approval): refresh the cards quietly.
+  const newestAlert = alerts[0]?.id;
+  const firstAlert = useRef(true);
+  useEffect(() => {
+    if (firstAlert.current) {
+      firstAlert.current = false;
+      return;
+    }
+    if (newestAlert) void load(true);
+  }, [newestAlert, load]);
 
   // Nothing in the workshop: keep the garage tidy.
   if (state.status === 'ready' && state.list.length === 0) return null;
@@ -722,8 +810,12 @@ function RepairsInProgress({ account }: { account: CustomerAccount }) {
         <ul className="mt-5 grid gap-4 md:grid-cols-2">
           {state.list.map((r) => {
             const name = repairVehicleName(r.vehicle);
+            const unseen = forRepair(r.id);
+            const needsApproval = r.status === 'awaiting_approval';
+            const messagesHref = sitePath(site, `track/${encodeURIComponent(r.tracking_code)}#messages`);
+            const latestMessage = unseen.find((a) => a.kind === 'message');
             return (
-              <li key={r.id} className="glass flex flex-col gap-4 rounded-2xl p-5">
+              <li key={r.id} className={`glass flex flex-col gap-4 rounded-2xl p-5 ${needsApproval || unseen.length ? 'ring-2 ring-red-500/40' : ''}`}>
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="flex min-w-0 items-center gap-3">
                     <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent/10 text-accent">
@@ -738,8 +830,52 @@ function RepairsInProgress({ account }: { account: CustomerAccount }) {
                       </p>
                     </div>
                   </div>
-                  <StatusPill status={r.status} />
+                  <div className="flex items-center gap-2">
+                    <Link
+                      to={messagesHref}
+                      aria-label={
+                        unseen.length
+                          ? `${unseen.length} new notification${unseen.length === 1 ? '' : 's'} for ${name}. Open messages`
+                          : `Messages for ${name}`
+                      }
+                      className={`relative flex h-10 w-10 items-center justify-center rounded-xl border transition coarse:h-11 coarse:w-11 ${
+                        unseen.length || needsApproval
+                          ? 'border-red-500/40 bg-red-500/10 text-red-500 hover:bg-red-500/20'
+                          : 'border-line bg-surface text-fg2 hover:bg-surface2 hover:text-fg'
+                      }`}
+                    >
+                      <Bell className={`h-[18px] w-[18px] ${unseen.length ? 'origin-top motion-safe:animate-[wiggle_1.2s_ease-in-out_2]' : ''}`} aria-hidden />
+                      <AlertCount count={unseen.length} className="absolute -right-1.5 -top-1.5" />
+                    </Link>
+                    <StatusPill status={r.status} />
+                  </div>
                 </div>
+                {needsApproval && (
+                  <Link
+                    to={sitePath(site, `track/${encodeURIComponent(r.tracking_code)}`)}
+                    className="flex items-start gap-3 rounded-xl border border-red-500/30 bg-red-500/10 p-3 transition hover:bg-red-500/15"
+                  >
+                    <span className="relative mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-red-600 text-white">
+                      <BellRing className="h-4 w-4" aria-hidden />
+                      <span aria-hidden className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-red-400 motion-safe:animate-ping" />
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block text-sm font-semibold text-fg">Your approval is needed</span>
+                      <span className="block text-xs text-fg2">
+                        {unseen.find((a) => a.kind === 'approval')?.body ?? 'The technician has diagnosed your car. Review the estimate and approve or decline the work.'}
+                      </span>
+                    </span>
+                  </Link>
+                )}
+                {latestMessage && (
+                  <Link to={messagesHref} className="flex items-start gap-3 rounded-xl border border-line bg-surface2/60 p-3 transition hover:bg-surface2">
+                    <MessageSquare className="mt-0.5 h-4 w-4 shrink-0 text-accent" aria-hidden />
+                    <span className="min-w-0">
+                      <span className="block text-xs font-semibold text-fg">New message from the workshop</span>
+                      <span className="line-clamp-2 block break-words text-xs text-fg2">{latestMessage.body}</span>
+                    </span>
+                  </Link>
+                )}
                 <ProgressBar status={r.status} label={`Progress of ${name}`} />
                 <Link
                   to={sitePath(site, `track/${encodeURIComponent(r.tracking_code)}`)}

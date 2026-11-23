@@ -112,6 +112,8 @@ export interface CustomerVehicleRow {
   vin: string | null;
   plate: string | null;
   nickname: string | null;
+  /** The car's photo in the customer-photos bucket (019). */
+  photo_path?: string | null;
   created_at: string;
 }
 

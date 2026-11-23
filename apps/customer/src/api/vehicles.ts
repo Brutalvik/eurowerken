@@ -3,7 +3,7 @@ import { friendlyError } from '@/lib/errors';
 import { supabase } from '@/lib/supabase';
 
 /** A customer's own cars (customer_vehicles). RLS lets a customer read and write only their rows. */
-const COLUMNS = 'id, customer_id, make, model, year, vin, plate, nickname, created_at';
+const COLUMNS = 'id, customer_id, make, model, year, vin, plate, nickname, photo_path, created_at';
 
 export type VehicleInput = Pick<CustomerVehicleRow, 'make' | 'model' | 'year' | 'vin' | 'plate' | 'nickname'>;
 
@@ -38,4 +38,11 @@ export async function updateVehicle(id: string, input: VehicleInput): Promise<Re
 export async function deleteVehicle(id: string): Promise<string | null> {
   const { error } = await supabase.from('customer_vehicles').delete().eq('id', id);
   return error ? friendlyError(error.message) : null;
+}
+
+/** Set or clear the car's photo (a path in the customer-photos bucket). */
+export async function setVehiclePhoto(id: string, photoPath: string | null): Promise<Result<CustomerVehicleRow>> {
+  const { data, error } = await supabase.from('customer_vehicles').update({ photo_path: photoPath }).eq('id', id).select(COLUMNS).single();
+  if (error) return { data: null, error: friendlyError(error.message) };
+  return { data: data as CustomerVehicleRow, error: null };
 }

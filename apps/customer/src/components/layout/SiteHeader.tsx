@@ -6,7 +6,8 @@ import { useResolvedCart } from '@/cart/CartContext';
 import { sitePath, useSite } from '@/site/SiteContext';
 import { useTheme } from '@/theme/ThemeProvider';
 import { Wordmark } from '../Wordmark';
-import { AccountMenu, Avatar } from './AccountMenu';
+import { AccountMenu, AlertCount, Avatar, LatestAlertLink } from './AccountMenu';
+import { useCustomerAlerts } from '@/auth/CustomerAlerts';
 import { NAV } from './nav';
 
 const iconButtonBase =
@@ -32,6 +33,7 @@ export function SiteHeader() {
   const { status, signOut } = useCustomerAuth();
   const navigate = useNavigate();
   const signedIn = status === 'signed-in' || status === 'recovery';
+  const { unread } = useCustomerAlerts();
 
   async function onSignOut() {
     setOpen(false);
@@ -58,16 +60,25 @@ export function SiteHeader() {
           ? // Liquid-glass style: a floating dark glass pill with a gap around it.
             // Negative bottom margin: the pill floats over the page, so no strip of page background shows behind it.
             'pt-safe sticky top-0 z-40 -mb-[calc(4.25rem+env(safe-area-inset-top))] px-3 pt-3 sm:px-4 xl:-mb-[calc(4.5rem+env(safe-area-inset-top))]'
-          : 'pt-safe sticky top-0 z-40 border-b border-line/70 bg-surface/85 backdrop-blur-xl'
+          : 'pt-safe sticky top-0 z-40 border-b border-line/70'
       }
     >
+      {/* The frosting sits on its own layer, not on the header or the pill: a browser cannot blur through two
+          nested frosted layers, so the account menu inside would show the page through it, unblurred. */}
+      {!pill && <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 bg-surface/85 backdrop-blur-xl" />}
       <div
         className={
           pill
-            ? 'dark mx-auto flex h-14 max-w-7xl items-center gap-2 rounded-full border border-white/10 bg-black/55 pl-4 pr-2 text-fg shadow-[inset_0_1px_0_rgba(255,255,255,0.14),inset_0_-1px_0_rgba(255,255,255,0.04),0_14px_40px_rgba(0,0,0,0.28)] backdrop-blur-2xl backdrop-saturate-150 sm:gap-3 xl:h-[60px]'
+            ? 'dark relative z-0 mx-auto flex h-14 max-w-7xl items-center gap-2 rounded-full border border-white/10 pl-4 pr-2 text-fg sm:gap-3 xl:h-[60px]'
             : 'container-site flex h-16 items-center gap-3 xl:h-[76px]'
         }
       >
+        {pill && (
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-0 -z-10 rounded-full bg-black/55 shadow-[inset_0_1px_0_rgba(255,255,255,0.14),inset_0_-1px_0_rgba(255,255,255,0.04),0_14px_40px_rgba(0,0,0,0.28)] backdrop-blur-2xl backdrop-saturate-150"
+          />
+        )}
         <Link to={sitePath(site)} aria-label={`${site.display_name} home`} className="min-w-0 shrink-0">
           <Wordmark site={site} />
         </Link>
@@ -166,10 +177,12 @@ export function SiteHeader() {
             onClick={() => setOpen((o) => !o)}
             aria-expanded={open}
             aria-controls="mobile-menu"
-            aria-label={open ? 'Close menu' : 'Open menu'}
-            className={`${iconButton} xl:hidden`}
+            aria-label={open ? 'Close menu' : `Open menu${signedIn && unread > 0 ? `, ${unread} new notification${unread === 1 ? '' : 's'}` : ''}`}
+            className={`${iconButton} relative xl:hidden`}
           >
             {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            {/* Phones: the account menu lives in here, so the count shows on this button. */}
+            {signedIn && !open && <AlertCount count={unread} className="absolute -right-0.5 -top-0.5 sm:hidden" />}
           </button>
         </div>
       </div>
@@ -232,6 +245,7 @@ export function SiteHeader() {
 function MobileAccount({ signedIn, loginHref, onSignOut }: { signedIn: boolean; loginHref: string; onSignOut: () => void }) {
   const site = useSite();
   const { displayName, account } = useCustomerAuth();
+  const { alerts } = useCustomerAlerts();
   const row = 'flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold text-fg transition hover:bg-surface2 coarse:min-h-11';
 
   if (!signedIn) {
@@ -257,6 +271,7 @@ function MobileAccount({ signedIn, loginHref, onSignOut }: { signedIn: boolean; 
           {account?.email && <p className="truncate text-xs text-fg3">{account.email}</p>}
         </div>
       </div>
+      {alerts[0] && <LatestAlertLink alert={alerts[0]} more={alerts.length - 1} className="my-1" />}
       <Link to={sitePath(site, 'garage')} className={row}>
         <Car className="h-4 w-4 text-fg3" aria-hidden />
         My Garage

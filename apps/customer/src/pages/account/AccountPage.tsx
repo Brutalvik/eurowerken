@@ -7,6 +7,7 @@ import type { CustomerAccount } from '@/auth/CustomerAuthContext';
 import { Switch } from '@/components/ui';
 import { sitePath, useSite } from '@/site/SiteContext';
 import { Field, FormAlert, FormSuccess, MIN_PASSWORD, SubmitButton, focusFirstError } from './AccountUI';
+import { ProfilePhotoEditor } from '@/components/PhotoPicker';
 
 export function AccountPage() {
   const site = useSite();
@@ -115,6 +116,9 @@ function ProfileCard({ account }: { account: CustomerAccount }) {
 
   return (
     <Card icon={UserRound} title="Profile" titleId="profile-title">
+      <div className="mb-5 border-b border-line pb-5">
+        <ProfilePhotoEditor />
+      </div>
       <form onSubmit={onSubmit} noValidate className="space-y-4">
         <div>
           <label htmlFor="account-email" className="label">

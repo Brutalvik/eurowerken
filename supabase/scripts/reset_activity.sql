@@ -3,7 +3,7 @@
 -- It cannot be undone.
 --
 -- Deletes: appointments, repair orders (items, approval records, timeline, photos and videos records, messages),
---          staff notifications and their read state; resets repair order numbering to RO-0001.
+--          staff notifications and their read state, customer alerts; resets repair order numbering to RO-0001.
 -- Keeps:   workshops, staff accounts and roles, customer accounts and vehicles, website settings,
 --          booking settings, business hours, closures and holidays, services, team, parts.
 --
@@ -17,6 +17,7 @@ set local eurowerken.allow_approval_delete = 'on';
 
 delete from public.notification_reads;
 delete from public.notifications;
+delete from public.customer_notifications;
 delete from public.repair_order_messages;
 delete from public.repair_order_media;
 delete from public.repair_item_approvals;

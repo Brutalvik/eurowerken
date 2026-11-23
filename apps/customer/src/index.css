@@ -112,6 +112,11 @@ body {
     @apply border border-white/35 border-t-white/40 bg-surface/75 shadow-[inset_0_1px_0_rgb(255_255_255/0.22),0_16px_48px_-18px_rgb(var(--ink)/0.18)] backdrop-blur-2xl backdrop-saturate-150;
     @apply dark:border-white/[0.09] dark:border-t-white/[0.16] dark:bg-surface/70 dark:shadow-[inset_0_1px_0_rgb(255_255_255/0.06),0_18px_52px_-18px_rgb(0_0_0/0.7)];
   }
+  /* Menus that float over the page (iOS-style): frosted, but opaque enough that text behind never competes. */
+  .glass-menu {
+    @apply border border-white/40 bg-surface/80 shadow-[inset_0_1px_0_rgb(255_255_255/0.3),0_20px_50px_-12px_rgb(var(--ink)/0.3)] backdrop-blur-2xl backdrop-saturate-[1.8];
+    @apply dark:border-white/[0.12] dark:bg-surface/[0.78] dark:shadow-[inset_0_1px_0_rgb(255_255_255/0.08),0_24px_60px_-12px_rgb(0_0_0/0.8)];
+  }
   .glass-dark {
     @apply border border-white/10 border-t-white/[0.16] bg-white/[0.06] shadow-[inset_0_1px_0_rgb(255_255_255/0.06)] backdrop-blur-xl backdrop-saturate-150;
   }
@@ -152,4 +157,14 @@ body {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* A bell that has something new for the customer gives a short ring. */
+@keyframes wiggle {
+  0%, 100% { transform: rotate(0); }
+  15% { transform: rotate(14deg); }
+  30% { transform: rotate(-12deg); }
+  45% { transform: rotate(8deg); }
+  60% { transform: rotate(-6deg); }
+  75% { transform: rotate(2deg); }
 }
