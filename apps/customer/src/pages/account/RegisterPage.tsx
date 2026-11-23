@@ -50,7 +50,7 @@ export function RegisterPage() {
   if (step === 'welcome') {
     return (
       <AuthScreen>
-        <WelcomeStep isNew email={email} onDone={() => navigate(next, { replace: true })} />
+        <WelcomeStep isNew email={email} next={next} onDone={() => navigate(next, { replace: true })} />
       </AuthScreen>
     );
   }

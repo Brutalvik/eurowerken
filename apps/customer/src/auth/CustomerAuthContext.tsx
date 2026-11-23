@@ -121,7 +121,8 @@ export function initialsOf(name: string): string {
  */
 export function safeNext(next: string | null | undefined, slug: string): string {
   const fallback = `/${slug}/garage`;
-  if (!next || !next.startsWith('/') || next.startsWith('//') || next.includes('\\')) return fallback;
+  // A relative path on this site only: no scheme, no protocol-relative //, no backslashes, no whitespace or control characters.
+  if (!next || next.length > 512 || !next.startsWith('/') || next.startsWith('//') || /[\\\s\u0000-\u001f\u007f]/.test(next)) return fallback;
   const base = `/${slug}`;
   if (next !== base && !['/', '?', '#'].some((c) => next.startsWith(`${base}${c}`))) return fallback;
   if (/^\/[^/]+\/(login|register|reset-password)(\/|\?|#|$)/.test(next)) return fallback;

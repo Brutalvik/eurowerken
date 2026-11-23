@@ -51,7 +51,19 @@ export interface RepairSummary {
   updated_at: string;
   completed_at: string | null;
   time_zone: string | null;
+  /** The repair belongs to a customer account (booked signed in, or linked on the first signed-in approval). */
+  linked_to_account: boolean;
   technician: RepairTechnician | null;
+}
+
+/** How a decision was made: online by the signed-in customer, or by phone, recorded by staff (migration 018). */
+export type DecisionMethod = 'online' | 'phone';
+
+/** The recorded decision on an item (the latest, from repair_item_approvals). */
+export interface ItemDecision {
+  decision: Decision;
+  method: DecisionMethod;
+  decided_at: string;
 }
 
 export interface RepairItem {
@@ -61,6 +73,8 @@ export interface RepairItem {
   quantity: number;
   unit_price: number;
   approval: ItemApproval;
+  /** The recorded decision, or null while none is recorded (pending, or decided before records began). */
+  decision: ItemDecision | null;
 }
 
 export interface RepairEvent {
@@ -258,6 +272,13 @@ function arr<T>(v: unknown): T[] {
   return Array.isArray(v) ? (v as T[]) : [];
 }
 
+function parseDecision(v: unknown): ItemDecision | null {
+  if (!v || typeof v !== 'object') return null;
+  const d = v as Record<string, unknown>;
+  if ((d.decision !== 'approved' && d.decision !== 'declined') || typeof d.decided_at !== 'string') return null;
+  return { decision: d.decision, method: d.method === 'phone' ? 'phone' : 'online', decided_at: d.decided_at };
+}
+
 function parseTracked(data: unknown): TrackedRepair | null {
   if (!data || typeof data !== 'object') return null;
   const d = data as Record<string, unknown>;
@@ -268,9 +289,10 @@ function parseTracked(data: unknown): TrackedRepair | null {
       ...r,
       vehicle: r.vehicle && typeof r.vehicle === 'object' ? r.vehicle : {},
       labour_rate: Number(r.labour_rate) || 0,
+      linked_to_account: r.linked_to_account === true,
       technician: r.technician ?? null,
     },
-    items: arr<RepairItem>(d.items).map((i) => ({ ...i, quantity: Number(i.quantity) || 0, unit_price: Number(i.unit_price) || 0 })),
+    items: arr<RepairItem>(d.items).map((i) => ({ ...i, quantity: Number(i.quantity) || 0, unit_price: Number(i.unit_price) || 0, decision: parseDecision(i.decision) })),
     events: arr<RepairEvent>(d.events),
     media: arr<RepairMedia>(d.media),
     messages: arr<RepairMessage>(d.messages),
@@ -288,6 +310,10 @@ export async function trackRepair(slug: string, code: string, contact: string): 
   return toResult(data, error);
 }
 
+/**
+ * Approving or declining needs a signed-in customer (migration 018). The
+ * server checks the account against the repair and records the decision.
+ */
 export async function respondToItems(slug: string, code: string, contact: string, itemIds: string[], decision: Decision): Promise<Result<TrackedRepair>> {
   const { data, error } = await supabase.rpc('respond_to_repair_items', {
     p_slug: slug,

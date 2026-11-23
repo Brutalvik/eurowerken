@@ -1,6 +1,6 @@
 import { useEffect, useId, useState } from 'react';
 import type { FormEvent, KeyboardEvent } from 'react';
-import { ArrowDown, ArrowUp, Plus, Send, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, Phone, Plus, Send, Trash2 } from 'lucide-react';
 import type { PartRow, ServiceRow } from '@eurowerken/shared';
 import { errorMessage } from '@/api/appointments';
 import { parseNumber } from '@/api/catalogue';
@@ -15,7 +15,7 @@ import {
   requestApproval,
   updateRepairItem,
 } from '@/api/repairOrders';
-import type { Approval, ItemKind, RepairItem, RepairOrder } from '@/api/repairOrders';
+import type { Approval, ItemKind, RepairApproval, RepairItem, RepairOrder } from '@/api/repairOrders';
 import { Badge } from '@/components/ui/Badge';
 import type { Tone } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -23,6 +23,7 @@ import { Card } from '@/components/ui/Card';
 import { formatCurrency } from '@/lib/format';
 import { ErrorNote, Labeled, inputClass } from '../inventory/PartForm';
 import { Confirm, SectionTitle, iconButton } from './common';
+import { ApprovalLine } from './RepairApprovals';
 
 const APPROVAL_LABEL: Record<Approval, string> = {
   approved: 'Approved',
@@ -45,10 +46,15 @@ interface RepairItemsCardProps {
   onItems: (items: RepairItem[]) => void;
   onOrder: (order: RepairOrder) => void;
   announce: (message: string) => void;
+  /** The latest recorded decision for each item (migration 018). */
+  approvals: Map<string, RepairApproval>;
+  tz: string;
+  /** Opens the "Record phone approval" dialog (shown only with full access and pending items). */
+  onRecordPhone: () => void;
 }
 
 /** The estimate: line items with inline quantity and price, approval badges, totals and the approval request. */
-export function RepairItemsCard({ order, items, services, parts, canEdit, selecting, onSelectingChange, onItems, onOrder, announce }: RepairItemsCardProps) {
+export function RepairItemsCard({ order, items, services, parts, canEdit, selecting, onSelectingChange, onItems, onOrder, announce, approvals, tz, onRecordPhone }: RepairItemsCardProps) {
   const id = useId();
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -119,6 +125,7 @@ export function RepairItemsCard({ order, items, services, parts, canEdit, select
   }
 
   const selectable = items.filter((x) => x.approval !== 'pending');
+  const pendingCount = items.length - selectable.length;
 
   return (
     <Card className="space-y-4 p-4 md:p-5">
@@ -128,11 +135,21 @@ export function RepairItemsCard({ order, items, services, parts, canEdit, select
           title="Line items"
           subtitle={order.labour_rate > 0 ? `Labour rate ${formatCurrency(order.labour_rate)} per hour` : 'No labour rate set (Settings, Booking)'}
           action={
-            editable && !selecting && selectable.length > 0 ? (
-              <Button variant="ghost" onClick={() => onSelectingChange(true)}>
-                <Send className="h-3.5 w-3.5" aria-hidden />
-                Ask customer to approve
-              </Button>
+            editable && !selecting && (selectable.length > 0 || pendingCount > 0) ? (
+              <div className="flex flex-wrap gap-2">
+                {pendingCount > 0 && (
+                  <Button variant="ghost" onClick={onRecordPhone}>
+                    <Phone className="h-3.5 w-3.5" aria-hidden />
+                    Record phone approval
+                  </Button>
+                )}
+                {selectable.length > 0 && (
+                  <Button variant="ghost" onClick={() => onSelectingChange(true)}>
+                    <Send className="h-3.5 w-3.5" aria-hidden />
+                    Ask customer to approve
+                  </Button>
+                )}
+              </div>
             ) : undefined
           }
         />
@@ -171,6 +188,8 @@ export function RepairItemsCard({ order, items, services, parts, canEdit, select
                 <ItemRow
                   key={item.id}
                   item={item}
+                  record={item.approval === 'pending' ? undefined : approvals.get(item.id)}
+                  tz={tz}
                   first={index === 0}
                   last={index === items.length - 1}
                   editable={editable}
@@ -241,6 +260,9 @@ export function RepairItemsCard({ order, items, services, parts, canEdit, select
 
 interface ItemRowProps {
   item: RepairItem;
+  /** The recorded decision behind the item's current approval, if any. */
+  record?: RepairApproval;
+  tz: string;
   first: boolean;
   last: boolean;
   editable: boolean;
@@ -253,7 +275,7 @@ interface ItemRowProps {
   onRemove: () => void;
 }
 
-function ItemRow({ item, first, last, editable, busy, selecting, chosen, onChoose, onSave, onMove, onRemove }: ItemRowProps) {
+function ItemRow({ item, record, tz, first, last, editable, busy, selecting, chosen, onChoose, onSave, onMove, onRemove }: ItemRowProps) {
   const id = useId();
   const [qty, setQty] = useState(String(item.quantity));
   const [price, setPrice] = useState(item.unit_price.toFixed(2));
@@ -300,6 +322,7 @@ function ItemRow({ item, first, last, editable, busy, selecting, chosen, onChoos
             <span className="text-[10px] uppercase tracking-wider text-fg3">{ITEM_KIND_LABEL[item.kind]}</span>
             <Badge tone={APPROVAL_TONE[item.approval]}>{APPROVAL_LABEL[item.approval]}</Badge>
           </div>
+          {record && record.decision === item.approval && <ApprovalLine record={record} tz={tz} />}
         </div>
       </div>
 

@@ -50,7 +50,7 @@ export function LoginPage() {
   if (step === 'welcome') {
     return (
       <AuthScreen>
-        <WelcomeStep isNew={isNew} email={email} onDone={() => navigate(next, { replace: true })} />
+        <WelcomeStep isNew={isNew} email={email} next={next} onDone={() => navigate(next, { replace: true })} />
       </AuthScreen>
     );
   }

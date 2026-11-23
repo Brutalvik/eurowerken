@@ -2,7 +2,7 @@
 -- NOT a migration: run it by hand in the Supabase SQL editor, once, when you mean it.
 -- It cannot be undone.
 --
--- Deletes: appointments, repair orders (items, timeline, photos and videos records, messages),
+-- Deletes: appointments, repair orders (items, approval records, timeline, photos and videos records, messages),
 --          staff notifications and their read state; resets repair order numbering to RO-0001.
 -- Keeps:   workshops, staff accounts and roles, customer accounts and vehicles, website settings,
 --          booking settings, business hours, closures and holidays, services, team, parts.
@@ -12,10 +12,14 @@
 
 begin;
 
+-- Approval records are protected; this setting lets this script remove them.
+set local eurowerken.allow_approval_delete = 'on';
+
 delete from public.notification_reads;
 delete from public.notifications;
 delete from public.repair_order_messages;
 delete from public.repair_order_media;
+delete from public.repair_item_approvals;
 delete from public.repair_order_events;
 delete from public.repair_order_items;
 delete from public.repair_orders;

@@ -1,4 +1,4 @@
-export type Role = 'Manager' | 'Service Advisor' | 'Parts Staff' | 'Accountant';
+export type Role = 'Manager' | 'Service Advisor' | 'Technician' | 'Parts Staff' | 'Accountant';
 
 export type ModuleId =
   | 'dashboard'
@@ -14,7 +14,7 @@ export type ModuleId =
 /** none = hidden and blocked, view = read-only, full = read and write */
 export type Access = 'none' | 'view' | 'full';
 
-export const ROLES: Role[] = ['Manager', 'Service Advisor', 'Parts Staff', 'Accountant'];
+export const ROLES: Role[] = ['Manager', 'Service Advisor', 'Technician', 'Parts Staff', 'Accountant'];
 
 export const MODULE_LABELS: Record<ModuleId, string> = {
   dashboard: 'Dashboard',
@@ -77,6 +77,18 @@ export const ACCESS: PermissionMatrix = {
     'repair-orders': 'view',
     customers: 'view',
     sales: 'view',
+    invoices: 'none',
+    reports: 'none',
+    users: 'none',
+    settings: 'none',
+  },
+  // Matches public.default_role_permissions() (supabase/migrations/017_role_defaults.sql).
+  Technician: {
+    dashboard: 'view',
+    inventory: 'view',
+    'repair-orders': 'full',
+    customers: 'view',
+    sales: 'none',
     invoices: 'none',
     reports: 'none',
     users: 'none',

@@ -36,6 +36,7 @@ export const INVOICE_TONE: Record<InvoiceStatus, Tone> = {
 export const ROLE_TONE: Record<Role, Tone> = {
   Manager: 'violet',
   'Service Advisor': 'info',
+  Technician: 'ok',
   'Parts Staff': 'warn',
   Accountant: 'bad',
 };

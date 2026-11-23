@@ -19,7 +19,7 @@ import { useAuth, useCurrentUser } from '@/auth/AuthContext';
 import { LegalFooter } from '@/pages/legal/LegalPage';
 import { MODULE_LABELS, MODULE_ORDER } from '@/auth/rbac';
 import type { ModuleId } from '@/auth/rbac';
-import { EXTRA_PAGES } from '@/config/nav';
+import { EXTRA_PAGES, HELP_PAGE } from '@/config/nav';
 
 const NAV_ICONS: Record<ModuleId, LucideIcon> = {
   dashboard: LayoutDashboard,
@@ -54,6 +54,8 @@ export function Sidebar({ open, onNavigate }: SidebarProps) {
     }
   }
   if (isPlatformAdmin) items.push({ key: 'admin', to: '/admin', label: 'Platform admin', icon: ShieldAlert });
+  // Help comes last, for every role.
+  items.push({ key: HELP_PAGE.path, to: `/${HELP_PAGE.path}`, label: HELP_PAGE.label, icon: HELP_PAGE.icon });
 
   return (
     // Phone (< md): slide-out drawer. Tablet (md to lg): icon rail. Desktop (lg+): full sidebar.

@@ -18,6 +18,7 @@ import type { ReactNode } from 'react';
 // Pages inside the app layout load on demand; AppLayout wraps them in a PageBoundary
 // (spinner while loading, a friendly message if one fails).
 const AdminPage = lazy(() => import('@/pages/admin/AdminPage').then((m) => ({ default: m.AdminPage })));
+const HelpPage = lazy(() => import('@/pages/HelpPage').then((m) => ({ default: m.HelpPage })));
 const AppointmentsPage = lazy(() => import('@/pages/AppointmentsPage').then((m) => ({ default: m.AppointmentsPage })));
 const CustomersPage = lazy(() => import('@/pages/CustomersPage').then((m) => ({ default: m.CustomersPage })));
 const DashboardPage = lazy(() => import('@/pages/DashboardPage').then((m) => ({ default: m.DashboardPage })));
@@ -88,6 +89,8 @@ export default function App() {
         <Route path="settings" element={guarded('settings', <SettingsPage />)} />
         {/* Platform super admins only; AdminPage shows "not found" to everyone else. */}
         <Route path="admin" element={<AdminPage />} />
+        {/* The usage guide: every signed-in role, not guarded by a module. */}
+        <Route path="help" element={<HelpPage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Route>
     </Routes>

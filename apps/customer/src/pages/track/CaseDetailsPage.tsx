@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { FormEvent, KeyboardEvent, ReactNode, RefObject } from 'react';
-import { Link, useLocation, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft,
   CalendarClock,
@@ -23,12 +23,15 @@ import {
 } from 'lucide-react';
 import { GST_RATE, itemAmount, postMessage, repairTotals, respondToItems, useTrackedRepair, vehicleName } from '@/api/repairs';
 import type { Decision, RepairItem, RepairMessage, TrackedRepair } from '@/api/repairs';
+import { useCustomerAuth } from '@/auth/CustomerAuthContext';
 import { Photo } from '@/components/Photo';
 import { Breadcrumbs, DemoNotice, telHref } from '@/components/ui';
 import { formatMoney } from '@/lib/format';
 import { sitePath, useSite } from '@/site/SiteContext';
 import {
   ApprovalPill,
+  ApprovalRecordNote,
+  DecisionRecord,
   LookupForm,
   MediaGrid,
   RepairTimeline,
@@ -39,8 +42,11 @@ import {
   WorkshopUpdates,
   formatDay,
   formatWhen,
+  maskEmailsIn,
   repairTimeZone,
+  SignInToApprove,
   useRepairContact,
+  useReturnLinks,
 } from './repairUi';
 
 /**
@@ -341,11 +347,18 @@ const KIND_LABEL: Record<RepairItem['kind'], string> = { service: 'Service', lab
 
 function WorkOrder({ tracked, contact, onUpdate }: { tracked: TrackedRepair; contact: string; onUpdate: (data: TrackedRepair) => void }) {
   const site = useSite();
+  const { status: authStatus, signOut } = useCustomerAuth();
+  const navigate = useNavigate();
+  const signedIn = authStatus === 'signed-in';
+  const authChecking = authStatus === 'loading';
+  const returnLinks = useReturnLinks();
   const { repair, items } = tracked;
+  const tz = repairTimeZone(repair);
   const totals = repairTotals(items);
+  const hasDecisions = items.some((i) => i.approval !== 'pending' && i.decision);
   const [confirming, setConfirming] = useState<{ id: string; decision: Decision } | null>(null);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<{ id: string; message: string } | null>(null);
+  const [error, setError] = useState<{ id: string; message: string; signIn?: boolean } | null>(null);
   /** Decisions made on this page, to show the result where the buttons were. */
   const [done, setDone] = useState<Record<string, Decision>>({});
   const [announcement, setAnnouncement] = useState('');
@@ -371,13 +384,20 @@ function WorkOrder({ tracked, contact, onUpdate }: { tracked: TrackedRepair; con
     if (c) requestAnimationFrame(() => triggerRefs.current.get(`${c.id}:${c.decision}`)?.focus());
   }
 
+  /** Signed in with an email other than the booking one: sign out, then sign in again and come back here. */
+  async function switchAccount() {
+    await signOut();
+    navigate(returnLinks.login);
+  }
+
   async function submit(item: RepairItem, decision: Decision) {
     setBusy(true);
     setError(null);
     const res = await respondToItems(site.slug, repair.tracking_code, contact, [item.id], decision);
     setBusy(false);
     if (res.error !== null) {
-      setError({ id: item.id, message: res.error });
+      // The server may name the booking email: show it masked. A lapsed session gets a sign-in link.
+      setError({ id: item.id, message: maskEmailsIn(res.error), signIn: /sign in/i.test(res.error) && !/another account/i.test(res.error) });
       return;
     }
     setConfirming(null);
@@ -414,6 +434,12 @@ function WorkOrder({ tracked, contact, onUpdate }: { tracked: TrackedRepair; con
         {announcement}
       </p>
 
+      {totals.pendingCount > 0 && !signedIn && !authChecking && (
+        <div className="mt-5">
+          <SignInToApprove contact={contact} />
+        </div>
+      )}
+
       {items.length === 0 ? (
         <p className="mt-5 text-sm text-fg2">No work has been added yet. The estimate appears here once the technician has looked at your vehicle.</p>
       ) : (
@@ -444,7 +470,16 @@ function WorkOrder({ tracked, contact, onUpdate }: { tracked: TrackedRepair; con
                   <ApprovalPill approval={item.approval} />
                 </div>
 
-                {pending && !confirm && (
+                {pending && !confirm && authChecking && (
+                  <p className="mt-4 flex items-center gap-2 text-xs text-fg3">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none" aria-hidden />
+                    Checking your sign-in
+                  </p>
+                )}
+
+                {pending && !confirm && !signedIn && !authChecking && <p className="mt-3 text-xs text-fg3">Sign in above to approve or decline this.</p>}
+
+                {pending && !confirm && signedIn && (
                   <div className="mt-4 flex flex-wrap items-center gap-2">
                     <button
                       ref={(el) => {
@@ -481,7 +516,7 @@ function WorkOrder({ tracked, contact, onUpdate }: { tracked: TrackedRepair; con
                   </div>
                 )}
 
-                {pending && confirm && (
+                {pending && confirm && signedIn && (
                   <div role="group" aria-labelledby={`confirm-${item.id}`} className="mt-4 rounded-xl border border-line bg-surface/80 p-3">
                     <p id={`confirm-${item.id}`} className="text-sm text-fg">
                       {confirm.decision === 'approved' ? (
@@ -497,9 +532,24 @@ function WorkOrder({ tracked, contact, onUpdate }: { tracked: TrackedRepair; con
                     </p>
                     <p className="mt-1 text-[11px] text-fg3">You cannot change this here afterwards. To change your mind, message the workshop.</p>
                     {error?.id === item.id && (
-                      <p role="alert" className="mt-2 text-xs text-bad">
-                        {error.message}
-                      </p>
+                      <div role="alert" className="mt-2 rounded-lg border border-bad/30 bg-bad/5 px-3 py-2 text-xs text-bad">
+                        <p className="font-semibold">Your decision was not saved.</p>
+                        <p className="mt-0.5 break-words">{error.message}</p>
+                        {error.signIn &&
+                          (signedIn ? (
+                            <button
+                              type="button"
+                              onClick={() => void switchAccount()}
+                              className="mt-1 inline-flex min-h-11 items-center font-semibold text-accent hover:underline"
+                            >
+                              Sign out and sign in with that email
+                            </button>
+                          ) : (
+                            <Link to={returnLinks.login} className="mt-1 inline-flex min-h-11 items-center font-semibold text-accent hover:underline">
+                              Sign in to approve
+                            </Link>
+                          ))}
+                      </div>
                     )}
                     <div className="mt-3 flex flex-wrap gap-2">
                       <button
@@ -523,6 +573,8 @@ function WorkOrder({ tracked, contact, onUpdate }: { tracked: TrackedRepair; con
                   </div>
                 )}
 
+                {!pending && item.decision && <DecisionRecord decision={item.decision} timeZone={tz} className="mt-3" />}
+
                 {!pending && decided && (
                   <p
                     ref={(el) => {
@@ -545,6 +597,8 @@ function WorkOrder({ tracked, contact, onUpdate }: { tracked: TrackedRepair; con
           })}
         </ul>
       )}
+
+      {(totals.pendingCount > 0 || hasDecisions) && <ApprovalRecordNote className="mt-4" />}
 
       <Totals items={items} />
     </section>

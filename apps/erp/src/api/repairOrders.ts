@@ -132,6 +132,29 @@ export interface RepairOrderSummary extends RepairOrder {
   totals: RepairTotals;
 }
 
+/** One recorded customer decision (migration 018). Never changed once written. */
+export interface RepairApproval {
+  id: string;
+  repair_order_id: string;
+  /** Null when the item was deleted later; item_description keeps what it was. */
+  item_id: string | null;
+  item_description: string;
+  /** Quantity x unit price at the moment of the decision, before tax. */
+  amount: number;
+  amount_with_tax: number;
+  decision: 'approved' | 'declined';
+  method: 'online' | 'phone';
+  customer_email: string | null;
+  signed_in: boolean;
+  ip_address: string | null;
+  user_agent: string | null;
+  recorded_by: string | null;
+  /** The staff member who recorded a phone decision ("staff" when their profile cannot be read). */
+  recorded_by_name: string | null;
+  note: string | null;
+  decided_at: string;
+}
+
 export interface RepairOrderDetail {
   order: RepairOrder;
   items: RepairItem[];
@@ -485,7 +508,8 @@ export interface ItemPatch {
   description?: string;
   quantity?: number;
   unit_price?: number;
-  approval?: Approval;
+  /** Only back to pending: approved and declined are recorded with recordPhoneApproval or by the customer online. */
+  approval?: 'pending';
 }
 
 export async function updateRepairItem(item: RepairItem, patch: ItemPatch): Promise<RepairItem> {
@@ -536,6 +560,103 @@ export async function requestApproval(order: RepairOrder, itemIds: string[]): Pr
   if (order.status === 'awaiting_approval') return order;
   if (!canCancel(order.status)) throw new Error('A completed or cancelled repair order cannot be sent for approval.');
   return updateRepairStatus(order, 'awaiting_approval');
+}
+
+// Approval records (migration 018) ---------------------------------------------------------------------
+
+export const PHONE_NOTE_MIN = 3;
+export const PHONE_NOTE_MAX = 500;
+
+/**
+ * Every recorded decision for a repair order, oldest first. The staff member behind a phone approval is
+ * shown by name when their profile can be read (your own, or everyone with Users & Roles access), else "staff".
+ */
+export async function listApprovals(repairOrderId: string): Promise<RepairApproval[]> {
+  if (!UUID.test(repairOrderId)) return [];
+  const { data, error } = await supabase
+    .from('repair_item_approvals')
+    .select('*')
+    .eq('repair_order_id', repairOrderId)
+    .order('decided_at', { ascending: true });
+  if (error) {
+    if (error.code === '42P01' || error.code === 'PGRST205' || /schema cache|does not exist/i.test(error.message)) {
+      throw new Error('The database is not set up for approval records yet. Apply migration 018 (npm run db:migrate).');
+    }
+    fail(error);
+  }
+  const rows = (data ?? []) as Record<string, unknown>[];
+  const staffIds = [...new Set(rows.map((r) => r.recorded_by).filter((x): x is string => typeof x === 'string'))];
+  const names = new Map<string, string>();
+  if (staffIds.length > 0) {
+    const { data: people } = await supabase.from('profiles').select('id, full_name, email').in('id', staffIds);
+    for (const p of (people ?? []) as { id: string; full_name: string | null; email: string | null }[]) {
+      const name = p.full_name?.trim() || p.email?.split('@')[0] || '';
+      if (name) names.set(p.id, name);
+    }
+  }
+  return rows.map((r) => {
+    const by = (r.recorded_by as string | null) ?? null;
+    return {
+      id: String(r.id),
+      repair_order_id: String(r.repair_order_id),
+      item_id: (r.item_id as string | null) ?? null,
+      item_description: String(r.item_description ?? ''),
+      amount: num(r.amount),
+      amount_with_tax: num(r.amount_with_tax),
+      decision: r.decision === 'declined' ? 'declined' : 'approved',
+      method: r.method === 'phone' ? 'phone' : 'online',
+      customer_email: (r.customer_email as string | null) ?? null,
+      signed_in: Boolean(r.signed_in),
+      ip_address: (r.ip_address as string | null) ?? null,
+      user_agent: (r.user_agent as string | null) ?? null,
+      recorded_by: by,
+      recorded_by_name: by ? (names.get(by) ?? 'staff') : r.method === 'phone' ? 'staff' : null,
+      note: (r.note as string | null) ?? null,
+      decided_at: String(r.decided_at),
+    };
+  });
+}
+
+/** The latest record for each item id (items whose record was for a deleted item are not included). */
+export function latestApprovalByItem(records: RepairApproval[]): Map<string, RepairApproval> {
+  const out = new Map<string, RepairApproval>();
+  for (const r of records) {
+    if (!r.item_id) continue;
+    const prev = out.get(r.item_id);
+    if (!prev || prev.decided_at <= r.decided_at) out.set(r.item_id, r);
+  }
+  return out;
+}
+
+/** Checks the phone note; returns the problem, or null. */
+export function phoneNoteProblem(note: string): string | null {
+  const n = note.trim();
+  if (n.length < PHONE_NOTE_MIN) return 'Add a short note, for example who you spoke to and when.';
+  if (n.length > PHONE_NOTE_MAX) return `The note can be at most ${PHONE_NOTE_MAX} characters (now ${n.length}).`;
+  return null;
+}
+
+/**
+ * Records a decision the customer gave by phone for pending items (needs full Repair Orders access). The
+ * database records each decision with who recorded it, applies it, and moves an order that was awaiting
+ * approval to in progress when nothing is pending any more.
+ */
+export async function recordPhoneApproval(repairOrderId: string, itemIds: string[], decision: 'approved' | 'declined', note: string): Promise<void> {
+  if (itemIds.length === 0) throw new Error('Tick at least one item.');
+  const problem = phoneNoteProblem(note);
+  if (problem) throw new Error(problem);
+  const { error } = await supabase.rpc('record_phone_approval', {
+    p_repair_order: repairOrderId,
+    p_item_ids: itemIds,
+    p_decision: decision,
+    p_note: note.trim(),
+  });
+  if (error) {
+    if (error.code === 'PGRST202' || /could not find the function/i.test(error.message)) {
+      throw new Error('The database is not set up for phone approvals yet. Apply migration 018 (npm run db:migrate).');
+    }
+    fail(error);
+  }
 }
 
 // Timeline, media and messages ------------------------------------------------------------------------------

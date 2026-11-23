@@ -1,4 +1,4 @@
-import { CalendarDays } from 'lucide-react';
+import { CalendarDays, LifeBuoy } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { ModuleId } from '@/auth/rbac';
 
@@ -22,3 +22,6 @@ export const EXTRA_PAGES: ExtraPage[] = [
 export function extraPage(path: string): ExtraPage | undefined {
   return EXTRA_PAGES.find((p) => p.path === path);
 }
+
+/** The usage guide: open to every signed-in role, not part of the permission matrix. Last in the sidebar. */
+export const HELP_PAGE = { path: 'help', label: 'Help', icon: LifeBuoy } as const;

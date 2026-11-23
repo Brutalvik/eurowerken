@@ -175,6 +175,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [context, setContext] = useState<MyContext | null>(null);
   const [sessionChecked, setSessionChecked] = useState(!supabaseConfigured);
   const [profileLoading, setProfileLoading] = useState(false);
+  // Whose profile has finished loading. Until it matches the session, the app waits (otherwise a page
+  // reload briefly sees "no workshop", goes to onboarding and lands on the dashboard).
+  const [profileFor, setProfileFor] = useState<string | null>(null);
   const [recovery, setRecovery] = useState(false);
   const [permissions, setPermissions] = useState<PermissionMatrix>(ACCESS);
   // The workshop the permission matrix was last loaded for (undefined: not yet).
@@ -225,6 +228,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const ctx = ctxResult.error ? null : (ctxResult.data as MyContext | null);
     setContext(ctx && typeof ctx === 'object' && 'is_platform_admin' in ctx ? ctx : null);
     setProfileLoading(false);
+    setProfileFor(id);
   }, []);
 
   const loadPermissions = useCallback(async () => {
@@ -278,7 +282,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const role = user?.role ?? null;
 
   let status: AuthStatus;
-  if (!sessionChecked || (session && profileLoading && !profile)) status = 'loading';
+  if (!sessionChecked || (session && ((profileLoading && !profile) || profileFor !== session.user.id))) status = 'loading';
   else if (!session) status = 'signed-out';
   else if (recovery) status = 'recovery';
   else status = 'signed-in';

@@ -6,7 +6,8 @@
  */
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
-import { AlertCircle, CheckCircle2, Circle, Clock, ImageIcon, Loader2, NotebookPen, RotateCcw, Search, User, Wrench } from 'lucide-react';
+import { Link, useLocation } from 'react-router-dom';
+import { AlertCircle, CheckCircle2, Circle, Clock, ImageIcon, Loader2, LogIn, NotebookPen, Phone, RotateCcw, Search, ShieldCheck, User, UserPlus, Wrench, XCircle } from 'lucide-react';
 import { DEFAULT_TIME_ZONE } from '@/api/booking';
 import {
   STATUS_LABEL,
@@ -22,12 +23,12 @@ import {
   technicianPhotoUrl,
   trackRepair,
 } from '@/api/repairs';
-import type { RepairEvent, RepairItem, RepairMedia, RepairStatus, RepairSummary, RepairTechnician, TrackedRepair } from '@/api/repairs';
+import type { ItemDecision, RepairEvent, RepairItem, RepairMedia, RepairStatus, RepairSummary, RepairTechnician, TrackedRepair } from '@/api/repairs';
 import { useCustomerAuth } from '@/auth/CustomerAuthContext';
 import { Photo } from '@/components/Photo';
 import { Pill } from '@/components/ui';
 import { formatMoney } from '@/lib/format';
-import { useSite } from '@/site/SiteContext';
+import { sitePath, useSite } from '@/site/SiteContext';
 
 // Dates ----------------------------------------------------------------------------------
 
@@ -50,6 +51,38 @@ export function formatWhen(iso: string, timeZone: string): string {
 /** "Nov 18, 2026" in the workshop's time zone. */
 export function formatDay(iso: string, timeZone: string): string {
   return new Date(iso).toLocaleDateString('en-CA', { timeZone, month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+/** "25 Nov 2026, 10:42" in the workshop's time zone (decision records). */
+export function formatStamp(iso: string, timeZone: string): string {
+  return new Date(iso).toLocaleString('en-GB', {
+    timeZone,
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  });
+}
+
+// Masking ------------------------------------------------------------------------------------
+
+/** "jane.doe@gmail.com" to "j***@g***.com". Anything that is not an email gives null. */
+export function maskEmail(value: string | null | undefined): string | null {
+  const v = (value ?? '').trim();
+  const m = /^([^\s@]+)@([^\s@]+)$/.exec(v);
+  if (!m) return null;
+  const [, local, domain] = m as unknown as [string, string, string];
+  const dot = domain.lastIndexOf('.');
+  const host = dot > 0 ? domain.slice(0, dot) : domain;
+  const tld = dot > 0 ? domain.slice(dot) : '';
+  return `${local.charAt(0)}***@${host.charAt(0)}***${tld}`;
+}
+
+/** Masks every email inside a message (server messages may name the booking email). */
+export function maskEmailsIn(message: string): string {
+  return message.replace(/[^\s@()<>,;:"']+@[^\s@()<>,;:"']+\.[A-Za-z]{2,}/g, (e) => maskEmail(e) ?? e);
 }
 
 // Contact for a code -------------------------------------------------------------------------
@@ -445,6 +478,83 @@ const APPROVAL_PILL: Record<RepairItem['approval'], { label: string; tone: 'ok' 
 export function ApprovalPill({ approval }: { approval: RepairItem['approval'] }) {
   const p = APPROVAL_PILL[approval];
   return <Pill tone={p.tone}>{p.label}</Pill>;
+}
+
+// Approvals (migration 018) --------------------------------------------------------------------
+
+/** "Approved by you online · 25 Nov 2026, 10:42" or "Declined by phone · ...". */
+export function decisionLabel(d: ItemDecision, timeZone: string): string {
+  const verb = d.decision === 'approved' ? 'Approved' : 'Declined';
+  const how = d.method === 'phone' ? 'by phone' : 'by you online';
+  return `${verb} ${how} · ${formatStamp(d.decided_at, timeZone)}`;
+}
+
+/** The recorded decision on an item, as one quiet line. */
+export function DecisionRecord({ decision, timeZone, className = '' }: { decision: ItemDecision; timeZone: string; className?: string }) {
+  const Icon = decision.method === 'phone' ? Phone : decision.decision === 'approved' ? CheckCircle2 : XCircle;
+  return (
+    <p className={`flex items-start gap-1.5 text-xs text-fg2 ${className}`}>
+      <Icon className={`mt-px h-3.5 w-3.5 shrink-0 ${decision.decision === 'approved' ? 'text-ok' : 'text-fg3'}`} aria-hidden />
+      <span>
+        <time dateTime={decision.decided_at}>{decisionLabel(decision, timeZone)}</time>
+      </span>
+    </p>
+  );
+}
+
+/** The note under the approvals area. */
+export function ApprovalRecordNote({ className = '' }: { className?: string }) {
+  return (
+    <p className={`flex items-start gap-1.5 text-[11px] leading-relaxed text-fg3 ${className}`}>
+      <ShieldCheck className="mt-px h-3.5 w-3.5 shrink-0" aria-hidden />
+      Your decision is recorded with the date, time and your sign-in for your protection.
+    </p>
+  );
+}
+
+/**
+ * Login and register links that come back to this page (path only: never the
+ * email, phone or hash). The contact stays in sessionStorage for this tab.
+ */
+export function useReturnLinks(): { login: string; register: string } {
+  const site = useSite();
+  const { pathname } = useLocation();
+  const next = `?next=${encodeURIComponent(pathname)}`;
+  return { login: `${sitePath(site, 'login')}${next}`, register: `${sitePath(site, 'register')}${next}` };
+}
+
+/** Shown instead of Approve and Decline to visitors who are not signed in. */
+export function SignInToApprove({ contact }: { contact: string | null }) {
+  const links = useReturnLinks();
+  const masked = maskEmail(contact);
+  return (
+    <div className="rounded-xl border border-accent/25 bg-accent/5 p-4">
+      <p className="flex items-start gap-2 text-sm text-fg">
+        <LogIn className="mt-0.5 h-4 w-4 shrink-0 text-accent" aria-hidden />
+        <span>
+          To approve or decline work you need to be signed in.
+          {masked ? (
+            <>
+              {' '}
+              Use the email you booked with: <span className="break-all font-semibold">{masked}</span>.
+            </>
+          ) : (
+            ' Use the email you booked with.'
+          )}
+        </span>
+      </p>
+      <div className="mt-3 flex flex-col gap-2 min-[420px]:flex-row min-[420px]:flex-wrap">
+        <Link to={links.login} className="btn-ink min-h-11 bg-accent px-4 py-2.5 text-accent-fg shadow-accent/20">
+          <LogIn className="h-4 w-4" aria-hidden />
+          Sign in to approve
+        </Link>
+        <Link to={links.register} className="btn-outline min-h-11 px-4 py-2.5">
+          <UserPlus className="h-4 w-4" aria-hidden />
+          Create an account
+        </Link>
+      </div>
+    </div>
+  );
 }
 
 /** Compact list of the work with an approval pill per line. */

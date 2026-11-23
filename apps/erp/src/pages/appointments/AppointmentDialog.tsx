@@ -440,17 +440,10 @@ function Details({ appt, workshopId, ctx, site, technicians, canEdit, onChanged,
         )}
       </Section>
 
-      <div className="flex flex-wrap items-center gap-3 border-t border-line pt-4">
-        <span title="Coming in Phase 4">
-          <Button variant="ghost" disabled aria-describedby={`${id}-ro-hint`}>
-            <ClipboardList className="h-3.5 w-3.5" aria-hidden />
-            Create repair order
-          </Button>
-        </span>
-        <span id={`${id}-ro-hint`} className="text-[11px] text-fg3">
-          Coming in Phase 4
-        </span>
-      </div>
+      <p className="border-t border-line pt-4 text-[11px] text-fg3">
+        <ClipboardList className="mr-1 inline h-3.5 w-3.5 align-[-2px]" aria-hidden />
+        Checking the car in creates its repair order automatically.
+      </p>
 
       {!canEdit && (
         <p className="text-[11px] text-fg3">You can view bookings. Changing them needs full Repair Orders access.</p>

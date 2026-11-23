@@ -1,8 +1,6 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
-import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import type { LucideIcon } from 'lucide-react';
-import { Bell, CalendarCheck, CalendarClock, CalendarX, Car, FileText, Pencil, Plus, RotateCcw, ScanLine, Settings, Trash2, User, Wrench } from 'lucide-react';
+import { Bell, CalendarCheck, CalendarClock, CalendarX, Car, FileText, Pencil, Plus, RotateCcw, Settings, Trash2, User, Wrench } from 'lucide-react';
 import type { CustomerVehicleRow } from '@eurowerken/shared';
 import { cancelMyAppointment, formatZonedDateTime, listMyAppointments, useBookingSettings } from '@/api/booking';
 import type { Appointment, AppointmentStatus } from '@/api/booking';
@@ -55,9 +53,7 @@ export function GaragePage() {
 
       <MyAppointments account={account} />
 
-      <div className="grid gap-6 md:grid-cols-2">
-        <EmptySection id="invoices" icon={FileText} title="Invoices" text="No invoices yet. Invoices from your visits will appear here." />
-      </div>
+      {/* Invoices: shown once invoices exist (none are issued yet). */}
     </div>
   );
 }
@@ -74,16 +70,6 @@ function Greeting() {
           <p className="eyebrow">My Garage</p>
           <h1 className="mt-2 break-words font-display text-2xl font-bold tracking-tight text-fg sm:text-3xl">Welcome back, {first}</h1>
           <p className="mt-2 text-sm text-fg2">Your vehicles, visits and reminders at {site.display_name}.</p>
-        </div>
-        <div className="flex flex-col gap-3 sm:flex-row">
-          <Link to={sitePath(site, 'book')} className="btn-ink">
-            <CalendarCheck className="h-4 w-4" aria-hidden />
-            Book Appointment
-          </Link>
-          <Link to={sitePath(site, 'track')} className="btn-outline">
-            <ScanLine className="h-4 w-4" aria-hidden />
-            Track a repair
-          </Link>
         </div>
       </div>
     </section>
@@ -368,31 +354,6 @@ function Reminders({ account }: { account: CustomerAccount }) {
         <Settings className="h-4 w-4" aria-hidden />
         Account settings
       </Link>
-    </section>
-  );
-}
-
-function EmptySection({ id, icon: Icon, title, text }: { id: string; icon: LucideIcon; title: string; text: ReactNode }) {
-  const site = useSite();
-  return (
-    <section aria-labelledby={id} className="glass flex flex-col rounded-2xl p-5 sm:p-6">
-      <h2 id={id} className="flex items-center gap-2 font-display text-lg font-semibold text-fg">
-        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent/10 text-accent">
-          <Icon className="h-4 w-4" aria-hidden />
-        </span>
-        {title}
-      </h2>
-      <p className="mt-4 text-sm text-fg2">{text}</p>
-      <div className="mt-5 flex flex-col gap-3 sm:flex-row">
-        <Link to={sitePath(site, 'book')} className="btn-ink">
-          <CalendarCheck className="h-4 w-4" aria-hidden />
-          Book
-        </Link>
-        <Link to={sitePath(site, 'track')} className="btn-outline">
-          <ScanLine className="h-4 w-4" aria-hidden />
-          Track
-        </Link>
-      </div>
     </section>
   );
 }

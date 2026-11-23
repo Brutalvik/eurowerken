@@ -26,6 +26,8 @@ export function SiteHeader() {
   const { mode, toggle } = useTheme();
   const { count } = useResolvedCart();
   const { pathname } = useLocation();
+  // My Garage has its own Book button, so the header doesn't repeat it there.
+  const onGarage = pathname.replace(/\/+$/, '') === sitePath(site, 'garage').replace(/\/+$/, '');
   const [open, setOpen] = useState(false);
   const { status, signOut } = useCustomerAuth();
   const navigate = useNavigate();
@@ -142,6 +144,7 @@ export function SiteHeader() {
               Sign in
             </Link>
           )}
+          {!onGarage && (
           <Link
             to={sitePath(site, 'book')}
             className={
@@ -152,6 +155,7 @@ export function SiteHeader() {
           >
             Book Appointment
           </Link>
+          )}
           {!pill && (
             <Link to={sitePath(site, 'garage')} className="btn-outline hidden whitespace-nowrap px-4 py-2.5 shadow-none 2xl:inline-flex">
               Dashboard

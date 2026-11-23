@@ -9,7 +9,7 @@ import { WelcomeCard } from './AccountUI';
  * customer auth context (account, link to this workshop) and a vehicles
  * fetch, then onDone.
  */
-export function WelcomeStep({ isNew, email, onDone }: { isNew: boolean; email: string; onDone: () => void }) {
+export function WelcomeStep({ isNew, email, onDone, next }: { isNew: boolean; email: string; onDone: () => void; next?: string }) {
   const site = useSite();
   const { status, account, displayName, initials, setupProgress } = useCustomerAuth();
   const ready = status === 'signed-in';
@@ -37,7 +37,7 @@ export function WelcomeStep({ isNew, email, onDone }: { isNew: boolean; email: s
   return (
     <WelcomeCard
       title={`${isNew ? 'Welcome' : 'Welcome back'}${firstName ? `, ${firstName}` : ''}`}
-      subtitle={`Opening your garage at ${site.display_name}`}
+      subtitle={next && /\/track\//.test(next) ? `Taking you back to your repair at ${site.display_name}` : `Opening your garage at ${site.display_name}`}
       email={account?.email || email.trim()}
       initials={ready ? initials : '?'}
       avatarUrl={account?.avatar_url}

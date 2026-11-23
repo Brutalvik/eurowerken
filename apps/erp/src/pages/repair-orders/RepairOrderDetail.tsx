@@ -26,6 +26,8 @@ import {
   canCancel,
   getRepairOrder,
   getRepairOrderRow,
+  latestApprovalByItem,
+  listApprovals,
   listRepairEvents,
   listRepairItems,
   listRepairMessages,
@@ -36,13 +38,14 @@ import {
   updateRepairOrder,
   updateRepairStatus,
 } from '@/api/repairOrders';
-import type { RepairAction, RepairOrder, RepairOrderDetail as Detail } from '@/api/repairOrders';
+import type { RepairAction, RepairApproval, RepairOrder, RepairOrderDetail as Detail } from '@/api/repairOrders';
 import { useAuth } from '@/auth/AuthContext';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { ErrorNote, Labeled, inputClass } from '../inventory/PartForm';
 import { Confirm, SectionTitle, iconButton, textLink } from './common';
+import { ApprovalHistoryCard, PhoneApprovalDialog } from './RepairApprovals';
 import { RepairItemsCard } from './RepairItemsCard';
 import { MediaCard } from './RepairMediaCard';
 import { MessagesCard, TimelineCard } from './RepairThreadCards';
@@ -66,6 +69,10 @@ export function RepairOrderDetail() {
   const [parts, setParts] = useState<PartRow[]>([]);
   const [live, setLive] = useState('');
   const [selecting, setSelecting] = useState(false);
+  const [approvals, setApprovals] = useState<RepairApproval[]>([]);
+  const [approvalsError, setApprovalsError] = useState<string | null>(null);
+  /** The phone approval dialog: closed (null), or open with an optional explanation. */
+  const [phone, setPhone] = useState<{ intro: string | null } | null>(null);
   const itemsRef = useRef<HTMLDivElement>(null);
 
   const announce = useCallback((message: string) => {
@@ -74,8 +81,19 @@ export function RepairOrderDetail() {
     window.setTimeout(() => setLive(message), 30);
   }, []);
 
+  const loadApprovals = useCallback(async () => {
+    try {
+      const list = await listApprovals(id);
+      setApprovals(list);
+      setApprovalsError(null);
+    } catch (err) {
+      setApprovalsError(errorMessage(err, 'The approval history could not be loaded.'));
+    }
+  }, [id]);
+
   const load = useCallback(async () => {
     setLoadError(null);
+    void loadApprovals();
     try {
       const d = await getRepairOrder(id);
       setDetail(d);
@@ -84,10 +102,13 @@ export function RepairOrderDetail() {
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [id, loadApprovals]);
 
   useEffect(() => {
     setDetail(null);
+    setApprovals([]);
+    setApprovalsError(null);
+    setPhone(null);
     setSelecting(false);
     setLoading(true);
     void load();
@@ -116,6 +137,8 @@ export function RepairOrderDetail() {
       if (table === 'repair_orders') void getRepairOrderRow(id).then((o) => o && patch((d) => ({ ...d, order: o }))).catch(() => undefined);
       if (table === 'repair_order_items') void listRepairItems(id).then((items) => patch((d) => ({ ...d, items }))).catch(() => undefined);
       if (table === 'repair_order_events') void listRepairEvents(id).then((events) => patch((d) => ({ ...d, events }))).catch(() => undefined);
+      // A decision changes the items and writes a timeline entry; the records themselves are read again then.
+      if (table === 'repair_order_items' || table === 'repair_order_events') void loadApprovals();
       if (table === 'repair_order_messages') void listRepairMessages(id).then((messages) => patch((d) => ({ ...d, messages }))).catch(() => undefined);
     });
     const onVisible = () => document.visibilityState === 'visible' && void load();
@@ -124,7 +147,7 @@ export function RepairOrderDetail() {
       unsubscribe();
       document.removeEventListener('visibilitychange', onVisible);
     };
-  }, [id, load]);
+  }, [id, load, loadApprovals]);
 
   if (loading && !detail) {
     return (
@@ -163,7 +186,13 @@ export function RepairOrderDetail() {
 
   const { order } = detail;
   const setOrder = (o: RepairOrder) => setDetail((d) => (d ? { ...d, order: o } : d));
-  const hasPending = detail.items.some((i) => i.approval === 'pending');
+  const pendingItems = detail.items.filter((i) => i.approval === 'pending');
+  const hasPending = pendingItems.length > 0;
+  const latest = latestApprovalByItem(approvals);
+
+  function openPhone(intro: string | null = null) {
+    setPhone({ intro });
+  }
 
   function askForApproval() {
     setSelecting(true);
@@ -182,7 +211,19 @@ export function RepairOrderDetail() {
       </Link>
 
       <HeaderCard order={order} tz={tz} site={site} announce={announce} />
-      <StatusCard order={order} canEdit={canEdit} hasPending={hasPending} onOrder={setOrder} onAskApproval={askForApproval} announce={announce} />
+      <StatusCard
+        order={order}
+        canEdit={canEdit}
+        hasPending={hasPending}
+        onOrder={setOrder}
+        onAskApproval={askForApproval}
+        onNeedPhone={() =>
+          openPhone(
+            `${pendingItems.length} item${pendingItems.length === 1 ? ' is' : 's are'} still waiting for the customer. Record their answer first; when nothing is waiting any more, the repair moves to in progress by itself.`,
+          )
+        }
+        announce={announce}
+      />
 
       <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)]">
         <div className="min-w-0 space-y-4">
@@ -198,8 +239,12 @@ export function RepairOrderDetail() {
               onItems={(items) => setDetail((d) => (d ? { ...d, items } : d))}
               onOrder={setOrder}
               announce={announce}
+              approvals={latest}
+              tz={tz}
+              onRecordPhone={() => openPhone()}
             />
           </div>
+          <ApprovalHistoryCard records={approvals} items={detail.items} tz={tz} error={approvalsError} />
           <MediaCard order={order} media={detail.media} canEdit={canEdit} onMedia={(media) => setDetail((d) => (d ? { ...d, media } : d))} announce={announce} />
         </div>
         <div className="min-w-0 space-y-4">
@@ -222,6 +267,21 @@ export function RepairOrderDetail() {
           />
         </div>
       </div>
+
+      {canEdit && (
+        <PhoneApprovalDialog
+          open={phone !== null}
+          order={order}
+          pending={pendingItems}
+          intro={phone?.intro}
+          onClose={() => setPhone(null)}
+          onDone={(n, decision) => {
+            setPhone(null);
+            announce(`${n} item${n === 1 ? '' : 's'} ${decision} by phone, recorded.`);
+            void load();
+          }}
+        />
+      )}
 
       {!canEdit && <p className="text-[11px] text-fg3">You can view repair orders. Changing them needs full Repair Orders access.</p>}
     </div>
@@ -325,10 +385,12 @@ interface StatusCardProps {
   hasPending: boolean;
   onOrder: (o: RepairOrder) => void;
   onAskApproval: () => void;
+  /** Items are still pending: the customer's answer has to be recorded before the repair starts. */
+  onNeedPhone: () => void;
   announce: (m: string) => void;
 }
 
-function StatusCard({ order, canEdit, hasPending, onOrder, onAskApproval, announce }: StatusCardProps) {
+function StatusCard({ order, canEdit, hasPending, onOrder, onAskApproval, onNeedPhone, announce }: StatusCardProps) {
   const id = useId();
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -340,6 +402,10 @@ function StatusCard({ order, canEdit, hasPending, onOrder, onAskApproval, announ
   async function go(action: RepairAction) {
     if (action.to === 'awaiting_approval' && !hasPending) {
       onAskApproval();
+      return;
+    }
+    if (action.to === 'in_progress' && hasPending) {
+      onNeedPhone();
       return;
     }
     setBusy(action.to);
@@ -404,7 +470,7 @@ function StatusCard({ order, canEdit, hasPending, onOrder, onAskApproval, announ
           <div className="flex flex-wrap items-center gap-2">
             {actions.map((a) => (
               <Button key={a.to} variant={a.primary ? 'primary' : 'ghost'} disabled={busy !== null} onClick={() => void go(a)}>
-                {busy === a.to ? 'Saving...' : a.label}
+                {busy === a.to ? 'Saving...' : a.to === 'in_progress' && hasPending ? 'Record phone approval to start' : a.label}
               </Button>
             ))}
             {canCancel(order.status) && (
@@ -418,7 +484,7 @@ function StatusCard({ order, canEdit, hasPending, onOrder, onAskApproval, announ
           </div>
         )}
         {order.status === 'awaiting_approval' && hasPending && (
-          <p className="text-[11px] text-fg2">Waiting for the customer to approve on the tracking page. When everything is answered the repair moves to in progress by itself.</p>
+          <p className="text-[11px] text-fg2">Waiting for the customer to approve on the tracking page (signed in), or record the answer they gave you with Record phone approval. When everything is answered the repair moves to in progress by itself.</p>
         )}
         <ErrorNote errors={error} />
       </section>

@@ -5,6 +5,8 @@ import type { Access, ModuleId, Role } from '@/auth/rbac';
 import { Badge } from '@/components/ui/Badge';
 import type { Tone } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
+import { RotateCcw } from 'lucide-react';
+import { ConfirmDialog } from './inventory/PartForm';
 import { Card, CardHeader } from '@/components/ui/Card';
 import { DataTable } from '@/components/ui/DataTable';
 import type { Column } from '@/components/ui/DataTable';
@@ -36,6 +38,26 @@ export function UsersPage() {
   const [profiles, setProfiles] = useState<ProfileRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Reset to defaults: a role name, 'all', or null when no confirm is open.
+  const [resetRole, setResetRole] = useState<Role | 'all' | null>(null);
+  const [resetBusy, setResetBusy] = useState(false);
+  const [resetError, setResetError] = useState<string | null>(null);
+  const [resetNote, setResetNote] = useState<string | null>(null);
+
+  async function confirmReset() {
+    if (!resetRole) return;
+    setResetBusy(true);
+    setResetError(null);
+    const { error: err } = await supabase.rpc('reset_role_permissions', { p_role: resetRole === 'all' ? null : resetRole });
+    setResetBusy(false);
+    if (err) {
+      setResetError(/reset_role_permissions/.test(err.message) ? 'Apply database migrations 016 and 017 to use this.' : err.message);
+      return;
+    }
+    await reloadPermissions();
+    setResetNote(resetRole === 'all' ? 'All roles are back to their default permissions.' : `${resetRole} is back to its default permissions.`);
+    setResetRole(null);
+  }
   const [savingId, setSavingId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -188,7 +210,20 @@ export function UsersPage() {
               ? 'Access level each role has per module. Changes apply the next time each person loads the app. Manager is always full.'
               : 'Access level each role has per module'
           }
+          action={
+            isManager ? (
+              <Button size="sm" variant="ghost" onClick={() => setResetRole('all')}>
+                <RotateCcw className="h-3.5 w-3.5" aria-hidden />
+                Reset all roles to defaults
+              </Button>
+            ) : undefined
+          }
         />
+        {resetNote && (
+          <p role="status" className="mb-3 rounded-lg border border-ok/30 bg-ok/10 px-3 py-2 text-xs text-ok">
+            {resetNote}
+          </p>
+        )}
         <div className="overflow-x-auto">
           <table className="w-full min-w-[560px] border-collapse text-xs">
             <thead>
@@ -203,6 +238,16 @@ export function UsersPage() {
                     className="px-3 py-2.5 text-left text-[10px] font-medium uppercase tracking-wider text-fg3"
                   >
                     {role}
+                    {isManager && role !== 'Manager' && (
+                      <button
+                        type="button"
+                        onClick={() => setResetRole(role)}
+                        className="mt-1 flex items-center gap-1 text-[10px] font-medium normal-case tracking-normal text-accent hover:underline coarse:min-h-11"
+                      >
+                        <RotateCcw className="h-3 w-3" aria-hidden />
+                        Reset to default
+                      </button>
+                    )}
                   </th>
                 ))}
               </tr>
@@ -244,6 +289,23 @@ export function UsersPage() {
           </table>
         </div>
       </Card>
+      <ConfirmDialog
+        open={resetRole !== null}
+        title={resetRole === 'all' ? 'Reset all roles to defaults?' : `Reset ${resetRole ?? ''} to defaults?`}
+        message={
+          resetRole === 'all'
+            ? 'Every role except Manager goes back to the default access for each module. Your custom changes are lost.'
+            : `${resetRole ?? ''} goes back to the default access for each module. Your custom changes for this role are lost.`
+        }
+        confirmLabel="Reset"
+        busy={resetBusy}
+        error={resetError}
+        onConfirm={() => void confirmReset()}
+        onCancel={() => {
+          setResetRole(null);
+          setResetError(null);
+        }}
+      />
     </div>
   );
 }

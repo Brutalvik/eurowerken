@@ -3,7 +3,7 @@ import { NotificationBell } from '@/notifications/NotificationBell';
 import { useLocation } from 'react-router-dom';
 import { MODULE_LABELS } from '@/auth/rbac';
 import type { ModuleId } from '@/auth/rbac';
-import { extraPage } from '@/config/nav';
+import { HELP_PAGE, extraPage } from '@/config/nav';
 import { useTheme } from '@/theme/ThemeProvider';
 
 /** safeTop: pad for the notch. Off when something above the header (the support session banner) already does. */
@@ -12,7 +12,7 @@ export function Header({ onMenuClick, safeTop = true }: { onMenuClick: () => voi
   const { pathname } = useLocation();
   const segment = pathname.split('/')[1] ?? '';
   const title =
-    segment === 'admin' ? 'Platform admin' : (MODULE_LABELS[segment as ModuleId] ?? extraPage(segment)?.label ?? 'Not found');
+    segment === 'admin' ? 'Platform admin' : segment === HELP_PAGE.path ? HELP_PAGE.label : (MODULE_LABELS[segment as ModuleId] ?? extraPage(segment)?.label ?? 'Not found');
 
   return (
     <header className={`${safeTop ? 'pt-safe ' : ''}relative z-30 shrink-0 border-b border-white/30 bg-surface/70 shadow-[inset_0_-1px_0_rgb(var(--line)/0.6)] backdrop-blur-xl backdrop-saturate-150 dark:border-white/[0.07] dark:bg-surface/60`}>
