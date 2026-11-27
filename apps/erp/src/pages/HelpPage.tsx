@@ -8,6 +8,7 @@ import { sectionText, visibleChapters } from './help/guideContent';
 import type { GuideChapter, GuideSection, GuideShot } from './help/guideContent';
 import { GuideToc } from './help/GuideToc';
 import { Lightbox, SectionBlock } from './help/GuideParts';
+import { LegalFooter } from './legal/LegalPage';
 
 /** Which chapter (and section) an address hash points at: #repair-orders or #repair-orders-approvals. */
 function resolve(hash: string, chapters: GuideChapter[]): { chapter: GuideChapter; section: GuideSection | null } | null {
@@ -269,6 +270,7 @@ export function HelpPage() {
         </div>
       </div>
 
+      <LegalFooter className="pt-2" />
       <Lightbox shot={lightbox} onClose={closeLightbox} />
     </div>
   );

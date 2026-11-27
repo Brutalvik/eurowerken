@@ -3,7 +3,8 @@ import type { FocusEvent, MouseEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { NavLink } from 'react-router-dom';
 import { useNotifications } from '@/notifications/NotificationsContext';
-import { LogOut, PanelLeftClose, PanelLeftOpen, Wrench } from 'lucide-react';
+import { LogOut, Moon, PanelLeftClose, PanelLeftOpen, Sun } from 'lucide-react';
+import { useTheme } from '@/theme/ThemeProvider';
 import { BRAND } from '@/config/brand';
 import { useAuth, useCurrentUser } from '@/auth/AuthContext';
 import { LegalFooter } from '@/pages/legal/LegalPage';
@@ -60,6 +61,7 @@ interface Tip {
 
 export function Sidebar({ open, onNavigate }: SidebarProps) {
   const { signOut, isPlatformAdmin, acting } = useAuth();
+  const { mode, toggle: toggleTheme, highContrast } = useTheme();
   const user = useCurrentUser();
   const { unopened } = useNotifications();
   const [collapsed, toggleCollapsed] = useCollapsed();
@@ -85,20 +87,20 @@ export function Sidebar({ open, onNavigate }: SidebarProps) {
     // Phone (< md): slide-out drawer. Tablet (md to lg): icon rail. Desktop (lg+): full sidebar.
     <aside
       aria-label="Sidebar"
-      className={`glass-strong pt-safe pb-safe pl-safe fixed inset-y-0 left-0 z-40 flex w-72 flex-col rounded-r-3xl text-fg transition-[transform,width] duration-200 md:static md:my-3 md:ml-3 md:w-[72px] md:translate-x-0 md:rounded-3xl ${
-        collapsed ? 'lg:w-[72px]' : 'lg:w-60'
+      className={`glass-strong pt-safe pb-safe pl-safe fixed inset-y-0 left-0 z-40 flex w-72 flex-col rounded-r-3xl text-fg transition-[transform,width] duration-200 md:static md:my-3 md:ml-3 md:w-[76px] md:translate-x-0 md:rounded-3xl ${
+        collapsed ? 'lg:w-[76px]' : 'lg:w-[264px]'
       } ${open ? 'translate-x-0' : '-translate-x-full'}`}
     >
-      <div className={`flex items-center gap-2.5 px-4 pb-4 pt-5 md:max-lg:justify-center md:max-lg:px-0 ${lg('lg:flex-col lg:justify-center lg:px-0')}`}>
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-accent shadow-[inset_0_1px_0_rgb(255_255_255/0.3)]">
-          <Wrench className="h-4 w-4 text-accent-fg" aria-hidden />
+      <div className={`flex items-center gap-3 px-5 pb-4 pt-5 md:max-lg:justify-center md:max-lg:px-0 ${lg('lg:flex-col lg:justify-center lg:px-0')}`}>
+        <span aria-hidden className="shrink-0 select-none font-display text-[30px] font-semibold italic leading-none tracking-[-0.06em] text-accent">
+          €w
         </span>
         <div className={`min-w-0 md:max-lg:hidden ${lg('lg:hidden')}`}>
-          <div className="font-display text-[17px] font-bold leading-none tracking-tight">
+          <div className="font-display text-[19px] font-semibold leading-none tracking-tight text-fg">
             {BRAND.prefix}
-            <span className="text-accent">{BRAND.suffix}</span>
+            <span>{BRAND.suffix}</span>
           </div>
-          <div className="mt-1 text-[11px] text-fg2">{BRAND.product}</div>
+          <div className="mt-1 text-[15px] text-fg2">{BRAND.product}</div>
         </div>
         {/* Desktop: fold the sidebar to icons, or open it again. */}
         <button
@@ -121,16 +123,13 @@ export function Sidebar({ open, onNavigate }: SidebarProps) {
       </div>
 
       {user.workshop && (
-        <div className={`mx-4 border-b border-line/50 pb-3 md:max-lg:hidden ${lg('lg:hidden')}`}>
-          <div className="truncate text-xs font-semibold text-fg" title={user.workshop.name}>
-            {user.workshop.name}
-          </div>
-          <div className="text-[11px] text-fg2">Workshop No. {user.workshop.number}</div>
+        <div className={`mx-5 border-b border-white/15 pb-3 md:max-lg:hidden ${lg('lg:hidden')}`} title={user.workshop.name}>
+          <div className="text-[15px] text-fg2">Workshop No. {user.workshop.number}</div>
           {acting && <div className="mt-0.5 text-[10px] font-semibold text-warn">(support session)</div>}
         </div>
       )}
 
-      <nav aria-label="Main" className="no-scrollbar flex-1 space-y-1 overflow-y-auto px-3 py-3">
+      <nav aria-label="Main" className="no-scrollbar flex-1 space-y-0.5 overflow-y-auto px-3 py-2.5">
         {items.map((item) => {
           const Icon = item.icon;
           return (
@@ -147,13 +146,13 @@ export function Sidebar({ open, onNavigate }: SidebarProps) {
               onBlur={hideTip}
               aria-label={rail ? item.label : undefined}
               className={({ isActive }) =>
-                `flex items-center gap-3 rounded-xl px-3 py-2 text-[13px] transition coarse:min-h-11 md:max-lg:justify-center md:max-lg:px-0 ${lg('lg:justify-center lg:px-0')} ${
+                `flex min-h-[38px] items-center gap-3.5 rounded-xl px-3.5 py-1.5 text-[15px] transition coarse:min-h-11 md:max-lg:justify-center md:max-lg:px-0 ${lg('lg:justify-center lg:px-0')} ${
                   isActive ? 'glass-active font-semibold' : 'text-fg2 hover:bg-fg/[0.06] hover:text-fg'
                 }`
               }
             >
               <span className="relative">
-                <Icon className="h-4 w-4 shrink-0" aria-hidden />
+                <Icon className="h-5 w-5 shrink-0" strokeWidth={1.6} aria-hidden />
                 {item.key === 'appointments' && unopened > 0 && (
                   // Tablet rail: a small dot on the icon (the full count shows beside the label elsewhere).
                   <span className={`absolute -right-1 -top-1 hidden h-2 w-2 rounded-full bg-bad md:max-lg:block ${lg('lg:block')}`} aria-hidden />
@@ -173,23 +172,39 @@ export function Sidebar({ open, onNavigate }: SidebarProps) {
         })}
       </nav>
 
-      <div className={`glass-field mx-3 mb-2 flex items-center gap-2.5 rounded-2xl px-3 py-2.5 md:max-lg:mx-2 md:max-lg:flex-col md:max-lg:px-1 ${lg('lg:mx-2 lg:flex-col lg:px-1')}`}>
+      <div className={`glass mx-3 mb-3 flex items-center gap-3 rounded-2xl px-3 py-3 md:max-lg:mx-2 md:max-lg:flex-col md:max-lg:px-1 ${lg('lg:mx-2 lg:flex-col lg:px-1')}`}>
         {user.avatarUrl ? (
           <img
             src={user.avatarUrl}
             alt=""
             referrerPolicy="no-referrer"
-            className="h-9 w-9 shrink-0 rounded-full object-cover ring-1 ring-line/60"
+            className="h-10 w-10 shrink-0 rounded-full object-cover ring-1 ring-white/30"
           />
         ) : (
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent/25 text-[11px] font-bold text-fg">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent/30 text-[13px] font-bold text-fg ring-1 ring-white/30">
             {user.initials}
           </span>
         )}
         <div className={`min-w-0 flex-1 md:max-lg:hidden ${lg('lg:hidden')}`}>
-          <div className="truncate text-[13px] font-semibold">{user.name}</div>
-          <div className="truncate text-[11px] text-fg2">{user.role ?? (isPlatformAdmin ? 'Platform admin' : user.suspended ? 'Workshop suspended' : 'Awaiting approval')}</div>
+          <div className="truncate text-[15px] font-semibold">{user.name}</div>
+          <div className="truncate text-sm text-fg2">{user.role ?? (isPlatformAdmin ? 'Platform admin' : user.suspended ? 'Workshop suspended' : 'Awaiting approval')}</div>
         </div>
+        <div className={`flex shrink-0 flex-col items-center gap-0.5 md:max-lg:flex-row ${lg('lg:flex-row')}`}>
+        {!highContrast && (
+          <button
+            type="button"
+            onClick={toggleTheme}
+            aria-label={mode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+            onMouseEnter={showTip(mode === 'dark' ? 'Light mode' : 'Dark mode')}
+            onMouseLeave={hideTip}
+            onFocus={showTip(mode === 'dark' ? 'Light mode' : 'Dark mode')}
+            onBlur={hideTip}
+            title={rail ? undefined : mode === 'dark' ? 'Light mode' : 'Dark mode'}
+            className="rounded-lg p-1 text-fg3 transition hover:bg-fg/10 hover:text-fg coarse:p-2.5"
+          >
+            {mode === 'dark' ? <Sun className="h-4 w-4" aria-hidden /> : <Moon className="h-4 w-4" aria-hidden />}
+          </button>
+        )}
         <button
           type="button"
           onClick={() => void signOut()}
@@ -199,12 +214,14 @@ export function Sidebar({ open, onNavigate }: SidebarProps) {
           onFocus={showTip('Sign out')}
           onBlur={hideTip}
           title={rail ? undefined : 'Sign out'}
-          className={`rounded-lg p-1.5 text-fg3 transition hover:bg-fg/10 hover:text-fg coarse:p-2.5 md:max-lg:mx-auto ${collapsed ? 'lg:mx-auto' : 'lg:ml-auto'}`}
+          className="rounded-lg p-1 text-fg3 transition hover:bg-fg/10 hover:text-fg coarse:p-2.5"
         >
           <LogOut className="h-4 w-4" aria-hidden />
         </button>
+        </div>
       </div>
-      <LegalFooter className={`px-4 pb-3 md:max-lg:hidden ${lg('lg:hidden')}`} />
+      {/* Short screens: the legal links move to the bottom of Help, so every page fits. */}
+      <LegalFooter className={`px-4 pb-3 md:max-lg:hidden [@media(max-height:860px)]:hidden ${lg('lg:hidden')}`} />
       {rail &&
         tip &&
         createPortal(

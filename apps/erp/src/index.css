@@ -27,7 +27,8 @@
   --violet: 124 58 237;
   --sidebar: 10 22 40;
 
-  /* Glass */
+  /* Glass: a tint colour laid over the canvas at --glass-alpha. */
+  --glass-tint: 235 238 242;
   --glass-alpha: 0.55;
   --glass-strong-alpha: 0.78;
   --glass-rim: 255 255 255;
@@ -50,30 +51,37 @@
 
 .dark {
   color-scheme: dark;
-  /* Midnight slate. Contrast on .glass over the canvas: fg 14.1:1, fg2 8.6:1, fg3 5.8:1 (4.8:1 on .glass-strong). */
-  --bg: 11 17 29;
-  --surface: 64 80 108;
-  --surface2: 74 91 121;
-  --line: 86 104 136;
-  --fg: 238 242 250;
-  --fg2: 178 192 214;
-  --fg3: 140 157 185;
-  --accent: 96 150 255;
-  --ok: 74 213 154;
-  --warn: 245 192 66;
-  --bad: 248 119 119;
-  --violet: 167 139 250;
-  --sidebar: 16 24 38;
+  /*
+   * Sampled from the owner's mockup: a navy-to-steel-blue canvas (11,18,30 at the left to 58,86,113 at the right)
+   * under milky white glass (about 14% white), bright rims (147,173,196), a frosted white selected item.
+   */
+  --bg: 14 24 38;
+  --surface: 46 58 74;
+  --surface2: 60 74 92;
+  --line: 128 148 172;
+  --fg: 246 248 252;
+  --fg2: 208 217 230;
+  --fg3: 170 184 204;
+  --accent: 99 142 246;
+  --ok: 96 222 160;
+  --warn: 250 204 92;
+  --bad: 255 138 138;
+  --violet: 186 166 255;
+  --sidebar: 30 40 54;
 
-  --glass-alpha: 0.28;
-  --glass-strong-alpha: 0.5;
-  --glass-rim-alpha: 0.13;
-  --glass-shadow: inset 0 1px 0 rgb(255 255 255 / 0.16), 0 1px 2px rgb(0 0 0 / 0.2);
+  --glass-tint: 255 255 255;
+  --glass-alpha: 0.13;
+  --glass-strong-alpha: 0.15;
+  --glass-rim: 255 255 255;
+  --glass-rim-alpha: 0.24;
+  --glass-shadow: inset 0 1px 0 rgb(255 255 255 / 0.32), inset 0 0 0 1px rgb(255 255 255 / 0.03), 0 8px 24px -16px rgb(0 0 0 / 0.45);
+  --glass-filter: blur(24px) saturate(140%);
 
-  --mesh-1: 56 108 196;
-  --mesh-1-alpha: 0.34;
-  --mesh-2: 82 110 150;
-  --mesh-2-alpha: 0.26;
+  --canvas: linear-gradient(115deg, rgb(11 18 30) 0%, rgb(15 27 44) 30%, rgb(27 48 72) 58%, rgb(48 76 104) 82%, rgb(60 88 115) 100%);
+  --mesh-1: 120 160 200;
+  --mesh-1-alpha: 0.22;
+  --mesh-2: 70 110 140;
+  --mesh-2-alpha: 0.3;
 }
 
 /* High contrast: solid surfaces, bright 2px outlines. On --surface: fg 18.1:1, fg2 14.3:1, fg3 11.5:1, accent 8.2:1,
@@ -95,6 +103,7 @@
   --violet: 200 180 255;
   --sidebar: 17 22 34;
 
+  --glass-tint: 17 22 34;
   --glass-alpha: 1;
   --glass-strong-alpha: 1;
   --glass-rim: 176 190 214;
@@ -103,6 +112,7 @@
   --glass-shadow: none;
   --glass-filter: none;
 
+  --canvas: none;
   --mesh-1-alpha: 0;
   --mesh-2-alpha: 0;
   --focus-ring: 3px;
@@ -120,9 +130,9 @@ body {
   /* Figures line up in columns: money, counts, dates, VINs, totals. */
   font-variant-numeric: tabular-nums;
   background-image:
-    radial-gradient(70rem 46rem at 105% -15%, rgb(var(--mesh-1) / var(--mesh-1-alpha)), transparent 62%),
-    radial-gradient(56rem 40rem at -10% 110%, rgb(var(--mesh-2) / var(--mesh-2-alpha)), transparent 62%),
-    radial-gradient(40rem 30rem at 45% 55%, rgb(var(--mesh-1) / calc(var(--mesh-1-alpha) * 0.35)), transparent 70%);
+    radial-gradient(60rem 44rem at 100% 40%, rgb(var(--mesh-1) / var(--mesh-1-alpha)), transparent 65%),
+    radial-gradient(50rem 30rem at 55% 110%, rgb(var(--mesh-2) / var(--mesh-2-alpha)), transparent 65%),
+    var(--canvas, none);
   background-attachment: fixed;
 }
 
@@ -159,16 +169,20 @@ body {
     backdrop-filter: var(--glass-filter);
   }
   .glass {
-    background-color: rgb(var(--surface) / var(--glass-alpha));
+    background-color: rgb(var(--glass-tint, var(--surface)) / var(--glass-alpha));
   }
   .glass-strong {
-    background-color: rgb(var(--surface) / var(--glass-strong-alpha));
+    background-color: rgb(var(--glass-tint, var(--surface)) / var(--glass-strong-alpha));
   }
 
   /* A field or control on glass: a quieter inset well. */
   .glass-field {
     border: 1px solid rgb(var(--line) / 0.7);
     background-color: rgb(var(--bg) / 0.35);
+  }
+  .dark .glass-field {
+    border-color: rgb(255 255 255 / 0.16);
+    background-color: rgb(255 255 255 / 0.07);
   }
   [data-contrast='high'] .glass-field {
     border-width: 2px;
@@ -181,6 +195,12 @@ body {
     background-color: rgb(var(--accent) / 0.16);
     box-shadow: inset 0 0 0 1px rgb(var(--accent) / 0.38), inset 0 1px 0 rgb(255 255 255 / 0.12), 0 0 18px -6px rgb(var(--accent) / 0.55);
     color: rgb(var(--fg));
+  }
+  /* Dark (the mockup): a frosted white pill with a soft white glow. */
+  .dark .glass-active {
+    background-color: rgb(255 255 255 / 0.26);
+    box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.5), inset 0 1px 0 rgb(255 255 255 / 0.4), 0 0 16px -2px rgb(200 220 255 / 0.45);
+    color: rgb(255 255 255);
   }
   [data-contrast='high'] .glass-active {
     background-color: rgb(var(--accent));

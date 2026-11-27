@@ -103,14 +103,14 @@ export function DataTable<T>({
 
       {/* Wider screens: the table. */}
       <div className={tableClass}>
-        <table className="w-full min-w-[640px] border-collapse text-xs">
+        <table className="w-full min-w-[640px] border-collapse text-[13px]">
           <thead>
-            <tr className="border-b border-line bg-surface2/50">
+            <tr className="border-b border-line/40 bg-fg/[0.07]">
               {columns.map((col) => (
                 <th
                   key={col.header}
                   scope="col"
-                  className="px-4 py-3 text-left text-[10px] font-medium uppercase tracking-wider text-fg3"
+                  className="px-4 py-2.5 text-left text-[13px] font-medium text-fg2"
                 >
                   {col.header}
                 </th>
@@ -129,10 +129,10 @@ export function DataTable<T>({
                 <tr
                   key={getKey(row)}
                   onClick={onRowClick ? () => onRowClick(row) : undefined}
-                  className={`border-b border-line last:border-b-0 ${clickable}`}
+                  className={`border-b border-line/30 last:border-b-0 ${clickable}`}
                 >
                   {columns.map((col) => (
-                    <td key={col.header} className={`px-4 py-3 ${col.className ?? 'text-fg2'}`}>
+                    <td key={col.header} className={`px-4 py-3 ${col.className ?? 'text-fg'}`}>
                       {col.cell(row)}
                     </td>
                   ))}

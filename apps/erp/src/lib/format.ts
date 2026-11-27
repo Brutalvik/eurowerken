@@ -19,6 +19,11 @@ export function formatCurrencyWhole(value: number): string {
   return currencyWhole.format(value);
 }
 
+/** Axis labels without a currency sign: 850, 1.2k, 15k, 1.4M. */
+export function formatCompactNumber(value: number): string {
+  return formatCompactCurrency(value).replace('$', '');
+}
+
 /** Axis labels: $850, $1.2k, $15k, $1.4M (not "$0k" on every line when amounts are small). */
 export function formatCompactCurrency(value: number): string {
   const v = Math.abs(value);

@@ -39,7 +39,7 @@ export function NotificationBell() {
         aria-expanded={open}
         aria-haspopup="true"
         onClick={() => setOpen((o) => !o)}
-        className="glass relative flex h-11 w-11 items-center justify-center rounded-2xl text-fg2 transition hover:text-fg"
+        className="glass relative flex h-12 w-12 items-center justify-center rounded-2xl text-fg transition hover:brightness-125"
       >
         <Bell className="h-5 w-5" aria-hidden />
         {unread > 0 && (

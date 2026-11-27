@@ -700,7 +700,7 @@ export const GUIDE: GuideChapter[] = [
           },
           {
             title: 'What the PDF leaves out',
-            body: 'The PDF is the record of the work: each repair with its work, approvals and the timeline the customer can see. It leaves out photos and conversations, and everything marked Team only: staff notes, team-only timeline entries and the notes on phone approvals.',
+            body: 'The PDF is the record of the work: each repair with its work lines, prices and taxes. It leaves out approvals, the timeline, photos, conversations and staff notes; those stay in the app.',
             callout: { kind: 'note', text: 'Photos and messages stay on the screen version of the history and on each repair order.' },
           },
         ],

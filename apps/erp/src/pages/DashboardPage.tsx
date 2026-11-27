@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { AlertTriangle, ClipboardList, DollarSign, Hourglass } from 'lucide-react';
+import { AlertTriangle, ClipboardList, Clock, DollarSign } from 'lucide-react';
 import { Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import type { PartRow } from '@eurowerken/shared';
 import { useAuth } from '@/auth/AuthContext';
@@ -15,7 +15,7 @@ import { Card, CardHeader } from '@/components/ui/Card';
 import { DataTable } from '@/components/ui/DataTable';
 import type { Column } from '@/components/ui/DataTable';
 import { KpiCard } from '@/components/ui/KpiCard';
-import { formatCompactCurrency, formatCurrency, formatCurrencyWhole } from '@/lib/format';
+import { formatCompactNumber, formatCurrency, formatCurrencyWhole } from '@/lib/format';
 import { chartPalette } from '@/theme/chartPalette';
 import { useTheme } from '@/theme/ThemeProvider';
 import { TodayAppointmentsCard } from './appointments/TodayAppointmentsCard';
@@ -39,7 +39,7 @@ const orderColumns: Column<DashOrder>[] = [
 ];
 
 function Empty({ children }: { children: React.ReactNode }) {
-  return <p className="flex h-full min-h-24 items-center justify-center rounded-lg border border-dashed border-line px-4 py-6 text-center text-xs text-fg3">{children}</p>;
+  return <p className="flex h-full min-h-24 items-center justify-center px-4 py-6 text-center text-[15px] text-fg2">{children}</p>;
 }
 
 export function DashboardPage() {
@@ -103,6 +103,8 @@ export function DashboardPage() {
 
   const stockAlerts = parts.status === 'ready' ? parts.data.filter((p) => p.stock < p.min_stock) : [];
   const sliceColors = [palette.accent, palette.ok, palette.warn, palette.bad];
+  // The mockup's ring is frosted white; further slices step down in brightness (solid colours in high contrast).
+  const ringColors = highContrast || mode !== 'dark' ? sliceColors : ['rgba(225,235,250,0.62)', 'rgba(99,142,246,0.85)', 'rgba(250,204,92,0.75)', 'rgba(255,138,138,0.75)'];
   const tooltipStyle = {
     background: palette.tooltipBg,
     border: `1px solid ${palette.tooltipBorder}`,
@@ -118,15 +120,15 @@ export function DashboardPage() {
         {seeOrders && (
           <KpiCard
             icon={DollarSign}
-            label="Completed work (this month)"
+            label="Completed work (this month):"
             value={dash(orders) ?? formatCurrencyWhole(stats.thisMonth)}
-            caption={stats.change !== undefined ? 'vs last month' : 'approved work, before tax'}
+            caption={stats.change !== undefined ? 'vs last month' : undefined}
             change={stats.change}
           />
         )}
-        {seeOrders && <KpiCard icon={ClipboardList} label="Open repair orders" value={dash(orders) ?? String(stats.open)} caption="not completed or cancelled" />}
-        {seeParts && <KpiCard icon={AlertTriangle} label="Stock alerts" value={dash(parts) ?? String(stockAlerts.length)} caption="parts below minimum" />}
-        {seeOrders && <KpiCard icon={Hourglass} label="Awaiting approval" value={dash(orders) ?? String(stats.awaiting.length)} caption="waiting for the customer" />}
+        {seeOrders && <KpiCard icon={ClipboardList} label="Open repair orders:" value={dash(orders) ?? String(stats.open)} />}
+        {seeParts && <KpiCard icon={AlertTriangle} label="Stock alerts:" value={dash(parts) ?? String(stockAlerts.length)} />}
+        {seeOrders && <KpiCard icon={Clock} label="Awaiting approval:" value={dash(orders) ?? String(stats.awaiting.length)} />}
       </div>
 
       {orders.status === 'error' && <p role="alert" className="text-sm text-bad">Could not load repair orders: {orders.message}</p>}
@@ -136,13 +138,9 @@ export function DashboardPage() {
       {seeOrders && (
         <div className="grid gap-4 xl:grid-cols-[1fr_300px]">
           <Card className="p-4 sm:p-5">
-            <CardHeader
-              title="Completed work"
-              subtitle="Approved items of completed repair orders, before tax"
-              action={<span className="text-xs font-medium text-fg2">6-month</span>}
-            />
+            <CardHeader title="Completed work" action={<span className="text-[15px] text-fg2">6-month</span>} />
             {stats.hasSeries ? (
-              <div className="h-52" role="img" aria-label="Bar chart of completed work per month for the last six months">
+              <div className="h-56" role="img" aria-label="Bar chart of completed work per month for the last six months, approved items of completed repair orders, before tax">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={stats.series} margin={{ top: 5, right: 8, left: -12, bottom: 0 }}>
                     <defs>
@@ -152,18 +150,19 @@ export function DashboardPage() {
                         <stop offset="100%" stopColor={palette.barBottom} stopOpacity={highContrast ? 1 : 0.9} />
                       </linearGradient>
                     </defs>
-                    <CartesianGrid stroke={palette.grid} strokeDasharray="3 3" vertical={false} />
-                    <XAxis dataKey="month" tick={{ fill: palette.axis, fontSize: 11 }} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fill: palette.axis, fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(v: number) => formatCompactCurrency(v)} />
+                    <CartesianGrid stroke={palette.grid} vertical={false} />
+                    <XAxis dataKey="month" tick={{ fill: palette.axis, fontSize: 13 }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fill: palette.axis, fontSize: 12 }} axisLine={false} tickLine={false} tickFormatter={(v: number) => formatCompactNumber(v)} />
                     <Tooltip contentStyle={tooltipStyle} cursor={{ fill: palette.grid }} formatter={(v) => formatCurrencyWhole(Number(v))} />
-                    <Bar dataKey="value" name="Completed work" radius={[8, 8, 0, 0]} maxBarSize={52}>
+                    <Bar dataKey="value" name="Completed work" radius={[8, 8, 4, 4]} maxBarSize={58}>
                       {stats.series.map((_, i) => (
                         <Cell
                           key={i}
                           fill={i === stats.series.length - 1 ? 'url(#dash-bar-current)' : palette.barMuted}
-                          fillOpacity={i === stats.series.length - 1 || highContrast ? 1 : 0.45}
-                          stroke={highContrast ? palette.axis : 'rgba(255,255,255,0.18)'}
+                          fillOpacity={i === stats.series.length - 1 || highContrast ? 1 : mode === 'dark' ? 0.24 : 0.5}
+                          stroke={highContrast ? palette.axis : i === stats.series.length - 1 ? 'rgba(160,190,255,0.7)' : 'rgba(255,255,255,0.45)'}
                           strokeWidth={highContrast ? 2 : 1}
+                          style={i === stats.series.length - 1 && !highContrast ? { filter: 'drop-shadow(0 0 10px rgba(99,142,246,0.55))' } : undefined}
                         />
                       ))}
                     </Bar>
@@ -176,7 +175,7 @@ export function DashboardPage() {
           </Card>
 
           <Card className="p-4 sm:p-5">
-            <CardHeader title="Work mix" subtitle="Completed work by item type" />
+            <CardHeader title="Work mix" />
             {stats.mix.length > 0 ? (
               <>
                 <div className="relative h-44" role="img" aria-label="Donut chart of completed work by item type">
@@ -185,15 +184,16 @@ export function DashboardPage() {
                       <Pie
                         data={stats.mix}
                         dataKey="value"
-                        innerRadius={56}
-                        outerRadius={78}
+                        innerRadius={58}
+                        outerRadius={80}
                         paddingAngle={stats.mix.length > 1 ? 3 : 0}
-                        stroke={highContrast ? palette.axis : 'rgba(255,255,255,0.22)'}
-                        strokeWidth={highContrast ? 2 : 1}
+                        stroke={highContrast ? palette.axis : 'rgba(255,255,255,0.7)'}
+                        strokeWidth={highContrast ? 2 : 1.5}
                         cornerRadius={stats.mix.length > 1 ? 6 : 0}
+                        style={highContrast ? undefined : { filter: 'drop-shadow(0 0 12px rgba(200,220,255,0.5))' }}
                       >
                         {stats.mix.map((slice, i) => (
-                          <Cell key={slice.name} fill={sliceColors[i % sliceColors.length]} />
+                          <Cell key={slice.name} fill={ringColors[i % ringColors.length]} />
                         ))}
                       </Pie>
                       <Tooltip contentStyle={tooltipStyle} formatter={(v) => formatCurrencyWhole(Number(v))} />
@@ -201,21 +201,23 @@ export function DashboardPage() {
                   </ResponsiveContainer>
                   {/* The largest share, in the middle of the ring. */}
                   <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center" aria-hidden>
-                    <span className="font-display text-2xl font-semibold tracking-tight text-fg">{stats.mix[0].pct}%</span>
-                    <span className="text-xs text-fg2">{stats.mix[0].name}</span>
+                    <span className="font-display text-[30px] font-semibold leading-none tracking-tight text-fg">{stats.mix[0].pct}%</span>
+                    <span className="mt-1 text-[15px] text-fg2">{stats.mix[0].name}</span>
                   </div>
                 </div>
+                {stats.mix.length > 1 && (
                 <ul className="mt-3 space-y-2">
                   {stats.mix.map((slice, i) => (
                     <li key={slice.name} className="flex items-center justify-between text-xs">
                       <span className="flex items-center gap-2 text-fg2">
-                        <span className="h-2 w-2 rounded-sm" style={{ background: sliceColors[i % sliceColors.length] }} />
+                        <span className="h-2 w-2 rounded-sm" style={{ background: ringColors[i % ringColors.length] }} />
                         {slice.name}
                       </span>
                       <span className="font-semibold text-fg">{slice.pct}%</span>
                     </li>
                   ))}
                 </ul>
+                )}
               </>
             ) : (
               <div className="h-44"><Empty>Shows once repair orders are completed.</Empty></div>

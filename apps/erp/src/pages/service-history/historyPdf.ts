@@ -1,9 +1,9 @@
 /**
  * The service history as a PDF (jsPDF, loaded on demand so it stays out of the main bundle).
  *
- * The PDF may be handed to the customer, so it leaves out everything the team keeps to itself: team-only
- * timeline entries, staff notes and the notes on phone approvals. It also leaves out photos and conversations:
- * the record is the work, the approvals and the timeline. The shop's document logo (Settings, Documents) heads it.
+ * The PDF may be handed to the customer: it holds the work done on each visit (lines, prices, taxes, notes for the
+ * customer). Staff notes, approvals, the timeline, photos and conversations stay in the app.
+ * The shop's document logo (Settings, Documents) heads it.
  *
  * buildHistoryPdf lays the whole document out first (so the caller can read the page count and warn about a
  * very long one), then a second pass writes "Page X of Y" and a running header on every page.
@@ -370,29 +370,7 @@ function repairSection(w: Writer, r: HistoryRepair, tz: string, taxes: TaxCompon
     itemsTable(w, r, taxes);
   }
 
-  if (r.approvals.length > 0) {
-    w.heading('Approvals');
-    for (const a of r.approvals) {
-      const how = a.method === 'phone' ? 'by phone' : 'online';
-      const who = a.method === 'online' && a.customer_email ? `, ${a.customer_email}` : '';
-      // Phone approvals carry a staff note: left out of the PDF.
-      w.text(`${a.decision === 'approved' ? 'Approved' : 'Declined'} ${how}: ${a.item_description} (${formatDateTime(a.decided_at, tz)}${who})`, {
-        size: 8.5,
-        after: 1.5,
-      });
-    }
-  }
-
-  const events = r.events.filter((e) => e.visible_to_customer);
-  if (events.length > 0) {
-    w.heading('Timeline');
-    for (const e of events) {
-      w.ensure(26);
-      w.text(`${formatDateTime(e.created_at, tz)}  ${e.title}`, { size: 8.5, bold: true });
-      if (e.body) w.text(e.body, { size: 8.5, x: MARGIN + 10, color: MUTED });
-      w.gap(2);
-    }
-  }
+  // Approvals and the timeline stay in the app; the printed history is the work itself.
 
   w.gap(14);
 }
@@ -418,7 +396,7 @@ function decorate(doc: jsPDF, history: ServiceHistory, summary: HistorySummary) 
   }
 }
 
-/** Lays out the whole history: the work, approvals and timeline of each repair (no photos or conversations). */
+/** Lays out the whole history: the work of each repair (no approvals, timeline, photos or conversations). */
 export async function buildHistoryPdf(
   history: ServiceHistory,
   summary: HistorySummary,

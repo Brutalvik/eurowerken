@@ -14,8 +14,8 @@ export function CardHeader({ title, subtitle, action }: CardHeaderProps) {
   return (
     <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
       <div>
-        <h2 className="font-display text-[15px] font-semibold tracking-tight text-fg">{title}</h2>
-        {subtitle && <p className="mt-0.5 text-xs text-fg2">{subtitle}</p>}
+        <h2 className="font-display text-lg font-semibold tracking-tight text-fg">{title}</h2>
+        {subtitle && <p className="mt-0.5 text-[13px] text-fg2">{subtitle}</p>}
       </div>
       {action}
     </div>
