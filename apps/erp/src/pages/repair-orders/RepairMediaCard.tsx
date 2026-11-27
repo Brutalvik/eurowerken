@@ -97,7 +97,7 @@ export function MediaCard({ order, media, canEdit, onMedia, announce }: MediaCar
           action={
             canEdit ? (
               <label
-                className={`inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-accent px-3.5 py-2 text-xs font-semibold text-white transition focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent hover:opacity-90 coarse:min-h-11 ${progress ? 'pointer-events-none opacity-50' : ''}`}
+                className={`inline-flex cursor-pointer items-center gap-1.5 rounded-lg bg-accent px-3.5 py-2 text-xs font-semibold text-accent-fg transition focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent hover:opacity-90 coarse:min-h-11 ${progress ? 'pointer-events-none opacity-50' : ''}`}
               >
                 <Upload className="h-3.5 w-3.5" aria-hidden />
                 Upload
@@ -168,7 +168,7 @@ function MediaTile({
   const label = media.caption || (media.kind === 'video' ? 'Repair video' : 'Repair photo');
 
   return (
-    <li className="min-w-0 overflow-hidden rounded-lg border border-line bg-surface2/40">
+    <li className="min-w-0 overflow-hidden rounded-xl glass-field">
       <div className="aspect-video bg-sidebar/80">
         {media.kind === 'video' ? (
           <video src={url} controls playsInline preload="metadata" className="h-full w-full object-contain" aria-label={label} />
@@ -191,7 +191,7 @@ function MediaTile({
               onKeyDown={(e) => {
                 if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
               }}
-              className="w-full rounded-lg border border-line bg-surface2 px-2.5 py-1.5 text-xs text-fg outline-none placeholder:text-fg3 focus:border-accent coarse:min-h-11"
+              className="w-full rounded-xl glass-field px-2.5 py-1.5 text-xs text-fg outline-none placeholder:text-fg3 focus:border-accent coarse:min-h-11"
             />
             <div className="flex items-center justify-between gap-2">
               <label htmlFor={`${id}-vis`} className="flex min-w-0 items-center gap-2 text-[11px] text-fg2 coarse:min-h-11">

@@ -107,7 +107,7 @@ export function InspectionTemplatesCard() {
             {(list ?? []).map((t) => {
               const sections = new Set(t.items.map((i) => i.section)).size;
               return (
-                <li key={t.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-line bg-surface2/40 p-3">
+                <li key={t.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl glass-field p-3">
                   <div className="min-w-0">
                     <p className="flex flex-wrap items-center gap-2 text-sm font-semibold text-fg">
                       <span className="break-words">{t.name}</span>

@@ -52,12 +52,12 @@ function Choice({
   return (
     <label
       className={`relative flex cursor-pointer rounded-lg border p-3 transition focus-within:ring-2 focus-within:ring-accent/50 ${
-        checked ? 'border-accent bg-accent/5' : 'border-line bg-surface2 hover:border-fg3'
+        checked ? 'border-accent bg-accent/5' : 'glass-field hover:border-fg3'
       } ${className}`}
     >
       <input type="radio" name={name} checked={checked} onChange={onChange} className="sr-only" />
       {checked && (
-        <span className="absolute right-2 top-2 rounded-full bg-accent p-0.5 text-white" aria-hidden>
+        <span className="absolute right-2 top-2 rounded-full bg-accent p-0.5 text-accent-fg" aria-hidden>
           <Check className="h-3 w-3" />
         </span>
       )}
@@ -79,7 +79,7 @@ export function WelcomeStep() {
         <h3 className="mb-2 text-xs font-semibold text-fg">Always included</h3>
         <ul className="grid gap-2 sm:grid-cols-2">
           {SITE_FIXED_FEATURES.map((f) => (
-            <li key={f.label} className="flex items-start gap-3 rounded-lg border border-line bg-surface2 p-3">
+            <li key={f.label} className="flex items-start gap-3 rounded-xl glass-field p-3">
               <Lock className="mt-0.5 h-4 w-4 shrink-0 text-fg3" aria-hidden />
               <span>
                 <span className="block text-xs font-semibold text-fg">
@@ -111,7 +111,7 @@ export function AddressStep({ draft, update }: StepProps) {
   return (
     <div className="grid gap-4">
       <Labeled id="setup-slug" label="Web address" hint={`Your website: ${siteHost}/${draft.slug || '...'}`}>
-        <div className="flex items-stretch overflow-hidden rounded-lg border border-line bg-surface2 focus-within:border-accent">
+        <div className="flex items-stretch overflow-hidden rounded-xl glass-field focus-within:border-accent">
           <span className="hidden items-center border-r border-line px-3 text-xs text-fg3 sm:flex">{siteHost}/</span>
           <input
             id="setup-slug"
@@ -272,7 +272,7 @@ export function StyleStep({ draft, update }: StepProps) {
               type="color"
               value={isHex(draft.accent_color) ? draft.accent_color : '#1d6ff0'}
               onChange={(e) => setAccent(e.target.value)}
-              className="h-9 w-12 shrink-0 cursor-pointer rounded-lg border border-line bg-surface2 p-1 coarse:h-11"
+              className="h-9 w-12 shrink-0 cursor-pointer rounded-xl glass-field p-1 coarse:h-11"
             />
             <input
               aria-label="Brand colour as hex"
@@ -356,7 +356,7 @@ export function StyleStep({ draft, update }: StepProps) {
 
 function NavIllustration({ style }: { style: NavStyle }) {
   return (
-    <div aria-hidden className="relative h-28 w-full overflow-hidden rounded-md border border-line bg-surface">
+    <div aria-hidden className="relative h-28 w-full overflow-hidden rounded-xl glass-field">
       {style === 'tabbar' ? (
         <>
           <div className="absolute left-1/2 top-2 h-4 w-24 -translate-x-1/2 rounded-full border border-white/40 bg-fg3/20 backdrop-blur" />
@@ -447,7 +447,7 @@ export function HomeStep({ draft, update }: StepProps) {
         Turn sections on or off and put them in order. {live} of {list.length} sections are on.
       </p>
       <ol className="space-y-2">
-        <li className="flex items-center gap-3 rounded-lg border border-line bg-surface2 p-3">
+        <li className="flex items-center gap-3 rounded-xl glass-field p-3">
           <Lock className="h-4 w-4 shrink-0 text-fg3" aria-hidden />
           <span className="min-w-0 flex-1">
             <span className="block text-xs font-semibold text-fg">Hero</span>
@@ -538,7 +538,7 @@ function ImageField({ id, label, hint, url, busy, wide = false, onFile, onRemove
       </p>
       <div className="flex flex-wrap items-center gap-3">
         <div
-          className={`flex shrink-0 items-center justify-center overflow-hidden rounded-lg border border-line bg-surface2 ${wide ? 'h-20 w-36' : 'h-16 w-16'}`}
+          className={`flex shrink-0 items-center justify-center overflow-hidden rounded-xl glass-field ${wide ? 'h-20 w-36' : 'h-16 w-16'}`}
         >
           {url ? (
             <img src={url} alt={`Current ${label.toLowerCase()}`} className={`h-full w-full ${wide ? 'object-cover' : 'object-contain'}`} />
@@ -741,7 +741,7 @@ export function ReviewStep({ draft, onEdit }: { draft: SiteDraft; onEdit: (s: St
     draft.own_website_url && 'Own website',
   ].filter(Boolean);
   return (
-    <dl className="rounded-lg border border-line bg-surface2 px-3">
+    <dl className="rounded-xl glass-field px-3">
       <Row label="Web address" step="address" onEdit={onEdit} value={`${siteHost}/${draft.slug}`} />
       <Row label="Name" step="address" onEdit={onEdit} value={v(draft.display_name)} />
       <Row label="Tagline" step="address" onEdit={onEdit} value={v(draft.tagline)} />

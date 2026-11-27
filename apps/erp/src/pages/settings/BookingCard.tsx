@@ -89,7 +89,7 @@ export function BookingCard() {
   return (
     <div className="max-w-3xl space-y-4">
       {!canEdit && (
-        <p className="rounded-lg border border-line bg-surface2/60 px-3 py-2 text-xs text-fg2">
+        <p className="rounded-xl glass-field px-3 py-2 text-xs text-fg2">
           You can view these settings. Changing them needs full Settings access.
         </p>
       )}

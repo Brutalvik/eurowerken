@@ -3,40 +3,11 @@ import type { FocusEvent, MouseEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { NavLink } from 'react-router-dom';
 import { useNotifications } from '@/notifications/NotificationsContext';
-import {
-  BadgeDollarSign,
-  BarChart3,
-  Boxes,
-  Contact,
-  FileText,
-  LayoutDashboard,
-  LogOut,
-  PanelLeftClose,
-  PanelLeftOpen,
-  Settings,
-  ShieldAlert,
-  ShieldCheck,
-  Wrench,
-} from 'lucide-react';
-import type { LucideIcon } from 'lucide-react';
+import { LogOut, PanelLeftClose, PanelLeftOpen, Wrench } from 'lucide-react';
 import { BRAND } from '@/config/brand';
 import { useAuth, useCurrentUser } from '@/auth/AuthContext';
 import { LegalFooter } from '@/pages/legal/LegalPage';
-import { MODULE_LABELS, MODULE_ORDER } from '@/auth/rbac';
-import type { ModuleId } from '@/auth/rbac';
-import { EXTRA_PAGES, HELP_PAGE } from '@/config/nav';
-
-const NAV_ICONS: Record<ModuleId, LucideIcon> = {
-  dashboard: LayoutDashboard,
-  inventory: Boxes,
-  'repair-orders': Wrench,
-  customers: Contact,
-  sales: BadgeDollarSign,
-  invoices: FileText,
-  reports: BarChart3,
-  users: ShieldCheck,
-  settings: Settings,
-};
+import { useNavItems } from './navItems';
 
 interface SidebarProps {
   open: boolean;
@@ -88,7 +59,7 @@ interface Tip {
 }
 
 export function Sidebar({ open, onNavigate }: SidebarProps) {
-  const { accessFor, signOut, isPlatformAdmin, acting } = useAuth();
+  const { signOut, isPlatformAdmin, acting } = useAuth();
   const user = useCurrentUser();
   const { unopened } = useNotifications();
   const [collapsed, toggleCollapsed] = useCollapsed();
@@ -108,39 +79,26 @@ export function Sidebar({ open, onNavigate }: SidebarProps) {
   };
   const hideTip = () => setTip(null);
 
-  const items: { key: string; to: string; label: string; icon: LucideIcon }[] = [];
-  for (const module of MODULE_ORDER) {
-    if (accessFor(module) !== 'none') {
-      items.push({ key: module, to: `/${module}`, label: MODULE_LABELS[module], icon: NAV_ICONS[module] });
-    }
-    for (const extra of EXTRA_PAGES) {
-      if (extra.after === module && accessFor(extra.module) !== 'none') {
-        items.push({ key: extra.path, to: `/${extra.path}`, label: extra.label, icon: extra.icon });
-      }
-    }
-  }
-  if (isPlatformAdmin) items.push({ key: 'admin', to: '/admin', label: 'Platform admin', icon: ShieldAlert });
-  // Help comes last, for every role.
-  items.push({ key: HELP_PAGE.path, to: `/${HELP_PAGE.path}`, label: HELP_PAGE.label, icon: HELP_PAGE.icon });
+  const items = useNavItems();
 
   return (
     // Phone (< md): slide-out drawer. Tablet (md to lg): icon rail. Desktop (lg+): full sidebar.
     <aside
       aria-label="Sidebar"
-      className={`pt-safe pb-safe pl-safe fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r border-white/10 bg-sidebar text-white transition-[transform,width] duration-200 md:static md:w-16 md:translate-x-0 ${
-        collapsed ? 'lg:w-16' : 'lg:w-56'
-      } ${open ? 'translate-x-0 shadow-2xl' : '-translate-x-full'}`}
+      className={`glass-strong pt-safe pb-safe pl-safe fixed inset-y-0 left-0 z-40 flex w-72 flex-col rounded-r-3xl text-fg transition-[transform,width] duration-200 md:static md:my-3 md:ml-3 md:w-[72px] md:translate-x-0 md:rounded-3xl ${
+        collapsed ? 'lg:w-[72px]' : 'lg:w-60'
+      } ${open ? 'translate-x-0' : '-translate-x-full'}`}
     >
-      <div className={`flex items-center gap-2.5 border-b border-white/10 px-4 py-5 md:max-lg:justify-center md:max-lg:px-0 ${lg('lg:flex-col lg:justify-center lg:px-0')}`}>
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent">
-          <Wrench className="h-4 w-4 text-white" aria-hidden />
+      <div className={`flex items-center gap-2.5 px-4 pb-4 pt-5 md:max-lg:justify-center md:max-lg:px-0 ${lg('lg:flex-col lg:justify-center lg:px-0')}`}>
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-accent shadow-[inset_0_1px_0_rgb(255_255_255/0.3)]">
+          <Wrench className="h-4 w-4 text-accent-fg" aria-hidden />
         </span>
         <div className={`min-w-0 md:max-lg:hidden ${lg('lg:hidden')}`}>
-          <div className="font-display text-[15px] font-bold leading-none">
+          <div className="font-display text-[17px] font-bold leading-none tracking-tight">
             {BRAND.prefix}
             <span className="text-accent">{BRAND.suffix}</span>
           </div>
-          <div className="mt-1 text-[9px] uppercase tracking-widest text-white/50">{BRAND.product}</div>
+          <div className="mt-1 text-[11px] text-fg2">{BRAND.product}</div>
         </div>
         {/* Desktop: fold the sidebar to icons, or open it again. */}
         <button
@@ -156,24 +114,23 @@ export function Sidebar({ open, onNavigate }: SidebarProps) {
           aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           aria-expanded={!collapsed}
           title={collapsed ? undefined : 'Collapse sidebar'}
-          className={`hidden rounded-lg p-1.5 text-white/60 transition hover:bg-white/10 hover:text-white lg:flex ${collapsed ? '' : 'ml-auto'}`}
+          className={`hidden rounded-lg p-1.5 text-fg3 transition hover:bg-fg/10 hover:text-fg lg:flex ${collapsed ? '' : 'ml-auto'}`}
         >
           {collapsed ? <PanelLeftOpen className="h-4 w-4" aria-hidden /> : <PanelLeftClose className="h-4 w-4" aria-hidden />}
         </button>
       </div>
 
       {user.workshop && (
-        <div className={`border-b border-white/10 px-4 py-3 md:max-lg:hidden ${lg('lg:hidden')}`}>
-          <div className="text-[9px] uppercase tracking-widest text-white/50">Workshop</div>
-          <div className="mt-0.5 truncate text-xs font-semibold" title={user.workshop.name}>
+        <div className={`mx-4 border-b border-line/50 pb-3 md:max-lg:hidden ${lg('lg:hidden')}`}>
+          <div className="truncate text-xs font-semibold text-fg" title={user.workshop.name}>
             {user.workshop.name}
           </div>
-          <div className="font-mono text-[10px] text-white/50">No. {user.workshop.number}</div>
+          <div className="text-[11px] text-fg2">Workshop No. {user.workshop.number}</div>
           {acting && <div className="mt-0.5 text-[10px] font-semibold text-warn">(support session)</div>}
         </div>
       )}
 
-      <nav aria-label="Main" className="no-scrollbar flex-1 space-y-0.5 overflow-y-auto px-2 py-3">
+      <nav aria-label="Main" className="no-scrollbar flex-1 space-y-1 overflow-y-auto px-3 py-3">
         {items.map((item) => {
           const Icon = item.icon;
           return (
@@ -190,8 +147,8 @@ export function Sidebar({ open, onNavigate }: SidebarProps) {
               onBlur={hideTip}
               aria-label={rail ? item.label : undefined}
               className={({ isActive }) =>
-                `flex items-center gap-2.5 rounded-lg px-3 py-2 text-xs transition coarse:py-3 md:max-lg:justify-center md:max-lg:px-0 ${lg('lg:justify-center lg:px-0')} ${
-                  isActive ? 'bg-accent font-semibold text-white' : 'text-white/65 hover:bg-white/5 hover:text-white'
+                `flex items-center gap-3 rounded-xl px-3 py-2 text-[13px] transition coarse:min-h-11 md:max-lg:justify-center md:max-lg:px-0 ${lg('lg:justify-center lg:px-0')} ${
+                  isActive ? 'glass-active font-semibold' : 'text-fg2 hover:bg-fg/[0.06] hover:text-fg'
                 }`
               }
             >
@@ -216,22 +173,22 @@ export function Sidebar({ open, onNavigate }: SidebarProps) {
         })}
       </nav>
 
-      <div className={`flex items-center gap-2.5 border-t border-white/10 px-4 py-3 md:max-lg:flex-col md:max-lg:px-2 ${lg('lg:flex-col lg:px-2')}`}>
+      <div className={`glass-field mx-3 mb-2 flex items-center gap-2.5 rounded-2xl px-3 py-2.5 md:max-lg:mx-2 md:max-lg:flex-col md:max-lg:px-1 ${lg('lg:mx-2 lg:flex-col lg:px-1')}`}>
         {user.avatarUrl ? (
           <img
             src={user.avatarUrl}
             alt=""
             referrerPolicy="no-referrer"
-            className="h-8 w-8 shrink-0 rounded-full object-cover"
+            className="h-9 w-9 shrink-0 rounded-full object-cover ring-1 ring-line/60"
           />
         ) : (
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent/25 text-[10px] font-bold text-white">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent/25 text-[11px] font-bold text-fg">
             {user.initials}
           </span>
         )}
         <div className={`min-w-0 flex-1 md:max-lg:hidden ${lg('lg:hidden')}`}>
-          <div className="truncate text-xs font-semibold">{user.name}</div>
-          <div className="truncate text-[10px] text-white/50">{user.role ?? (isPlatformAdmin ? 'Platform admin' : user.suspended ? 'Workshop suspended' : 'Awaiting approval')}</div>
+          <div className="truncate text-[13px] font-semibold">{user.name}</div>
+          <div className="truncate text-[11px] text-fg2">{user.role ?? (isPlatformAdmin ? 'Platform admin' : user.suspended ? 'Workshop suspended' : 'Awaiting approval')}</div>
         </div>
         <button
           type="button"
@@ -242,21 +199,20 @@ export function Sidebar({ open, onNavigate }: SidebarProps) {
           onFocus={showTip('Sign out')}
           onBlur={hideTip}
           title={rail ? undefined : 'Sign out'}
-          className={`rounded-lg p-1.5 text-white/60 hover:bg-white/10 hover:text-white coarse:p-2.5 md:max-lg:mx-auto ${collapsed ? 'lg:mx-auto' : 'lg:ml-auto'}`}
+          className={`rounded-lg p-1.5 text-fg3 transition hover:bg-fg/10 hover:text-fg coarse:p-2.5 md:max-lg:mx-auto ${collapsed ? 'lg:mx-auto' : 'lg:ml-auto'}`}
         >
           <LogOut className="h-4 w-4" aria-hidden />
         </button>
       </div>
-      <LegalFooter tone="sidebar" className={`px-3 pb-3 md:max-lg:hidden ${lg('lg:hidden')}`} />
+      <LegalFooter className={`px-4 pb-3 md:max-lg:hidden ${lg('lg:hidden')}`} />
       {rail &&
         tip &&
         createPortal(
           <div
             role="tooltip"
             style={{ top: tip.top, left: tip.left }}
-            className="pointer-events-none fixed z-[60] -translate-y-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-sidebar px-2.5 py-1.5 text-xs font-medium text-white shadow-xl"
+            className="glass-strong pointer-events-none fixed z-[60] -translate-y-1/2 animate-fade-in whitespace-nowrap rounded-lg px-2.5 py-1.5 text-xs font-medium text-fg"
           >
-            <span aria-hidden className="absolute -left-1 top-1/2 h-2 w-2 -translate-y-1/2 rotate-45 border-b border-l border-white/10 bg-sidebar" />
             {tip.label}
           </div>,
           document.body,

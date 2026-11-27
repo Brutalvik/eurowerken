@@ -2,13 +2,16 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Design tokens. Every colour is an RGB triplet so Tailwind can add alpha (bg-surface/50). Three sets:
+ *   :root                     light
+ *   .dark                     midnight slate (the default canvas)
+ *   [data-contrast='high']    high contrast (WCAG AAA): solid obsidian, no glass, 2px outlines
+ * Glass surfaces read the --glass-* tokens below, so high contrast turns the glass off by changing values only.
+ */
 :root {
   color-scheme: light;
-  /*
-   * Calm light: a muted grey-blue page, cards only a step lighter, softened
-   * text. Nothing near pure white, so nothing glares. Contrast on --surface:
-   * fg 12.7:1, fg2 5.4:1, fg3 3.6:1 (captions only).
-   */
+  /* Calm light: a muted grey-blue page, cards a step lighter. Contrast on --surface: fg 12.7:1, fg2 5.4:1. */
   --bg: 222 226 233;
   --surface: 235 238 242;
   --surface2: 228 232 238;
@@ -23,39 +26,114 @@
   --bad: 220 38 38;
   --violet: 124 58 237;
   --sidebar: 10 22 40;
+
+  /* Glass */
+  --glass-alpha: 0.55;
+  --glass-strong-alpha: 0.78;
+  --glass-rim: 255 255 255;
+  --glass-rim-alpha: 0.45;
+  --glass-rim-width: 1px;
+  --glass-shadow: inset 0 1px 0 rgb(255 255 255 / 0.5), 0 10px 30px -18px rgb(10 22 40 / 0.25);
+  --glass-filter: blur(22px) saturate(140%);
+
+  /* The ambient mesh behind everything (so the glass has something to blur) */
+  --mesh-1: 29 111 240;
+  --mesh-1-alpha: 0.07;
+  --mesh-2: 124 58 237;
+  --mesh-2-alpha: 0.04;
+
+  /* Motion: Apple-style ease-out; --motion-scale is 0 for people who ask for reduced motion. */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --motion-scale: 1;
+  --focus-ring: 2px;
 }
 
 .dark {
   color-scheme: dark;
-  --bg: 7 12 24;
-  --surface: 15 24 41;
-  --surface2: 21 32 53;
-  --line: 28 45 71;
-  --fg: 237 242 255;
-  --fg2: 123 147 191;
-  --fg3: 91 115 153;
-  --accent: 79 142 247;
-  --ok: 52 211 153;
-  --warn: 251 191 36;
-  --bad: 248 113 113;
+  /* Midnight slate. Contrast on .glass over the canvas: fg 14.1:1, fg2 8.6:1, fg3 5.8:1 (4.8:1 on .glass-strong). */
+  --bg: 11 17 29;
+  --surface: 64 80 108;
+  --surface2: 74 91 121;
+  --line: 86 104 136;
+  --fg: 238 242 250;
+  --fg2: 178 192 214;
+  --fg3: 140 157 185;
+  --accent: 96 150 255;
+  --ok: 74 213 154;
+  --warn: 245 192 66;
+  --bad: 248 119 119;
   --violet: 167 139 250;
-  --sidebar: 9 14 28;
+  --sidebar: 16 24 38;
+
+  --glass-alpha: 0.28;
+  --glass-strong-alpha: 0.5;
+  --glass-rim-alpha: 0.13;
+  --glass-shadow: inset 0 1px 0 rgb(255 255 255 / 0.16), 0 1px 2px rgb(0 0 0 / 0.2);
+
+  --mesh-1: 56 108 196;
+  --mesh-1-alpha: 0.34;
+  --mesh-2: 82 110 150;
+  --mesh-2-alpha: 0.26;
+}
+
+/* High contrast: solid surfaces, bright 2px outlines. On --surface: fg 18.1:1, fg2 14.3:1, fg3 11.5:1, accent 8.2:1,
+   ok 11.3:1, warn 12.9:1, bad 8.1:1, dark text on accent 9.2:1 (all AAA). Always dark. */
+[data-contrast='high'] {
+  color-scheme: dark;
+  --bg: 5 7 11;
+  --surface: 17 22 34;
+  --surface2: 27 34 50;
+  --line: 176 190 214;
+  --fg: 255 255 255;
+  --fg2: 222 229 240;
+  --fg3: 196 207 224;
+  --accent: 128 176 255;
+  --accent-fg: 5 7 11;
+  --ok: 86 230 140;
+  --warn: 255 214 92;
+  --bad: 255 140 140;
+  --violet: 200 180 255;
+  --sidebar: 17 22 34;
+
+  --glass-alpha: 1;
+  --glass-strong-alpha: 1;
+  --glass-rim: 176 190 214;
+  --glass-rim-alpha: 1;
+  --glass-rim-width: 2px;
+  --glass-shadow: none;
+  --glass-filter: none;
+
+  --mesh-1-alpha: 0;
+  --mesh-2-alpha: 0;
+  --focus-ring: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-scale: 0;
+  }
 }
 
 body {
   @apply bg-bg font-sans text-fg antialiased;
   -webkit-tap-highlight-color: transparent;
-  /* A very soft accent wash behind everything, so the glass cards have something to blur. */
+  /* Figures line up in columns: money, counts, dates, VINs, totals. */
+  font-variant-numeric: tabular-nums;
   background-image:
-    radial-gradient(60rem 40rem at 100% -10%, rgb(var(--accent) / 0.05), transparent 60%),
-    radial-gradient(50rem 32rem at 10% 110%, rgb(var(--accent) / 0.03), transparent 60%);
+    radial-gradient(70rem 46rem at 105% -15%, rgb(var(--mesh-1) / var(--mesh-1-alpha)), transparent 62%),
+    radial-gradient(56rem 40rem at -10% 110%, rgb(var(--mesh-2) / var(--mesh-2-alpha)), transparent 62%),
+    radial-gradient(40rem 30rem at 45% 55%, rgb(var(--mesh-1) / calc(var(--mesh-1-alpha) * 0.35)), transparent 70%);
   background-attachment: fixed;
 }
 
-.dark body {
-  background-image:
-    radial-gradient(60rem 40rem at 100% -10%, rgb(var(--accent) / 0.07), transparent 60%),
-    radial-gradient(50rem 32rem at 10% 110%, rgb(var(--violet) / 0.04), transparent 60%);
+/* Keyboard focus is always visible; high contrast makes it thicker. */
+:focus-visible {
+  outline: var(--focus-ring) solid rgb(var(--accent));
+  outline-offset: 2px;
+}
+[data-contrast='high'] :focus-visible {
+  outline: var(--focus-ring) solid rgb(var(--fg));
+  outline-offset: 2px;
 }
 
 /* iOS zooms into any field under 16px when it gets focus; touch screens get 16px fields. */
@@ -69,18 +147,45 @@ body {
 
 @layer components {
   /*
-   * Glass cards: frosted, translucent, a thin rim lighter at the top, a soft
-   * wide shadow. .glass for cards; .glass-strong for floating or prominent
-   * cards and the header (more opaque, so text stays readable).
-   * Table rows and list items inside a glass card get no blur of their own.
+   * Glass: translucent, blurred, a hairline rim with a light top edge. One layer only: rows and list items inside
+   * a glass card get no glass of their own. .glass-strong is more opaque, for the header, sidebar and dialogs.
+   * In high contrast the same classes become solid panels with 2px outlines (the --glass-* tokens above).
    */
+  .glass,
+  .glass-strong {
+    border: var(--glass-rim-width) solid rgb(var(--glass-rim) / var(--glass-rim-alpha));
+    box-shadow: var(--glass-shadow);
+    -webkit-backdrop-filter: var(--glass-filter);
+    backdrop-filter: var(--glass-filter);
+  }
   .glass {
-    @apply border border-white/30 border-t-white/40 bg-surface/55 shadow-[inset_0_1px_0_rgb(255_255_255/0.18),0_10px_36px_-18px_rgb(var(--sidebar)/0.18)] backdrop-blur-xl backdrop-saturate-150;
-    @apply dark:border-white/[0.07] dark:border-t-white/[0.13] dark:bg-surface/45 dark:shadow-[inset_0_1px_0_rgb(255_255_255/0.05),0_14px_44px_-18px_rgb(0_0_0/0.6)];
+    background-color: rgb(var(--surface) / var(--glass-alpha));
   }
   .glass-strong {
-    @apply border border-white/35 border-t-white/40 bg-surface/75 shadow-[inset_0_1px_0_rgb(255_255_255/0.22),0_16px_48px_-20px_rgb(var(--sidebar)/0.22)] backdrop-blur-2xl backdrop-saturate-150;
-    @apply dark:border-white/[0.09] dark:border-t-white/[0.16] dark:bg-surface/70 dark:shadow-[inset_0_1px_0_rgb(255_255_255/0.06),0_18px_52px_-18px_rgb(0_0_0/0.7)];
+    background-color: rgb(var(--surface) / var(--glass-strong-alpha));
+  }
+
+  /* A field or control on glass: a quieter inset well. */
+  .glass-field {
+    border: 1px solid rgb(var(--line) / 0.7);
+    background-color: rgb(var(--bg) / 0.35);
+  }
+  [data-contrast='high'] .glass-field {
+    border-width: 2px;
+    border-color: rgb(var(--line));
+    background-color: rgb(var(--bg));
+  }
+
+  /* The selected item in the sidebar, the bottom bar and segmented controls: a soft luminous pill. */
+  .glass-active {
+    background-color: rgb(var(--accent) / 0.16);
+    box-shadow: inset 0 0 0 1px rgb(var(--accent) / 0.38), inset 0 1px 0 rgb(255 255 255 / 0.12), 0 0 18px -6px rgb(var(--accent) / 0.55);
+    color: rgb(var(--fg));
+  }
+  [data-contrast='high'] .glass-active {
+    background-color: rgb(var(--accent));
+    box-shadow: none;
+    color: rgb(var(--accent-fg));
   }
 }
 
@@ -102,6 +207,11 @@ body {
   .no-scrollbar::-webkit-scrollbar {
     display: none;
   }
+}
+
+/* High contrast: solid accent fills carry dark text (white on the light accent would fail contrast). */
+[data-contrast='high'] .bg-accent {
+  color: rgb(var(--accent-fg));
 }
 
 ::-webkit-scrollbar {

@@ -9,8 +9,10 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const VARIANTS: Record<Variant, string> = {
-  primary: 'bg-accent text-white hover:opacity-90',
-  ghost: 'border border-line bg-transparent text-fg2 hover:bg-surface2 hover:text-fg',
+  // Translucent cobalt with a light top edge; solid accent with dark text in high contrast (index.css).
+  primary:
+    'bg-accent text-accent-fg shadow-[inset_0_1px_0_rgb(255_255_255/0.22),0_6px_18px_-8px_rgb(var(--accent)/0.7)] hover:brightness-110 active:brightness-95 [[data-contrast=high]_&]:shadow-none',
+  ghost: 'glass-field text-fg2 hover:bg-surface2/70 hover:text-fg',
 };
 
 const SIZES: Record<Size, string> = {
@@ -22,7 +24,7 @@ export function Button({ variant = 'primary', size = 'md', className = '', type 
   return (
     <button
       type={type}
-      className={`inline-flex items-center justify-center gap-1.5 rounded-lg transition disabled:cursor-not-allowed disabled:opacity-50 ${VARIANTS[variant]} ${SIZES[size]} ${className}`}
+      className={`inline-flex items-center justify-center gap-1.5 rounded-xl transition-[filter,background-color,color,transform] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 ${VARIANTS[variant]} ${SIZES[size]} ${className}`}
       {...rest}
     />
   );

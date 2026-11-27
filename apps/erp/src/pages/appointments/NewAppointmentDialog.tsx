@@ -196,7 +196,7 @@ function BookingForm({ workshopId, userId, ctx, site, services, technicians, day
         <fieldset className="space-y-3">
           <legend className="mb-2 text-[10px] font-medium uppercase tracking-wider text-fg3">Car</legend>
           {known && known.vehicles.length > 0 && (
-            <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-line bg-surface2 px-3 py-2">
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl glass-field px-3 py-2">
               <p className="flex min-w-0 items-center gap-1.5 text-[11px] text-fg2">
                 <Car className="h-3.5 w-3.5 shrink-0 text-accent" aria-hidden />
                 {carFrom ? (
@@ -243,7 +243,7 @@ function BookingForm({ workshopId, userId, ctx, site, services, technicians, day
               {active.map((s) => {
                 const checkId = `${id}-svc-${s.id}`;
                 return (
-                  <li key={s.id} className="flex items-center gap-2.5 rounded-lg border border-line bg-surface2 px-3 py-2 coarse:min-h-11">
+                  <li key={s.id} className="flex items-center gap-2.5 rounded-xl glass-field px-3 py-2 coarse:min-h-11">
                     <input
                       id={checkId}
                       type="checkbox"

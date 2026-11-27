@@ -965,7 +965,7 @@ const ItemRow = memo(function ItemRow({
               const url = mediaUrl(m.path);
               const label = m.caption || `${item.label} ${m.kind}`;
               return (
-                <li key={m.id} className="relative h-20 w-24 overflow-hidden rounded-lg border border-line bg-surface2">
+                <li key={m.id} className="relative h-20 w-24 overflow-hidden rounded-xl glass-field">
                   {m.kind === 'video' ? (
                     <video src={url} controls playsInline preload="metadata" className="h-full w-full object-cover" aria-label={label} />
                   ) : (

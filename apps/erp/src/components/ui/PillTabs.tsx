@@ -22,10 +22,8 @@ export function PillTabs<T extends string>({ options, value, onChange, label }: 
             role="tab"
             aria-selected={active}
             onClick={() => onChange(option)}
-            className={`shrink-0 whitespace-nowrap rounded-lg px-3 py-1.5 text-xs transition coarse:min-h-10 coarse:px-3.5 ${
-              active
-                ? 'bg-accent font-semibold text-white'
-                : 'border border-line bg-surface/70 text-fg2 hover:text-fg'
+            className={`shrink-0 whitespace-nowrap rounded-xl px-3 py-1.5 text-xs transition coarse:min-h-11 coarse:px-3.5 ${
+              active ? 'glass-active font-semibold' : 'glass-field text-fg2 hover:text-fg'
             }`}
           >
             {option}

@@ -127,7 +127,7 @@ export function InspectionCard({ order, tz, canEdit, announce }: InspectionCardP
               const pct = i.counts.total ? Math.round((i.counts.checked / i.counts.total) * 100) : 0;
               const open = i.status === 'in_progress';
               return (
-                <li key={i.id} className="rounded-lg border border-line bg-surface2/40 p-3">
+                <li key={i.id} className="rounded-xl glass-field p-3">
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <div className="min-w-0 space-y-1">
                       <p className="flex flex-wrap items-center gap-2 text-sm font-semibold text-fg">

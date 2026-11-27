@@ -232,7 +232,7 @@ function Details({ appt, workshopId, ctx, site, technicians, canEdit, onChanged,
       {canEdit && actions.length > 0 && (
         <Section id={`${id}-status`} title="Status">
           {asking ? (
-            <div className="space-y-2 rounded-lg border border-line bg-surface2/50 p-3">
+            <div className="space-y-2 rounded-xl glass-field p-3">
               <Labeled id={`${id}-reason`} label={`Reason (${asking.label.toLowerCase()})`} hint="Up to 300 characters. The customer may see it.">
                 <textarea
                   id={`${id}-reason`}

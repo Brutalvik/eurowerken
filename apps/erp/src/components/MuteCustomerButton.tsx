@@ -22,7 +22,7 @@ export function MuteCustomerButton({ email, name, mutes }: { email: string | nul
     return (
       <Link
         to="/settings?tab=notifications"
-        className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-surface2 px-2.5 py-1.5 text-[11px] font-medium text-fg2 hover:text-fg coarse:min-h-11"
+        className="inline-flex items-center gap-1.5 rounded-xl glass-field px-2.5 py-1.5 text-[11px] font-medium text-fg2 hover:text-fg coarse:min-h-11"
         title="Customer message notifications are muted for every customer in Settings"
       >
         <BellOff className="h-3.5 w-3.5" aria-hidden />

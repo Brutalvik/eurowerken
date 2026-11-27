@@ -7,6 +7,8 @@ import { Header } from './Header';
 import { PageBoundary } from './PageBoundary';
 import { Sidebar } from './Sidebar';
 import { NotificationsProvider } from '@/notifications/NotificationsContext';
+import { VoiceProvider } from '@/voice/VoiceProvider';
+import { MobileTabBar } from './MobileTabBar';
 
 export function AppLayout() {
   const [navOpen, setNavOpen] = useState(false);
@@ -34,6 +36,7 @@ export function AppLayout() {
   return (
     // 100dvh follows mobile browser toolbars; h-screen would hide the bottom under them.
     <NotificationsProvider>
+      <VoiceProvider>
       <div className="flex h-[100dvh] overflow-hidden">
         <Sidebar open={navOpen} onNavigate={() => setNavOpen(false)} />
         {navOpen && (
@@ -41,13 +44,14 @@ export function AppLayout() {
             type="button"
             aria-label="Close navigation"
             onClick={() => setNavOpen(false)}
-            className="fixed inset-0 z-30 bg-black/50 md:hidden"
+            className="fixed inset-0 z-30 animate-fade-in bg-bg/60 backdrop-blur-sm md:hidden"
           />
         )}
         <div className="flex min-w-0 flex-1 flex-col">
           {acting && <ActingBanner workshopName={user.workshop?.name ?? 'this workshop'} />}
-          <Header onMenuClick={() => setNavOpen(true)} safeTop={!acting} />
-          <main className="pb-safe flex-1 overflow-y-auto overscroll-contain p-4 sm:p-5 lg:p-6">
+          <Header safeTop={!acting} />
+          {/* Phones: room at the bottom for the floating tab bar. */}
+          <main className="flex-1 overflow-y-auto overscroll-contain px-4 pb-32 pt-1 sm:px-5 md:pb-6 lg:px-6">
             {user.role || (isPlatformAdmin && onAdmin) ? (
               <PageBoundary resetKey={pathname}>
                 <Outlet />
@@ -59,7 +63,9 @@ export function AppLayout() {
             )}
           </main>
         </div>
+        <MobileTabBar onMore={() => setNavOpen((o) => !o)} moreOpen={navOpen} />
       </div>
+      </VoiceProvider>
     </NotificationsProvider>
   );
 }
@@ -81,7 +87,7 @@ function ActingBanner({ workshopName }: { workshopName: string }) {
   }
 
   return (
-    <div role="region" aria-label="Support session" className="glass-strong pt-safe relative z-20 shrink-0 border-x-0 border-t-0 !border-b-warn/40">
+    <div role="region" aria-label="Support session" className="glass-strong pt-safe relative z-20 shrink-0 rounded-b-2xl border-t-0">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 bg-warn/15 px-4 py-1.5 lg:px-6">
         <ShieldAlert className="h-4 w-4 shrink-0 text-warn" aria-hidden />
         <p className="min-w-0 flex-1 text-xs text-fg">

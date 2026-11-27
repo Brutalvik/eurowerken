@@ -367,7 +367,7 @@ export function WebsiteSetupPage() {
                     <span
                       aria-hidden
                       className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold ${
-                        active ? 'bg-accent text-white' : visited ? 'bg-ok/20 text-ok' : 'bg-fg3/15 text-fg3'
+                        active ? 'bg-accent text-accent-fg' : visited ? 'bg-ok/20 text-ok' : 'bg-fg3/15 text-fg3'
                       }`}
                     >
                       {visited && !active ? <Check className="h-3 w-3" /> : i + 1}
@@ -473,14 +473,14 @@ function Success({ heading, url, live, onBack }: { heading: RefObject<HTMLHeadin
           ? 'Customers can book, track repairs and sign in at:'
           : 'Your website is not published. Turn on Published in Settings, Website to make it public at:'}
       </p>
-      <p className="mt-3 break-all rounded-lg border border-line bg-surface2 px-3 py-2 font-mono text-xs text-fg">{url}</p>
+      <p className="mt-3 break-all rounded-xl glass-field px-3 py-2 font-mono text-xs text-fg">{url}</p>
       <div className="mt-4 flex flex-wrap justify-center gap-2">
         <CopyButton text={url} onCopied={() => setCopied(true)} />
         <a
           href={url}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3.5 py-2 text-xs font-semibold text-white hover:opacity-90 coarse:min-h-11"
+          className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3.5 py-2 text-xs font-semibold text-accent-fg hover:opacity-90 coarse:min-h-11"
         >
           Open <ExternalLink className="h-3.5 w-3.5" aria-hidden />
         </a>

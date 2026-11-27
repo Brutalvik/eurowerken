@@ -32,9 +32,9 @@ function Empty({ children }: { children: React.ReactNode }) {
 }
 
 export function ReportsPage() {
-  const { mode } = useTheme();
+  const { effective: mode, highContrast } = useTheme();
   const { user } = useAuth();
-  const palette = chartPalette(mode);
+  const palette = chartPalette(mode, highContrast);
   const workshopId = user?.workshop?.id ?? null;
   const [state, setState] = useState<Load<DashOrder[]>>({ status: 'loading' });
 

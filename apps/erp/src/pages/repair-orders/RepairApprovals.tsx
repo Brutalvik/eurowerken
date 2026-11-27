@@ -61,7 +61,7 @@ export function ApprovalLine({ record, tz }: { record: RepairApproval; tz: strin
         <summary className="inline-flex cursor-pointer select-none items-center rounded text-fg3 hover:text-fg focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent coarse:min-h-9">
           Record details
         </summary>
-        <dl className="mt-1 grid gap-x-3 gap-y-0.5 rounded-lg border border-line bg-surface2/50 p-2 text-fg2 sm:grid-cols-[auto_minmax(0,1fr)]">
+        <dl className="mt-1 grid gap-x-3 gap-y-0.5 rounded-xl glass-field p-2 text-fg2 sm:grid-cols-[auto_minmax(0,1fr)]">
           <dt className="text-fg3">Amount</dt>
           <dd className="tabular-nums">
             {formatCurrency(record.amount)} ({formatCurrency(record.amount_with_tax)} with tax)
@@ -218,7 +218,7 @@ export function PhoneApprovalDialog({ open, order, pending, intro, onClose, onDo
           ? value === 'approved'
             ? 'bg-ok font-semibold text-white'
             : 'bg-bad font-semibold text-white'
-          : 'border border-line bg-surface/70 text-fg2 hover:text-fg'
+          : 'glass-field text-fg2 hover:text-fg'
       }`}
     >
       {label}

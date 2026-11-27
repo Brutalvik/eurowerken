@@ -39,9 +39,9 @@ export function NotificationBell() {
         aria-expanded={open}
         aria-haspopup="true"
         onClick={() => setOpen((o) => !o)}
-        className="relative rounded-lg p-2 text-fg2 hover:bg-surface2 hover:text-fg coarse:p-2.5"
+        className="glass relative flex h-11 w-11 items-center justify-center rounded-2xl text-fg2 transition hover:text-fg"
       >
-        <Bell className="h-4 w-4" />
+        <Bell className="h-5 w-5" aria-hidden />
         {unread > 0 && (
           <span className="absolute -right-0.5 -top-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full border-2 border-surface bg-bad px-1 text-[10px] font-bold leading-none text-white">
             {unread > 99 ? '99+' : unread}
@@ -53,7 +53,7 @@ export function NotificationBell() {
         <div
           role="dialog"
           aria-label="Notifications"
-          className="glass-strong absolute right-0 top-full z-50 mt-2 w-[min(24rem,calc(100vw-2rem))] overflow-hidden rounded-xl"
+          className="glass-strong absolute right-0 top-full z-50 mt-2 w-[min(24rem,calc(100vw-2rem))] animate-glass-in overflow-hidden rounded-2xl"
         >
           <div className="flex items-center justify-between border-b border-line/60 px-4 py-3">
             <p className="text-sm font-semibold text-fg">Notifications</p>

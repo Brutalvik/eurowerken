@@ -99,7 +99,7 @@ export function SitePreview({ draft, services, team }: { draft: SiteDraft; servi
   return (
     <div className="flex min-h-0 flex-col gap-2">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div role="group" aria-label="Preview width" className="inline-flex rounded-lg border border-line bg-surface2 p-0.5">
+        <div role="group" aria-label="Preview width" className="inline-flex rounded-xl glass-field p-0.5">
           {(
             [
               ['desktop', 'Desktop', Monitor],
@@ -132,7 +132,7 @@ export function SitePreview({ draft, services, team }: { draft: SiteDraft; servi
 
       <div ref={boxRef} className="w-full">
         <div
-          className={`relative mx-auto overflow-hidden border border-line bg-surface2 ${device === 'phone' ? 'rounded-[28px]' : 'rounded-lg'}`}
+          className={`relative mx-auto overflow-hidden glass-field ${device === 'phone' ? 'rounded-[28px]' : 'rounded-lg'}`}
           style={{ width: size.w * scale, height: size.h * scale }}
         >
           {src ? (

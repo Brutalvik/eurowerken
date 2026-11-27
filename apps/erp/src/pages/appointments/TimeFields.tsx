@@ -216,7 +216,7 @@ export function TimeFields({ workshopId, ctx, site, excludeId, day, time, durati
                     onClick={() => onChange({ time: value })}
                     title={`${f.remaining} ${f.remaining === 1 ? 'bay' : 'bays'} free`}
                     className={`rounded-lg px-2.5 py-1 text-[11px] transition coarse:min-h-11 coarse:px-3 ${
-                      active ? 'bg-accent font-semibold text-white' : 'border border-line bg-surface2 text-fg2 hover:text-fg'
+                      active ? 'glass-active font-semibold' : 'glass-field text-fg2 hover:text-fg'
                     }`}
                   >
                     {formatTime(f.starts_at, tz)}

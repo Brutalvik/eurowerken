@@ -113,7 +113,7 @@ export function PaymentsCard() {
       <div className="space-y-4 text-xs">
         {!s && !error && <p className="text-fg2">Loading...</p>}
         {s && (
-          <div className="flex flex-wrap items-center gap-2 rounded-lg border border-line bg-surface2 p-3">
+          <div className="flex flex-wrap items-center gap-2 rounded-xl glass-field p-3">
             {s.connected ? (
               <>
                 <CheckCircle2 className="h-4 w-4 text-ok" aria-hidden />

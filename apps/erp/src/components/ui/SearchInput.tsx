@@ -17,7 +17,7 @@ export function SearchInput({ value, onChange, placeholder, className = 'w-full 
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         aria-label={placeholder}
-        className="w-full rounded-lg border border-line bg-surface py-2 pl-8 pr-3 text-xs coarse:min-h-11 text-fg outline-none placeholder:text-fg3 focus:border-accent"
+        className="glass-field w-full rounded-xl py-2 pl-8 pr-3 text-xs text-fg outline-none transition placeholder:text-fg3 focus:border-accent coarse:min-h-11"
       />
     </div>
   );

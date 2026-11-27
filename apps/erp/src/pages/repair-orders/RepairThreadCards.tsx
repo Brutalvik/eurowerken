@@ -180,7 +180,7 @@ export function MessagesCard({ order, messages, tz, canEdit, onSent, announce }:
               const staff = m.sender === 'staff';
               return (
                 <li key={m.id} className={`flex ${staff ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-[85%] rounded-2xl px-3 py-2 text-xs ${staff ? 'rounded-br-md bg-accent text-white' : 'rounded-bl-md border border-line bg-surface2 text-fg'}`}>
+                  <div className={`max-w-[85%] rounded-2xl px-3 py-2 text-xs ${staff ? 'rounded-br-md bg-accent text-accent-fg' : 'rounded-bl-md glass-field text-fg'}`}>
                     <p className="whitespace-pre-line break-words">{m.body}</p>
                     <p className={`mt-1 text-[10px] ${staff ? 'text-white/80' : 'text-fg3'}`}>
                       {m.author_name || (staff ? 'Workshop' : order.contact_name)} · <time dateTime={m.created_at}>{formatDateTime(m.created_at, tz)}</time>
@@ -193,7 +193,7 @@ export function MessagesCard({ order, messages, tz, canEdit, onSent, announce }:
         )}
 
         {closed && (
-          <p className="flex items-center gap-2 rounded-lg border border-line bg-surface2 px-3 py-2 text-[11px] text-fg2">
+          <p className="flex items-center gap-2 rounded-xl glass-field px-3 py-2 text-[11px] text-fg2">
             <Lock className="h-3.5 w-3.5 shrink-0 text-fg3" aria-hidden />
             This repair is {order.status === 'cancelled' ? 'cancelled' : 'completed'}, so the conversation is closed.
           </p>

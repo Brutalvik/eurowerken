@@ -159,7 +159,7 @@ export function RepairOrdersPage() {
                 aria-pressed={active}
                 onClick={() => setTab(t)}
                 className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-1.5 text-xs transition coarse:min-h-11 coarse:px-3.5 ${
-                  active ? 'bg-accent font-semibold text-white' : 'border border-line bg-surface/70 text-fg2 hover:text-fg'
+                  active ? 'glass-active font-semibold' : 'glass-field text-fg2 hover:text-fg'
                 }`}
               >
                 {t === 'all' ? 'All' : REPAIR_STATUS_LABEL[t]}
@@ -191,7 +191,7 @@ export function RepairOrdersPage() {
           <p className="max-w-sm text-[11px] text-fg3">For a walk-in, add an appointment first and check it in.</p>
           <Link
             to="/appointments"
-            className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3.5 py-2 text-xs font-semibold text-white hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent coarse:min-h-11"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3.5 py-2 text-xs font-semibold text-accent-fg hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent coarse:min-h-11"
           >
             <CalendarDays className="h-3.5 w-3.5" aria-hidden />
             Go to Appointments

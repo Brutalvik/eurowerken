@@ -151,7 +151,7 @@ export function HelpPage() {
           </Card>
 
           {/* Phone and tablet: contents in a dropdown. */}
-          <div className="glass rounded-xl lg:hidden">
+          <div className="glass rounded-2xl lg:hidden">
             <button
               type="button"
               onClick={() => setTocOpen((o) => !o)}
@@ -220,7 +220,7 @@ export function HelpPage() {
                             e.preventDefault();
                             goTo(s.id);
                           }}
-                          className="inline-flex rounded-full border border-line bg-surface/70 px-2.5 py-1 text-[11px] text-fg2 transition hover:border-accent hover:text-fg coarse:min-h-10 coarse:items-center focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+                          className="inline-flex rounded-full glass-field px-2.5 py-1 text-[11px] text-fg2 transition hover:border-accent hover:text-fg coarse:min-h-10 coarse:items-center focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
                         >
                           {s.title}
                         </a>

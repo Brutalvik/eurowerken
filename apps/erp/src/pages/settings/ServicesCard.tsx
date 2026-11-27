@@ -438,7 +438,7 @@ function ServiceForm({ workshopId, service, defaultSort, onClose, onSaved }: Ser
                 <label
                   key={id}
                   className={`flex h-10 w-10 cursor-pointer items-center justify-center rounded-lg border has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-accent/40 coarse:h-11 coarse:w-11 ${
-                    selected ? 'border-accent bg-accent/15 text-accent' : 'border-line bg-surface2 text-fg2 hover:text-fg'
+                    selected ? 'border-accent bg-accent/15 text-accent' : 'glass-field text-fg2 hover:text-fg'
                   }`}
                   title={label}
                 >

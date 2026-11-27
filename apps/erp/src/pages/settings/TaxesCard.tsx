@@ -315,7 +315,7 @@ export function TaxesCard() {
             )}
           </fieldset>
 
-          <p id={`${id}-example`} className="rounded-lg border border-line bg-surface2/40 px-3 py-2 text-xs text-fg" aria-live="polite">
+          <p id={`${id}-example`} className="rounded-xl glass-field px-3 py-2 text-xs text-fg" aria-live="polite">
             {example ?? 'Fix the rates above to see an example.'}
           </p>
 

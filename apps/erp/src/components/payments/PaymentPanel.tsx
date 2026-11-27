@@ -200,7 +200,7 @@ export function PaymentPanel({ invoice, onChange, tz }: Props) {
   const refundsOf = (id: string) => list.filter((r) => r.kind === 'refund' && r.refund_of === id);
 
   return (
-    <div className="space-y-3 rounded-lg border border-line bg-surface2 p-3">
+    <div className="space-y-3 rounded-xl glass-field p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="min-w-0">
           <div className="text-[11px] text-fg2">Balance</div>
@@ -257,7 +257,7 @@ export function PaymentPanel({ invoice, onChange, tz }: Props) {
 
       {payments && payments.length === 0 && <p className="text-xs text-fg3">No payments yet.</p>}
       {list.length > 0 && (
-        <ul className="divide-y divide-line rounded-lg border border-line bg-surface">
+        <ul className="divide-y divide-line rounded-xl glass-field">
           {list
             .filter((p) => p.kind === 'payment' || !p.refund_of || !list.some((x) => x.id === p.refund_of))
             .map((p) => (

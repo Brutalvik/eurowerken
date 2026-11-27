@@ -73,7 +73,7 @@ function DeployWelcome({ canEdit }: { canEdit: boolean }) {
       </p>
       <ul className="mt-4 grid gap-2 sm:grid-cols-2">
         {gives.map(({ icon: Icon, text }) => (
-          <li key={text} className="flex items-start gap-2.5 rounded-lg border border-line bg-surface2 p-3 text-xs text-fg">
+          <li key={text} className="flex items-start gap-2.5 rounded-xl glass-field p-3 text-xs text-fg">
             <Icon className="mt-0.5 h-4 w-4 shrink-0 text-accent" aria-hidden />
             {text}
           </li>
@@ -83,7 +83,7 @@ function DeployWelcome({ canEdit }: { canEdit: boolean }) {
         {canEdit ? (
           <Link
             to={SETUP}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-4 py-2.5 text-xs font-semibold text-white hover:opacity-90 coarse:min-h-11"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-4 py-2.5 text-xs font-semibold text-accent-fg hover:opacity-90 coarse:min-h-11"
           >
             <Rocket className="h-4 w-4" aria-hidden />
             Deploy your website
@@ -130,7 +130,7 @@ function DesignPanel({ site, canEdit }: { site: WorkshopSite; canEdit: boolean }
         {canEdit && (
           <Link
             to={`${SETUP}?step=style`}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3.5 py-2 text-xs font-semibold text-white hover:opacity-90 coarse:min-h-11"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3.5 py-2 text-xs font-semibold text-accent-fg hover:opacity-90 coarse:min-h-11"
           >
             <Palette className="h-3.5 w-3.5" aria-hidden />
             Change design

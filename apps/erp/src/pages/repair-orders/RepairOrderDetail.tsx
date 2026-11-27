@@ -449,7 +449,7 @@ function StatusCard({ order, canEdit, hasPending, onOrder, onAskApproval, onNeed
       <section aria-labelledby={`${id}-title`} className="space-y-4">
         <SectionTitle id={`${id}-title`} title="Progress" />
         {order.status === 'cancelled' ? (
-          <p className="rounded-lg border border-line bg-surface2/60 px-3 py-2 text-xs text-fg2">This repair order was cancelled.</p>
+          <p className="rounded-xl glass-field px-3 py-2 text-xs text-fg2">This repair order was cancelled.</p>
         ) : (
           <ol className="flex flex-wrap gap-1.5" aria-label="Repair steps">
             {REPAIR_STEPS.map((s, i) => {
@@ -460,7 +460,7 @@ function StatusCard({ order, canEdit, hasPending, onOrder, onAskApproval, onNeed
                   key={s}
                   aria-current={now ? 'step' : undefined}
                   className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] ${
-                    now ? 'bg-accent font-semibold text-white' : done ? 'bg-ok/15 text-ok' : 'border border-line text-fg3'
+                    now ? 'glass-active font-semibold' : done ? 'bg-ok/15 text-ok' : 'border border-line text-fg3'
                   }`}
                 >
                   {done ? <Check className="h-3 w-3" aria-hidden /> : <span className="tabular-nums">{i + 1}</span>}
@@ -634,7 +634,7 @@ function JobCard({ order, tz, technicians, canEdit, onOrder, announce }: JobCard
         )}
 
         {order.customer_notes && (
-          <div className="rounded-lg border border-line bg-surface2/50 p-3">
+          <div className="rounded-xl glass-field p-3">
             <p className="text-[10px] font-medium uppercase tracking-wider text-fg3">Customer notes from the booking</p>
             <p className="mt-1 whitespace-pre-line break-words text-fg">{order.customer_notes}</p>
           </div>

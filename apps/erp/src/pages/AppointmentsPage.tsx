@@ -40,6 +40,7 @@ import { ErrorNote } from './inventory/PartForm';
 import { AgendaList, DayTimeline, WeekGrid } from './appointments/CalendarViews';
 import { AppointmentDialog } from './appointments/AppointmentDialog';
 import { NewAppointmentDialog } from './appointments/NewAppointmentDialog';
+import { useVoiceAction } from '@/voice/useVoiceAction';
 
 type Filter = 'all' | AppointmentStatus;
 const FILTERS: Filter[] = ['all', ...APPOINTMENT_STATUSES];
@@ -73,6 +74,9 @@ export function AppointmentsPage() {
   const { appointmentsVersion, appointmentOpened } = useNotifications();
   const [params, setParams] = useSearchParams();
   const [creating, setCreating] = useState(false);
+  // Voice: "New appointment" opens the form (staff who may book only).
+  const openNewFromVoice = useCallback(() => setCreating(true), []);
+  useVoiceAction('new-appointment', openNewFromVoice, canEdit);
   /** Set when the form was opened from an empty calendar slot. */
   const [createAt, setCreateAt] = useState<{ day: string; time: string } | null>(null);
   const [live, setLive] = useState('');
@@ -308,14 +312,14 @@ export function AppointmentsPage() {
       </p>
 
       <div className="flex flex-wrap items-center gap-2">
-        <div role="group" aria-label="Calendar view" className="flex rounded-lg border border-line bg-surface/70 p-0.5">
+        <div role="group" aria-label="Calendar view" className="glass flex rounded-xl p-0.5">
           {(['day', 'week'] as const).map((v) => (
             <button
               key={v}
               type="button"
               aria-pressed={view === v}
               onClick={() => setView(v)}
-              className={`${segment} ${view === v ? 'bg-accent font-semibold text-white' : 'text-fg2 hover:text-fg'}`}
+              className={`${segment} ${view === v ? 'glass-active font-semibold' : 'text-fg2 hover:text-fg'}`}
             >
               {v === 'day' ? 'Day' : 'Week'}
             </button>
@@ -400,11 +404,11 @@ export function AppointmentsPage() {
                 aria-pressed={active}
                 onClick={() => setFilter(f)}
                 className={`whitespace-nowrap rounded-lg px-3 py-1.5 text-xs transition coarse:min-h-11 ${
-                  active ? 'bg-accent font-semibold text-white' : 'border border-line bg-surface/70 text-fg2 hover:text-fg'
+                  active ? 'glass-active font-semibold' : 'glass-field text-fg2 hover:text-fg'
                 }`}
               >
                 {f === 'all' ? 'All' : APPOINTMENT_STATUS_LABEL[f]}
-                <span className={`ml-1.5 text-[10px] ${active ? 'text-white/80' : 'text-fg3'}`}>{count}</span>
+                <span className={`ml-1.5 text-[10px] ${active ? 'text-fg2' : 'text-fg3'}`}>{count}</span>
               </button>
             );
           })}

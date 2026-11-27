@@ -12,7 +12,7 @@ import { CUSTOMER_SITE_URL } from '@/config/customerSite';
 
 
 const inputClass =
-  'w-full rounded-lg border border-line bg-surface2 px-3 py-2 text-xs text-fg outline-none placeholder:text-fg3 focus:border-accent coarse:min-h-11';
+  'w-full rounded-xl glass-field px-3 py-2 text-xs text-fg outline-none placeholder:text-fg3 focus:border-accent coarse:min-h-11';
 
 function Labeled({ id, label, hint, children }: { id: string; label: string; hint?: string; children: ReactNode }) {
   return (
@@ -168,7 +168,7 @@ export function WebsiteCard({ onSaved }: { onSaved?: (site: WorkshopSite) => voi
                   type="color"
                   value={hexToRgbTriplet(draft.accent_color) ? draft.accent_color : DEFAULT_ACCENT}
                   onChange={(e) => set('accent_color', e.target.value)}
-                  className="h-9 w-12 cursor-pointer rounded-lg border border-line bg-surface2 p-1 coarse:h-11"
+                  className="h-9 w-12 cursor-pointer rounded-xl glass-field p-1 coarse:h-11"
                 />
                 <input
                   aria-label="Brand colour hex"
@@ -258,7 +258,7 @@ export function WebsiteCard({ onSaved }: { onSaved?: (site: WorkshopSite) => voi
                 <label
                   key={value}
                   className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition ${
-                    (draft.nav_style ?? 'tabbar') === value ? 'border-accent bg-accent/5' : 'border-line bg-surface2'
+                    (draft.nav_style ?? 'tabbar') === value ? 'border-accent bg-accent/5' : 'glass-field'
                   }`}
                 >
                   <input
@@ -278,7 +278,7 @@ export function WebsiteCard({ onSaved }: { onSaved?: (site: WorkshopSite) => voi
             </div>
           </fieldset>
 
-          <label className="flex items-start gap-3 rounded-lg border border-line bg-surface2 p-3">
+          <label className="flex items-start gap-3 rounded-xl glass-field p-3">
             <input
               type="checkbox"
               checked={draft.published}

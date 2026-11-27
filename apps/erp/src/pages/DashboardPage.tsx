@@ -43,10 +43,10 @@ function Empty({ children }: { children: React.ReactNode }) {
 }
 
 export function DashboardPage() {
-  const { mode } = useTheme();
+  const { effective: mode, highContrast } = useTheme();
   const { user, can } = useAuth();
   const navigate = useNavigate();
-  const palette = chartPalette(mode);
+  const palette = chartPalette(mode, highContrast);
   const workshopId = user?.workshop?.id ?? null;
   const seeOrders = can('repair-orders', 'view');
   const seeParts = can('inventory', 'view');
@@ -95,7 +95,7 @@ export function DashboardPage() {
       hasSeries: series.some((s) => s.value > 0),
       thisMonth,
       change: lastMonth > 0 ? ((thisMonth - lastMonth) / lastMonth) * 100 : undefined,
-      mix: [...mix.entries()].filter(([, v]) => v > 0).map(([kind, v]) => ({ name: ITEM_KIND_LABEL[kind], value: v, pct: mixTotal ? Math.round((v / mixTotal) * 100) : 0 })),
+      mix: [...mix.entries()].filter(([, v]) => v > 0).map(([kind, v]) => ({ name: ITEM_KIND_LABEL[kind], value: v, pct: mixTotal ? Math.round((v / mixTotal) * 100) : 0 })).sort((a, b) => b.value - a.value),
       open: list.filter((o) => o.status !== 'completed' && o.status !== 'cancelled').length,
       awaiting: list.filter((o) => o.status === 'awaiting_approval'),
     };
@@ -136,16 +136,37 @@ export function DashboardPage() {
       {seeOrders && (
         <div className="grid gap-4 xl:grid-cols-[1fr_300px]">
           <Card className="p-4 sm:p-5">
-            <CardHeader title="Completed work" subtitle="Last 6 months · approved items of completed repair orders, before tax" />
+            <CardHeader
+              title="Completed work"
+              subtitle="Approved items of completed repair orders, before tax"
+              action={<span className="text-xs font-medium text-fg2">6-month</span>}
+            />
             {stats.hasSeries ? (
               <div className="h-52" role="img" aria-label="Bar chart of completed work per month for the last six months">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={stats.series} margin={{ top: 5, right: 8, left: -12, bottom: 0 }}>
+                    <defs>
+                      {/* The current month: a cobalt glass bar. Earlier months: quiet translucent bars. */}
+                      <linearGradient id="dash-bar-current" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor={palette.barTop} stopOpacity={1} />
+                        <stop offset="100%" stopColor={palette.barBottom} stopOpacity={highContrast ? 1 : 0.9} />
+                      </linearGradient>
+                    </defs>
                     <CartesianGrid stroke={palette.grid} strokeDasharray="3 3" vertical={false} />
                     <XAxis dataKey="month" tick={{ fill: palette.axis, fontSize: 11 }} axisLine={false} tickLine={false} />
                     <YAxis tick={{ fill: palette.axis, fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(v: number) => formatCompactCurrency(v)} />
                     <Tooltip contentStyle={tooltipStyle} cursor={{ fill: palette.grid }} formatter={(v) => formatCurrencyWhole(Number(v))} />
-                    <Bar dataKey="value" name="Completed work" fill={palette.accent} radius={[4, 4, 0, 0]} maxBarSize={44} />
+                    <Bar dataKey="value" name="Completed work" radius={[8, 8, 0, 0]} maxBarSize={52}>
+                      {stats.series.map((_, i) => (
+                        <Cell
+                          key={i}
+                          fill={i === stats.series.length - 1 ? 'url(#dash-bar-current)' : palette.barMuted}
+                          fillOpacity={i === stats.series.length - 1 || highContrast ? 1 : 0.45}
+                          stroke={highContrast ? palette.axis : 'rgba(255,255,255,0.18)'}
+                          strokeWidth={highContrast ? 2 : 1}
+                        />
+                      ))}
+                    </Bar>
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -158,10 +179,19 @@ export function DashboardPage() {
             <CardHeader title="Work mix" subtitle="Completed work by item type" />
             {stats.mix.length > 0 ? (
               <>
-                <div className="h-32" role="img" aria-label="Donut chart of completed work by item type">
+                <div className="relative h-44" role="img" aria-label="Donut chart of completed work by item type">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
-                      <Pie data={stats.mix} dataKey="value" innerRadius={36} outerRadius={58} paddingAngle={3} stroke="none">
+                      <Pie
+                        data={stats.mix}
+                        dataKey="value"
+                        innerRadius={56}
+                        outerRadius={78}
+                        paddingAngle={stats.mix.length > 1 ? 3 : 0}
+                        stroke={highContrast ? palette.axis : 'rgba(255,255,255,0.22)'}
+                        strokeWidth={highContrast ? 2 : 1}
+                        cornerRadius={stats.mix.length > 1 ? 6 : 0}
+                      >
                         {stats.mix.map((slice, i) => (
                           <Cell key={slice.name} fill={sliceColors[i % sliceColors.length]} />
                         ))}
@@ -169,6 +199,11 @@ export function DashboardPage() {
                       <Tooltip contentStyle={tooltipStyle} formatter={(v) => formatCurrencyWhole(Number(v))} />
                     </PieChart>
                   </ResponsiveContainer>
+                  {/* The largest share, in the middle of the ring. */}
+                  <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center" aria-hidden>
+                    <span className="font-display text-2xl font-semibold tracking-tight text-fg">{stats.mix[0].pct}%</span>
+                    <span className="text-xs text-fg2">{stats.mix[0].name}</span>
+                  </div>
                 </div>
                 <ul className="mt-3 space-y-2">
                   {stats.mix.map((slice, i) => (

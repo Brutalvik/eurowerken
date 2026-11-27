@@ -121,7 +121,7 @@ export function UsersPage() {
             value={m.role ?? ''}
             disabled={savingId === m.id}
             onChange={(e) => void update(m.id, { role: (e.target.value || null) as Role | null })}
-            className="rounded-md border border-line bg-surface2 px-2 py-1 text-xs text-fg outline-none focus:border-accent coarse:min-h-11"
+            className="rounded-xl glass-field px-2 py-1 text-xs text-fg outline-none focus:border-accent coarse:min-h-11"
           >
             <option value="">Awaiting approval</option>
             {ROLES.filter((r) => isManager || r !== 'Manager' || m.role === 'Manager').map((r) => (
@@ -269,7 +269,7 @@ export function UsersPage() {
                             value={access}
                             disabled={savingCell === `${role}:${module}`}
                             onChange={(e) => void setAccess(role, module, e.target.value as Access)}
-                            className="rounded-md border border-line bg-surface2 px-2 py-1 text-xs text-fg outline-none focus:border-accent coarse:min-h-11"
+                            className="rounded-xl glass-field px-2 py-1 text-xs text-fg outline-none focus:border-accent coarse:min-h-11"
                           >
                             {(['none', 'view', 'full'] as Access[]).map((a) => (
                               <option key={a} value={a}>

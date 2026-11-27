@@ -21,7 +21,7 @@ import { ImageUpload } from '@/components/ui/ImageUpload';
 // and Team cards in Settings. They belong in components/ui once that is agreed.
 
 export const inputClass =
-  'w-full rounded-lg border border-line bg-surface2 px-3 py-2 text-xs text-fg outline-none placeholder:text-fg3 focus:border-accent coarse:min-h-11';
+  'w-full rounded-xl glass-field px-3 py-2 text-xs text-fg outline-none placeholder:text-fg3 focus:border-accent coarse:min-h-11';
 
 export function Labeled({ id, label, hint, children }: { id: string; label: string; hint?: string; children: ReactNode }) {
   return (
@@ -68,7 +68,7 @@ export function CheckRow({
   onChange: (v: boolean) => void;
 }) {
   return (
-    <div className="flex items-start gap-3 rounded-lg border border-line bg-surface2 p-3">
+    <div className="flex items-start gap-3 rounded-xl glass-field p-3">
       <input
         id={id}
         type="checkbox"
@@ -151,7 +151,7 @@ export function Dialog({ open, title, onClose, children, footer, role = 'dialog'
 
   return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-stretch justify-center bg-sidebar/60 md:items-center md:p-6"
+      className="fixed inset-0 z-50 flex animate-fade-in items-stretch justify-center bg-bg/55 backdrop-blur-sm md:items-center md:p-6 [[data-contrast=high]_&]:bg-bg/90 [[data-contrast=high]_&]:backdrop-blur-none"
       onMouseDown={(e) => {
         if (closeOnBackdrop && e.target === e.currentTarget) onClose();
       }}
@@ -163,9 +163,9 @@ export function Dialog({ open, title, onClose, children, footer, role = 'dialog'
         aria-labelledby={titleId}
         tabIndex={-1}
         onKeyDown={onKeyDown}
-        className={`pt-safe pb-safe flex h-[100dvh] w-full flex-col bg-surface text-fg outline-none md:h-auto md:max-h-[90dvh] md:rounded-xl md:border md:border-line md:shadow-xl ${width}`}
+        className={`glass-strong pt-safe pb-safe flex h-[100dvh] w-full animate-glass-in flex-col text-fg outline-none md:h-auto md:max-h-[90dvh] md:rounded-3xl ${width}`}
       >
-        <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-3 md:px-5">
+        <div className="flex items-center justify-between gap-3 border-b border-line/50 px-4 py-3 md:px-5">
           <h2 id={titleId} className="min-w-0 truncate font-display text-sm font-semibold text-fg">
             {title}
           </h2>
@@ -182,7 +182,7 @@ export function Dialog({ open, title, onClose, children, footer, role = 'dialog'
           {children}
         </div>
         {footer && (
-          <div className="flex flex-wrap items-center justify-end gap-2 border-t border-line px-4 py-3 md:px-5">{footer}</div>
+          <div className="flex flex-wrap items-center justify-end gap-2 border-t border-line/50 px-4 py-3 md:px-5">{footer}</div>
         )}
       </div>
     </div>,

@@ -90,13 +90,13 @@ export function InvitesCard({ isManager, onChanged }: { isManager: boolean; onCh
           aria-label="Email to invite"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className="min-w-0 flex-1 rounded-lg border border-line bg-surface2 px-3 py-2 text-xs text-fg outline-none placeholder:text-fg3 focus:border-accent coarse:min-h-11"
+          className="min-w-0 flex-1 rounded-xl glass-field px-3 py-2 text-xs text-fg outline-none placeholder:text-fg3 focus:border-accent coarse:min-h-11"
         />
         <select
           aria-label="Role for the invite"
           value={role}
           onChange={(e) => setRole(e.target.value as Role)}
-          className="rounded-lg border border-line bg-surface2 px-2 py-2 text-xs text-fg outline-none focus:border-accent coarse:min-h-11"
+          className="rounded-xl glass-field px-2 py-2 text-xs text-fg outline-none focus:border-accent coarse:min-h-11"
         >
           {ROLES.filter((r) => isManager || r !== 'Manager').map((r) => (
             <option key={r} value={r}>
@@ -127,7 +127,7 @@ export function InvitesCard({ isManager, onChanged }: { isManager: boolean; onCh
               value={inviteUrl(created.token)}
               aria-label="Invite link"
               onFocus={(e) => e.currentTarget.select()}
-              className="min-w-0 flex-1 rounded-md border border-line bg-surface px-2 py-1.5 font-mono text-[11px] text-fg"
+              className="min-w-0 flex-1 rounded-xl glass-field px-2 py-1.5 font-mono text-[11px] text-fg"
             />
             <Button size="sm" variant="ghost" onClick={() => void copy(created.token)}>
               {copied === created.token ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}

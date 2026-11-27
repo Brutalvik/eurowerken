@@ -191,7 +191,7 @@ function OrderPartsDialog({
           <fieldset className="space-y-2">
             <legend className="mb-1 text-xs font-medium text-fg2">Part lines to order</legend>
             {lines.map((l) => (
-              <label key={l.id} className="flex items-start gap-3 rounded-lg border border-line bg-surface2 p-3 text-xs">
+              <label key={l.id} className="flex items-start gap-3 rounded-xl glass-field p-3 text-xs">
                 <input
                   type="checkbox"
                   checked={chosen.has(l.id)}

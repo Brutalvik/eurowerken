@@ -59,7 +59,7 @@ function MutesCard() {
               }}
             />
           ) : (
-            <p className="rounded-lg border border-line bg-surface2 p-3 text-xs text-fg2">
+            <p className="rounded-xl glass-field p-3 text-xs text-fg2">
               Customer message notifications are <strong className="text-fg">{state.all ? 'off' : 'on'}</strong> for this shop. Only staff
               with full access to Settings can change this.
             </p>
@@ -184,7 +184,7 @@ function CustomerEmailsCard() {
               />
             </>
           ) : (
-            <p className="rounded-lg border border-line bg-surface2 p-3 text-xs text-fg2">
+            <p className="rounded-xl glass-field p-3 text-xs text-fg2">
               Progress emails are <strong className="text-fg">{s.email_progress ? 'on' : 'off'}</strong> and invoice emails are{' '}
               <strong className="text-fg">{s.email_invoice ? 'on' : 'off'}</strong> for this shop. Approval requests are always emailed. Invoices{' '}
               <strong className="text-fg">{s.invoice_hide_contact ? 'hide' : 'show'}</strong> the customer&apos;s phone and email by default
@@ -192,7 +192,7 @@ function CustomerEmailsCard() {
             </p>
           )}
 
-          <div className="flex items-start gap-3 rounded-lg border border-line bg-surface2 p-3 opacity-60">
+          <div className="flex items-start gap-3 rounded-xl glass-field p-3 opacity-60">
             <input
               id={`${id}-sms`}
               type="checkbox"

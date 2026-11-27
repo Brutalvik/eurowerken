@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ImageOff, Plus } from 'lucide-react';
+import { useVoiceAction } from '@/voice/useVoiceAction';
+import { Cog, ImageOff, Plus } from 'lucide-react';
+import { useVoice } from '@/voice/VoiceProvider';
 import type { PartRow } from '@eurowerken/shared';
 import { deletePart, imageUrl, listPartCosts, listParts } from '@/api/catalogue';
 import { useAuth } from '@/auth/AuthContext';
@@ -23,6 +25,7 @@ export function InventoryPage() {
   const { user, can } = useAuth();
   const workshopId = user?.workshop?.id ?? null;
   const canEdit = can('inventory', 'full');
+  const { openVoice, supported: voiceSupported } = useVoice();
   const canSeeCost = can('inventory', 'view');
 
   const [parts, setParts] = useState<PartRow[]>([]);
@@ -32,6 +35,9 @@ export function InventoryPage() {
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState<string>(ALL);
   const [editing, setEditing] = useState<{ part: PartRow | null } | null>(null);
+  // Voice: "Add part to inventory" opens the new part form (staff who may change inventory only).
+  const addFromVoice = useCallback(() => setEditing({ part: null }), []);
+  useVoiceAction('add-part', addFromVoice, canEdit && Boolean(workshopId));
   const [deleting, setDeleting] = useState<PartRow | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -109,7 +115,7 @@ export function InventoryPage() {
       mobile: 'title',
       cell: (p) => (
         <div className="flex min-w-0 items-center gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-line bg-surface2">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl glass-field">
             {p.image_paths[0] ? (
               <img src={imageUrl(p.image_paths[0])} alt="" className="h-full w-full object-cover" loading="lazy" />
             ) : (
@@ -212,26 +218,19 @@ export function InventoryPage() {
       </div>
     );
   } else if (parts.length === 0) {
-    body = (
-      <div className="flex flex-col items-center gap-3 px-4 py-12 text-center">
-        <p className="text-xs text-fg2">No parts yet. Add your first part.</p>
-        {canEdit && (
-          <Button onClick={() => setEditing({ part: null })}>
-            <Plus className="h-3.5 w-3.5" aria-hidden />
-            Add part
-          </Button>
-        )}
-      </div>
-    );
+    body = null; // The empty state is its own centred card below.
   } else {
     body = <DataTable columns={columns} rows={filtered} getKey={(p) => p.id} emptyMessage="No parts match your search." />;
   }
 
+  const empty = !loading && !loadError && parts.length === 0;
+
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+      {/* One frosted toolbar: search, categories, purchase orders, Add part. */}
+      <div className="glass flex flex-col gap-3 rounded-2xl p-2.5 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
         <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
-          <SearchInput value={search} onChange={setSearch} placeholder="Search parts, SKUs, brands" />
+          <SearchInput value={search} onChange={setSearch} placeholder="Search parts, SKUs, brands" className="w-full sm:w-64" />
           {categories.length > 0 && <PillTabs label="Part category" options={tabs} value={category} onChange={setCategory} />}
           {canSeeCost && <OpenOrdersLink count={onOrder.size} />}
         </div>
@@ -243,7 +242,32 @@ export function InventoryPage() {
         )}
       </div>
 
-      <Card className="overflow-hidden">{body}</Card>
+      {empty ? (
+        <div className="flex justify-center pt-8 sm:pt-16">
+          <Card className="flex w-full max-w-md flex-col items-center gap-3 px-6 py-8 text-center">
+            <Cog className="h-14 w-14 text-fg3" strokeWidth={1.5} aria-hidden />
+            <h2 className="font-display text-xl font-semibold tracking-tight text-fg sm:text-2xl">No parts yet. Add your first part.</h2>
+            <p className="max-w-xs text-sm text-fg2">Parts you add here are tracked in stock and can be used on repair orders.</p>
+            {canEdit && (
+              <>
+                <Button variant="ghost" onClick={() => setEditing({ part: null })} disabled={!workshopId} className="mt-1 text-fg">
+                  <Plus className="h-3.5 w-3.5" aria-hidden />
+                  Add part
+                </Button>
+                <button
+                  type="button"
+                  onClick={() => openVoice({ listen: voiceSupported })}
+                  className="text-sm text-fg2 underline-offset-4 transition hover:text-fg hover:underline"
+                >
+                  Or say: Add brake pad to inventory
+                </button>
+              </>
+            )}
+          </Card>
+        </div>
+      ) : (
+        <Card className="overflow-hidden">{body}</Card>
+      )}
 
       {workshopId && (
         <PartForm

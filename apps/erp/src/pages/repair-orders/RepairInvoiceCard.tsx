@@ -170,7 +170,7 @@ function InvoiceCard({ repairOrderId, status, invoice, outbox, loaded, loadError
               {invoice.status === 'void' && '. Void because the repair was cancelled.'}
             </p>
 
-            <dl className="space-y-1 rounded-lg border border-line bg-surface2/50 p-3 tabular-nums">
+            <dl className="space-y-1 rounded-xl glass-field p-3 tabular-nums">
               <div className="flex justify-between gap-3">
                 <dt className="text-fg2">Subtotal</dt>
                 <dd className="text-fg">{formatCurrency(invoice.subtotal)}</dd>

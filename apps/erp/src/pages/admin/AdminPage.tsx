@@ -282,7 +282,7 @@ function WorkshopsTab({
             id={filterId}
             value={status}
             onChange={(e) => setStatus(e.target.value as StatusFilter)}
-            className="rounded-lg border border-line bg-surface2 px-2.5 py-2 text-xs text-fg outline-none focus:border-accent coarse:min-h-11"
+            className="rounded-xl glass-field px-2.5 py-2 text-xs text-fg outline-none focus:border-accent coarse:min-h-11"
           >
             <option value="all">All</option>
             <option value="active">Active</option>

@@ -312,7 +312,7 @@ export function ImportWizard({ open, onClose }: { open: boolean; onClose: () => 
             </label>
             <ErrorNote errors={fileError} />
             {parsed && (
-              <div role="status" className="rounded-lg border border-line bg-surface2/50 px-3 py-2 text-fg2">
+              <div role="status" className="rounded-xl glass-field px-3 py-2 text-fg2">
                 <p className="font-semibold text-fg">{fileName}</p>
                 <p>
                   {parsed.rows.length.toLocaleString('en-CA')} rows, {parsed.headers.length} columns, {parsed.delimiter === ';' ? 'semicolon' : parsed.delimiter === '\t' ? 'tab' : 'comma'} separated, {parsed.encoding}.
@@ -468,7 +468,7 @@ function Stepper({ step }: { step: Step }) {
           key={s}
           aria-current={i === step ? 'step' : undefined}
           className={`rounded-full px-2.5 py-0.5 text-[10px] font-semibold ${
-            i === step ? 'bg-accent text-white' : i < step ? 'bg-accent/15 text-accent' : 'bg-surface2 text-fg3'
+            i === step ? 'bg-accent text-accent-fg' : i < step ? 'bg-accent/15 text-accent' : 'bg-surface2 text-fg3'
           }`}
         >
           {i + 1}. {s}

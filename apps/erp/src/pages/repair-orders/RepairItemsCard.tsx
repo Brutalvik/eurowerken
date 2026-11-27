@@ -325,7 +325,7 @@ function ItemRow({ item, record, tz, first, last, editable, busy, selecting, cho
     }
   };
 
-  const small = 'w-full rounded-lg border border-line bg-surface2 px-2 py-1.5 text-xs tabular-nums text-fg outline-none focus:border-accent coarse:min-h-11';
+  const small = 'w-full rounded-xl glass-field px-2 py-1.5 text-xs tabular-nums text-fg outline-none focus:border-accent coarse:min-h-11';
 
   return (
     <li className={`grid gap-2 px-3 py-3 text-xs lg:grid-cols-[minmax(0,1fr)_5.5rem_7rem_6rem_auto] lg:items-center lg:gap-3 ${item.approval === 'declined' ? 'opacity-70' : ''}`}>
@@ -521,7 +521,7 @@ function AddItemForm({ order, items, services, parts, onAdded }: AddItemFormProp
   const preview = qtyNumber !== null && priceNumber !== null ? formatCurrency(Math.round(qtyNumber * priceNumber * 100) / 100) : null;
 
   return (
-    <form onSubmit={(e) => void submit(e)} className="space-y-3 rounded-lg border border-line bg-surface2/40 p-3" aria-labelledby={`${id}-title`}>
+    <form onSubmit={(e) => void submit(e)} className="space-y-3 rounded-xl glass-field p-3" aria-labelledby={`${id}-title`}>
       <h3 id={`${id}-title`} className="text-[10px] font-medium uppercase tracking-wider text-fg3">
         Add an item
       </h3>
@@ -533,7 +533,7 @@ function AddItemForm({ order, items, services, parts, onAdded }: AddItemFormProp
             aria-pressed={kind === k}
             onClick={() => reset(k)}
             className={`rounded-lg px-3 py-1.5 text-xs transition coarse:min-h-11 coarse:px-4 ${
-              kind === k ? 'bg-accent font-semibold text-white' : 'border border-line bg-surface/70 text-fg2 hover:text-fg'
+              kind === k ? 'glass-active font-semibold' : 'glass-field text-fg2 hover:text-fg'
             }`}
           >
             {ITEM_KIND_LABEL[k]}

@@ -284,7 +284,7 @@ export function InvoicesPage() {
       </p>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 [&>*:last-child:nth-child(odd)]:col-span-2 sm:[&>*:last-child:nth-child(odd)]:col-span-1">
         {cards.map((card) => (
-          <div key={card.label} className="glass rounded-xl p-4 sm:p-5">
+          <div key={card.label} className="glass rounded-2xl p-4 sm:p-5">
             <div className="text-xs text-fg2">{card.label}</div>
             <div className={`mt-2 font-display text-xl font-semibold tabular-nums ${card.color}`}>{invoices ? card.value : '...'}</div>
             <div className="mt-1 text-[11px] text-fg3">{card.caption}</div>

@@ -14,7 +14,7 @@ export function LegalPage({ doc }: { doc: LegalDocument }) {
           {BRAND.prefix}
           {BRAND.suffix}
         </Link>
-        <article className="mt-6 glass-strong rounded-xl p-5 sm:p-8">
+        <article className="mt-6 glass-strong rounded-2xl p-5 sm:p-8">
           <h1 className="font-display text-xl font-semibold text-fg sm:text-2xl">{doc.title}</h1>
           <p className="mt-1 text-xs text-fg3">
             {MADE_BY_NOTICE} Effective {LEGAL_EFFECTIVE_DATE}.

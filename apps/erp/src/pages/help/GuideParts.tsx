@@ -47,7 +47,7 @@ function Callout({ kind, text }: { kind: CalloutKind; text: string }) {
 function Figure({ shot, onOpen }: { shot: GuideShot; onOpen: (s: GuideShot) => void }) {
   const [failed, setFailed] = useState(false);
   return (
-    <figure className="overflow-hidden rounded-xl border border-line bg-surface2/40">
+    <figure className="overflow-hidden rounded-xl glass-field">
       {failed ? (
         <div className="flex aspect-[16/9] flex-col items-center justify-center gap-2 border-b border-dashed border-line px-6 text-center">
           <ImageOff className="h-6 w-6 text-fg3" aria-hidden />
@@ -131,7 +131,7 @@ function Step({ step, number, onOpen }: { step: GuideStep; number: number; onOpe
   return (
     <li className="flex gap-3 sm:gap-4">
       <span
-        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent font-display text-xs font-semibold text-white shadow-sm"
+        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent font-display text-xs font-semibold text-accent-fg shadow-sm"
         aria-hidden
       >
         {number}

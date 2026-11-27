@@ -103,7 +103,7 @@ export function ImageUpload({
       {value.length > 0 && (
         <ul className="mb-2 grid grid-cols-3 gap-2 sm:grid-cols-4" aria-label={`${label}: attached`}>
           {value.map((path, i) => (
-            <li key={path} className="relative overflow-hidden rounded-lg border border-line bg-surface2">
+            <li key={path} className="relative overflow-hidden rounded-xl glass-field">
               <img src={toUrl(path)} alt={`${label} ${i + 1}`} className="aspect-square w-full object-cover" loading="lazy" />
               {multiple && i === 0 && value.length > 1 && (
                 <span className="absolute left-1 top-1 rounded bg-surface/90 px-1.5 py-0.5 text-[10px] font-semibold text-fg">
