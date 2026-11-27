@@ -18,7 +18,7 @@ export const ACCESSIBILITY_SECTION: GuideSection = {
     },
     {
       title: 'High contrast',
-      body: 'Turn on **High contrast** here or with the accessibility button at the top right. Panels become solid with bright outlines, and every status shows an icon as well as its colour. It also turns on by itself when the device is set to increase contrast.',
+      body: 'Turn on **High contrast** here. While it is on, a **High Contrast: On** switch at the top right turns it off again. Panels become solid with bright outlines, and every status shows an icon as well as its colour. It also turns on by itself when the device is set to increase contrast.',
     },
   ],
 };

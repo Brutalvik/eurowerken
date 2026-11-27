@@ -1,4 +1,4 @@
-import { Accessibility, Mic, Moon, Sun } from 'lucide-react';
+import { Mic, Moon, Sun } from 'lucide-react';
 import { NotificationBell } from '@/notifications/NotificationBell';
 import { useLocation } from 'react-router-dom';
 import { MODULE_LABELS } from '@/auth/rbac';
@@ -56,11 +56,7 @@ export function Header({ safeTop = true }: { safeTop?: boolean }) {
                 <span className="absolute right-0.5 top-0.5 h-4 w-4 rounded-full bg-fg" />
               </span>
             </button>
-          ) : (
-            <button type="button" onClick={toggleContrast} aria-pressed={false} aria-label="Turn on high contrast" title="High contrast" className={iconButton}>
-              <Accessibility className="h-5 w-5" aria-hidden />
-            </button>
-          )}
+          ) : null}
 
           <NotificationBell />
 
