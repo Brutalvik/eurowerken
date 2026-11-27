@@ -5,6 +5,12 @@ creates the invoice; the ERP then makes the invoice PDF, stores it in the privat
 invoice email. This Edge Function sends the queue through your shop's email account (SMTP, with nodemailer),
 attaching the stored PDF to invoice emails.
 
+**Approval requests** (migration 034): every time the shop asks the customer to approve work, including a second
+request while the repair is already waiting, the customer gets an email listing each item waiting for a decision with
+its price, and a **Review and approve** button. These are sent even when progress emails are turned off, because the
+work cannot go ahead without an answer. If the customer has answered everything before the email goes out, it is
+skipped.
+
 It also sends **purchase orders to suppliers** (migration 031): when someone presses **Email to supplier** on a
 purchase order, the ERP makes the PO PDF, stores it in the private `documents` bucket
 (`<workshop id>/po/<po id>.pdf`) and queues a job in `supplier_outbox` (kind `purchase_order`). The function emails
@@ -18,7 +24,8 @@ Until these steps are done, nothing is lost: messages wait in the queue, and the
 
 In the Supabase SQL editor, run `supabase/migrations/023_customer_emails_invoices.sql`, then
 `supabase/migrations/024_invoice_privacy_and_pdf.sql`. For purchase orders also run
-`supabase/migrations/031_purchasing.sql` (the function keeps sending customer emails without it).
+`supabase/migrations/031_purchasing.sql`, and for approval emails `supabase/migrations/034_approval_emails.sql` (the
+function keeps sending the other emails without them).
 
 ## 2. Get your email account's SMTP settings
 

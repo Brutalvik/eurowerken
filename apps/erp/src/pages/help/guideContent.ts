@@ -1276,6 +1276,10 @@ export const GUIDE: GuideChapter[] = [
             body: 'With **Email customers at every progress step** on, the customer gets an email each time their repair moves to a new step. Customers with an account who turned emails off get none.',
           },
           {
+            title: 'Approval requests',
+            body: 'Every time you ask the customer to approve work (**Ask customer to approve** on a repair order, or sending an inspection with its findings), they get an email listing each item waiting for their decision, the prices and a **Review and approve** button. This includes a second or third request while the repair is already waiting. Approval emails are sent even with progress emails off, because the work cannot go ahead without an answer.',
+          },
+          {
             title: 'Invoice email',
             body: 'With **Email the invoice as a PDF when a repair is ready for pickup** on, the invoice is emailed when the repair is marked Ready for pickup.',
           },

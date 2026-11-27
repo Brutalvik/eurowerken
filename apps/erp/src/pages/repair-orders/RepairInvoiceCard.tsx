@@ -211,6 +211,7 @@ function describe(row: OutboxRow, invoice: Invoice | null): string {
   if (row.kind === 'invoice') {
     return invoice && row.invoice_id === invoice.id ? `Invoice ${invoice.number}` : 'Invoice';
   }
+  if (row.kind === 'approval') return 'Approval request (estimate)';
   return row.status ? `Status: ${REPAIR_STATUS_LABEL[row.status] ?? row.status}` : 'Status update';
 }
 
@@ -222,7 +223,7 @@ function CustomerEmailsCard({ rows, invoice, tz }: { rows: OutboxRow[]; invoice:
       <section aria-labelledby={`${id}-title`} className="space-y-3 text-xs">
         <SectionTitle id={`${id}-title`} title="Customer emails" subtitle="Newest first" />
         {rows.length === 0 ? (
-          <p className="text-fg2">No emails to the customer yet. One is sent at each progress step, if the shop has progress emails on.</p>
+          <p className="text-fg2">No emails to the customer yet. One is sent at each progress step (if the shop has progress emails on) and every time the customer is asked to approve work.</p>
         ) : (
           <ul className="divide-y divide-line">
             {rows.map((row) => {

@@ -107,12 +107,14 @@ const STATUS_COPY: Record<RepairStatus, (car: string, shop: string, ro: string) 
   }),
 };
 
-function wrapEmail(shop: Shop, repair: RepairInfo, lines: string[], cta: string | null): Omit<Email, 'subject'> {
+function wrapEmail(shop: Shop, repair: RepairInfo, lines: string[], cta: string | null, footer?: string): Omit<Email, 'subject'> {
   const hello = `Hi ${firstName(repair.contact_name)},`;
   const contact = [shop.phone, shop.email, shop.address].filter(Boolean) as string[];
-  const footerNote = repair.hasAccount
-    ? 'You get these updates because you have a repair with us. To stop progress emails, turn off email reminders in your account.'
-    : 'You get these updates because you have a repair with us.';
+  const footerNote =
+    footer ??
+    (repair.hasAccount
+      ? 'You get these updates because you have a repair with us. To stop progress emails, turn off email reminders in your account.'
+      : 'You get these updates because you have a repair with us.');
 
   const text = [
     hello,
@@ -153,6 +155,40 @@ export function statusEmail(status: RepairStatus, shop: Shop, repair: RepairInfo
   const copy = STATUS_COPY[status](car, shop.name, repair.number);
   const cta = status === 'awaiting_approval' ? 'Review the estimate' : 'Track your repair';
   return { ...wrapEmail(shop, repair, copy.lines, cta), subject: copy.subject };
+}
+
+/** A line of the estimate that waits for the customer's decision. */
+export interface ApprovalLine {
+  description: string;
+  quantity: number;
+  unit_price: number;
+}
+
+/**
+ * The approval request (migration 034): sent each time the shop asks the customer to approve work, listing every
+ * line still waiting for a decision. Sent even when progress emails are off: the work cannot go ahead without it.
+ */
+export function approvalEmail(shop: Shop, repair: RepairInfo, items: ApprovalLine[]): Email {
+  const car = vehicleName(repair.vehicle);
+  const lineTotal = (l: ApprovalLine) => Math.round((Number(l.quantity) || 0) * (Number(l.unit_price) || 0) * 100) / 100;
+  const total = Math.round(items.reduce((a, l) => a + lineTotal(l), 0) * 100) / 100;
+  const n = items.length;
+  const lines = [
+    `${shop.name} needs your OK before working on your ${car}.`,
+    `${n === 1 ? 'This item is' : `These ${n} items are`} waiting for your approval:`,
+    ...items.map((l) => {
+      const q = Number(l.quantity) || 0;
+      const qtyText = q !== 1 ? `${Number.isInteger(q) ? q : q.toFixed(2)} x ` : '';
+      return `• ${qtyText}${l.description}: ${money(lineTotal(l))}`;
+    }),
+    `Total waiting: ${money(total)} before tax.`,
+    'Please approve or decline each item. Nothing is done without your OK, and you can ask us any questions first.',
+  ];
+  const footer = 'You get this email because work on your repair needs your decision.';
+  return {
+    ...wrapEmail(shop, repair, lines, 'Review and approve', footer),
+    subject: `Approval needed: ${n === 1 ? '1 item' : `${n} items`} for your ${car} (${money(total)})`,
+  };
 }
 
 /** The Ready-for-pickup email that carries the invoice PDF. */

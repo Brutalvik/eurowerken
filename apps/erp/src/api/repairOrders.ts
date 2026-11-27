@@ -599,7 +599,17 @@ export async function requestApproval(order: RepairOrder, itemIds: string[]): Pr
   if (itemIds.length === 0) throw new Error('Choose at least one item for the customer to approve.');
   const { error } = await supabase.from('repair_order_items').update({ approval: 'pending' }).in('id', itemIds).eq('repair_order_id', order.id);
   if (error) fail(error);
-  if (order.status === 'awaiting_approval') return order;
+  if (order.status === 'awaiting_approval') {
+    // Already waiting: the status does not change, so ask the database for the approval email (migration 034).
+    const { error: mailError } = await supabase.rpc('queue_approval_email', { p_repair_order: order.id });
+    if (mailError) {
+      const text = `${mailError.message} ${mailError.details ?? ''}`;
+      // Before migration 034 the lines still wait on the tracking page; only the email is missing.
+      if (mailError.code === 'PGRST202' || /queue_approval_email.*(does not exist|schema cache)|could not find the function/i.test(text)) return order;
+      fail(mailError);
+    }
+    return order;
+  }
   if (!canCancel(order.status)) throw new Error('A completed or cancelled repair order cannot be sent for approval.');
   return updateRepairStatus(order, 'awaiting_approval');
 }

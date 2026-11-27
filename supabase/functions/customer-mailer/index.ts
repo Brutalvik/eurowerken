@@ -1,5 +1,5 @@
-// customer-mailer: sends the customer emails queued in public.customer_outbox (migration 023) and the purchase
-// orders to suppliers queued in public.supplier_outbox (migration 031).
+// customer-mailer: sends the customer emails queued in public.customer_outbox (migration 023; approval requests
+// since migration 034) and the purchase orders to suppliers queued in public.supplier_outbox (migration 031).
 //
 // Called by Supabase Database Webhooks on INSERT into customer_outbox and supplier_outbox (and safe to call any time,
 // for example from a schedule): it claims up to 10 waiting messages from each queue, sends each, and marks it sent,
@@ -13,7 +13,7 @@
 // SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are provided by Supabase.
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import nodemailer from 'npm:nodemailer@6.9.16';
-import { day, invoiceEmail, invoiceFileName, purchaseOrderEmail, purchaseOrderFileName, statusEmail } from './content.ts';
+import { approvalEmail, day, invoiceEmail, invoiceFileName, purchaseOrderEmail, purchaseOrderFileName, statusEmail } from './content.ts';
 import type { PurchaseOrderInfo, RepairInfo, RepairStatus, Shop } from './content.ts';
 
 const MAX_ATTEMPTS = 5;
@@ -23,7 +23,7 @@ interface Job {
   workshop_id: string;
   repair_order_id: string;
   invoice_id: string | null;
-  kind: 'status' | 'invoice';
+  kind: 'status' | 'invoice' | 'approval';
   status: RepairStatus | null;
   channel: 'email' | 'sms';
   to_address: string | null;
@@ -97,7 +97,7 @@ async function context(job: Job) {
     trackUrl: base && slug ? `${base}/${slug}/track/${encodeURIComponent(ro.tracking_code)}` : null,
     hasAccount: Boolean(ro.customer_id),
   };
-  return { shop, repair };
+  return { shop, repair, status: ro.status as string };
 }
 
 async function send(shop: Shop, to: string, mail: { subject: string; text: string; html: string }, attachment?: { filename: string; content: Uint8Array }) {
@@ -113,16 +113,35 @@ async function send(shop: Shop, to: string, mail: { subject: string; text: strin
   });
 }
 
-/** Returns the final state: sent, or skipped (with the reason kept in last_error). */
-async function handle(job: Job): Promise<'sent' | 'skipped'> {
-  if (job.channel === 'sms') return 'skipped'; // No SMS provider yet.
-  const { shop, repair } = await context(job);
+type Outcome = 'sent' | { skipped: string };
+
+/** Returns the final state: sent, or skipped with the reason (kept in last_error). */
+async function handle(job: Job): Promise<Outcome> {
+  if (job.channel === 'sms') return { skipped: 'Text messages are not connected yet' };
+  const { shop, repair, status } = await context(job);
+
+  if (job.kind === 'approval') {
+    if (!job.to_address) return { skipped: 'No email address for this customer' };
+    if (status !== 'awaiting_approval') return { skipped: 'The repair is no longer waiting for approval' };
+    const { data: items, error } = await supabase
+      .from('repair_order_items')
+      .select('description, quantity, unit_price, sort_order')
+      .eq('repair_order_id', job.repair_order_id)
+      .eq('approval', 'pending')
+      .order('sort_order');
+    if (error) throw new Error(`Could not read the estimate: ${error.message}`);
+    if (!items || items.length === 0) return { skipped: 'Nothing is waiting for approval any more' };
+    const lines = items.map((i) => ({ description: String(i.description), quantity: Number(i.quantity) || 0, unit_price: Number(i.unit_price) || 0 }));
+    await send(shop, job.to_address, approvalEmail(shop, repair, lines));
+    return 'sent';
+  }
 
   if (job.kind === 'invoice') {
     if (!job.invoice_id) throw new Error('Invoice job without an invoice');
     const { data: inv, error } = await supabase.from('invoices').select('id, number, total, status, pdf_path').eq('id', job.invoice_id).single();
     if (error || !inv) throw new Error(`Invoice not found: ${error?.message ?? ''}`);
-    if (inv.status !== 'issued' || !job.to_address) return 'skipped';
+    if (inv.status !== 'issued') return { skipped: 'The invoice is no longer issued' };
+    if (!job.to_address) return { skipped: 'No email address for this customer' };
     if (!inv.pdf_path) throw new Error('The invoice PDF is not stored yet');
     const file = await supabase.storage.from('invoices').download(inv.pdf_path);
     if (file.error || !file.data) throw new Error(`Could not read the PDF: ${file.error?.message ?? ''}`);
@@ -132,7 +151,8 @@ async function handle(job: Job): Promise<'sent' | 'skipped'> {
     return 'sent';
   }
 
-  if (!job.to_address || !job.status) return 'skipped';
+  if (!job.to_address) return { skipped: 'No email address for this customer' };
+  if (!job.status) return { skipped: 'No status on this message' };
   await send(shop, job.to_address, statusEmail(job.status, shop, repair));
   return 'sent';
 }
@@ -186,12 +206,13 @@ async function runCustomerQueue(results: Record<string, string>): Promise<number
   const jobs = (data ?? []) as Job[];
   for (const job of jobs) {
     try {
-      const state = await handle(job);
+      const outcome = await handle(job);
+      const sent = outcome === 'sent';
       await supabase
         .from('customer_outbox')
-        .update({ state, sent_at: state === 'sent' ? new Date().toISOString() : null, last_error: state === 'sent' ? null : job.last_error })
+        .update({ state: sent ? 'sent' : 'skipped', sent_at: sent ? new Date().toISOString() : null, last_error: sent ? null : outcome.skipped })
         .eq('id', job.id);
-      results[job.id] = state;
+      results[job.id] = sent ? 'sent' : `skipped: ${outcome.skipped}`;
     } catch (e) {
       const message = (e instanceof Error ? e.message : String(e)).slice(0, 500);
       const state = job.attempts >= MAX_ATTEMPTS ? 'failed' : 'pending';

@@ -150,7 +150,11 @@ function CustomerEmailsCard() {
               <CheckRow
                 id={`${id}-progress`}
                 label="Email customers at every progress step"
-                hint={s.email_progress ? 'On: the customer gets an email each time the repair moves to a new step.' : 'Off: no progress emails are sent.'}
+                hint={
+                  s.email_progress
+                    ? 'On: the customer gets an email each time the repair moves to a new step. Approval requests are always emailed.'
+                    : 'Off: no progress emails are sent. Approval requests are still emailed, because the work cannot go ahead without an answer.'
+                }
                 checked={s.email_progress}
                 onChange={(on) => {
                   if (!busy) void save(on, s.email_invoice);
@@ -182,7 +186,7 @@ function CustomerEmailsCard() {
           ) : (
             <p className="rounded-lg border border-line bg-surface2 p-3 text-xs text-fg2">
               Progress emails are <strong className="text-fg">{s.email_progress ? 'on' : 'off'}</strong> and invoice emails are{' '}
-              <strong className="text-fg">{s.email_invoice ? 'on' : 'off'}</strong> for this shop. Invoices{' '}
+              <strong className="text-fg">{s.email_invoice ? 'on' : 'off'}</strong> for this shop. Approval requests are always emailed. Invoices{' '}
               <strong className="text-fg">{s.invoice_hide_contact ? 'hide' : 'show'}</strong> the customer&apos;s phone and email by default
               (you can still choose each time you print). Only staff with full access to Settings can change this.
             </p>

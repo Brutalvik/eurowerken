@@ -64,7 +64,7 @@ export interface OutboxRow {
   workshop_id: string;
   repair_order_id: string;
   invoice_id: string | null;
-  kind: 'status' | 'invoice';
+  kind: 'status' | 'invoice' | 'approval';
   status: RepairStatus | null;
   channel: 'email' | 'sms';
   to_address: string | null;
@@ -173,7 +173,7 @@ function normalizeOutbox(row: Record<string, unknown>): OutboxRow {
     workshop_id: String(row.workshop_id),
     repair_order_id: String(row.repair_order_id),
     invoice_id: text(row.invoice_id),
-    kind: row.kind === 'invoice' ? 'invoice' : 'status',
+    kind: row.kind === 'invoice' ? 'invoice' : row.kind === 'approval' ? 'approval' : 'status',
     status: (text(row.status) as RepairStatus | null) ?? null,
     channel: row.channel === 'sms' ? 'sms' : 'email',
     to_address: text(row.to_address),
