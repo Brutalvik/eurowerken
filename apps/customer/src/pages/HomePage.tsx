@@ -15,6 +15,8 @@ import {
   Star,
   User,
 } from 'lucide-react';
+import { normalizeSiteSections } from '@eurowerken/shared';
+import type { SiteSectionId } from '@eurowerken/shared';
 import { useServices, useTeam } from '@/api/catalogue';
 import { Photo } from '@/components/Photo';
 import { SERVICE_ICON_COMPONENTS } from '@/components/serviceIcons';
@@ -27,18 +29,37 @@ const PREVIEW_COUNT = 4;
 
 const GARAGE_ICONS = [Car, ScanLine, Receipt];
 
+/** The hero, then the shop's chosen sections in its order (Settings, Customer website). */
 export function HomePage() {
+  const site = useSite();
+  const sections = normalizeSiteSections(site.sections).filter((s) => s.enabled);
   return (
     <>
       <Hero />
-      <QuickActions />
-      <Services />
-      <GaragePreview />
-      <Technicians />
-      <Testimonials />
-      <CallToAction />
+      {sections.map((s, i) => (
+        <HomeSection key={s.id} id={s.id} afterHero={i === 0} />
+      ))}
     </>
   );
+}
+
+function HomeSection({ id, afterHero }: { id: SiteSectionId; afterHero: boolean }): JSX.Element | null {
+  switch (id) {
+    case 'quick_actions':
+      return <QuickActions overlapHero={afterHero} />;
+    case 'services':
+      return <Services />;
+    case 'garage_preview':
+      return <GaragePreview />;
+    case 'team':
+      return <Technicians />;
+    case 'reviews':
+      return <Testimonials />;
+    case 'call_to_action':
+      return <CallToAction />;
+    default:
+      return null;
+  }
 }
 
 /** Headline with the chosen word in the brand colour. */
@@ -56,6 +77,7 @@ function HeroTitle({ title, highlight }: { title: string; highlight: string | nu
 
 function Hero() {
   const site = useSite();
+  const heroImage = site.hero_image_url && /^https:\/\//i.test(site.hero_image_url) ? site.hero_image_url : null;
   return (
     <section className="relative overflow-hidden bg-gradient-to-b from-surface2 via-bg to-bg">
       <div
@@ -95,16 +117,27 @@ function Hero() {
         </div>
 
         <div className="relative mx-auto w-full max-w-xl lg:max-w-none">
-          {/* The design uses a cut-out car with no frame: add hero-car.png with a transparent background. */}
+          {/* The shop's own photo (Settings, Customer website) fills the frame; otherwise the built-in cut-out car
+              (public/images/hero-car.png, transparent background) with no frame. */}
           <div className="relative aspect-[4/3] sm:aspect-[16/11]">
-            <Photo
-              name="hero-car"
-              alt="Black Porsche Boxster convertible"
-              label="Hero photo: hero-car.png"
-              icon={Car}
-              fit="contain"
-              className="h-full w-full rounded-[2rem] drop-shadow-[0_30px_30px_rgb(var(--ink)/0.22)]"
-            />
+            {heroImage ? (
+              <img
+                key={heroImage}
+                src={heroImage}
+                alt={`${site.display_name} workshop`}
+                decoding="async"
+                className="h-full w-full rounded-3xl object-cover shadow-[0_30px_60px_-20px_rgb(var(--ink)/0.35)]"
+              />
+            ) : (
+              <Photo
+                name="hero-car"
+                alt="Black Porsche Boxster convertible"
+                label="Hero photo: hero-car.png"
+                icon={Car}
+                fit="contain"
+                className="h-full w-full rounded-[calc(2rem*var(--site-radius,1))] drop-shadow-[0_30px_30px_rgb(var(--ink)/0.22)]"
+              />
+            )}
           </div>
           {/* Floating status cards from the design; tucked inside the frame on phones. */}
           <div className="glass-strong absolute -top-5 right-3 w-52 rounded-2xl p-3.5 sm:-right-4 sm:w-60 sm:p-4">
@@ -141,7 +174,8 @@ function Hero() {
   );
 }
 
-function QuickActions() {
+/** Right under the hero the cards overlap its bottom edge; further down they sit in their own band. */
+function QuickActions({ overlapHero }: { overlapHero: boolean }) {
   const site = useSite();
   const navigate = useNavigate();
   const [trackingId, setTrackingId] = useState('');
@@ -154,7 +188,7 @@ function QuickActions() {
 
   const card = 'glass-strong rounded-2xl p-6';
   return (
-    <section aria-label="Quick actions" className="container-site relative z-10 -mt-12 grid gap-4 md:grid-cols-3 lg:-mt-16">
+    <section aria-label="Quick actions" className={`container-site relative z-10 grid gap-4 md:grid-cols-3 ${overlapHero ? '-mt-12 lg:-mt-16' : 'py-12 sm:py-16'}`}>
       <div className={card}>
         <IconBadge Icon={CalendarCheck} />
         <h2 className="mt-4 font-display text-lg font-semibold text-fg">Book Appointment</h2>

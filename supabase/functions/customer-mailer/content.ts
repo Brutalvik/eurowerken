@@ -1,4 +1,5 @@
-// What the customer-mailer sends: the email for each repair status, and the invoice email.
+// What the customer-mailer sends: the email for each repair status, the invoice email, and purchase orders to
+// suppliers (migration 031).
 // Pure functions (no Deno or Supabase calls), so they can be tested on their own.
 // The invoice PDF itself is made by the ERP (packages/shared/src/invoicePdf.ts) and stored; this only attaches it.
 
@@ -159,7 +160,7 @@ export function invoiceEmail(shop: Shop, repair: RepairInfo, invoice: Invoice): 
   const car = vehicleName(repair.vehicle);
   const lines = [
     `Your ${car} is ready for pickup.`,
-    `Your invoice ${invoice.number} is attached as a PDF. Total: ${money(invoice.total)} (including GST).`,
+    `Your invoice ${invoice.number} is attached as a PDF. Total: ${money(invoice.total)} (including tax).`,
   ];
   return { ...wrapEmail(shop, repair, lines, 'View your repair'), subject: `Your ${car} is ready for pickup · Invoice ${invoice.number}` };
 }
@@ -167,4 +168,107 @@ export function invoiceEmail(shop: Shop, repair: RepairInfo, invoice: Invoice): 
 export function invoiceFileName(invoice: Invoice, shopName: string): string {
   const clean = (x: string) => x.replace(/[^A-Za-z0-9-]+/g, '-').replace(/^-+|-+$/g, '');
   return `Invoice-${clean(invoice.number)}-${clean(shopName).slice(0, 40)}.pdf`;
+}
+
+// Purchase orders to suppliers (migration 031) ------------------------------------------------------------------
+
+export interface PurchaseOrderLine {
+  description: string;
+  part_number?: string | null;
+  quantity: number;
+  unit_cost: number;
+}
+
+export interface PurchaseOrderInfo {
+  number: string;
+  supplier_name: string;
+  contact_name?: string | null;
+  account_number?: string | null;
+  lines: PurchaseOrderLine[];
+  notes?: string | null;
+  /** Already formatted, e.g. "Dec 1, 2026". */
+  expected?: string | null;
+  /** The repair order the parts are for, if any. */
+  repair_number?: string | null;
+}
+
+function qty(n: number): string {
+  const v = Number(n) || 0;
+  return Number.isInteger(v) ? String(v) : v.toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
+}
+
+export function purchaseOrderTotal(lines: PurchaseOrderLine[]): number {
+  return Math.round(lines.reduce((a, l) => a + (Number(l.quantity) || 0) * (Number(l.unit_cost) || 0), 0) * 100) / 100;
+}
+
+/** The email that carries a purchase order PDF to the supplier. Replies go to the shop's email (set by the sender). */
+export function purchaseOrderEmail(shop: Shop, po: PurchaseOrderInfo): Email {
+  const hello = po.contact_name?.trim() ? `Hi ${firstName(po.contact_name)},` : 'Hello,';
+  const total = purchaseOrderTotal(po.lines);
+  const intro = [
+    `Please supply the parts below for purchase order ${po.number}. The order is attached as a PDF.`,
+    ...(po.account_number ? [`Our account number: ${po.account_number}.`] : []),
+    ...(po.expected ? [`Needed by: ${po.expected}.`] : []),
+    ...(po.repair_number ? [`For repair ${po.repair_number}.`] : []),
+  ];
+  const contact = [shop.phone, shop.email, shop.address].filter(Boolean) as string[];
+  const lineText = po.lines.map((l) => {
+    const pn = l.part_number ? ` (${l.part_number})` : '';
+    const cost = l.unit_cost > 0 ? ` @ ${money(l.unit_cost)}` : '';
+    return `- ${qty(l.quantity)} x ${l.description}${pn}${cost}`;
+  });
+  const notes = po.notes?.trim() ? po.notes.trim() : null;
+  const closing = 'Please confirm availability and delivery by replying to this email.';
+
+  const text = [
+    hello,
+    '',
+    ...intro,
+    '',
+    ...lineText,
+    ...(total > 0 ? ['', `Estimated total before tax: ${money(total)}`] : []),
+    ...(notes ? ['', `Notes: ${notes}`] : []),
+    '',
+    closing,
+    '',
+    shop.name,
+    ...contact,
+  ].join('\n');
+
+  const cell = 'padding:8px 6px;border-bottom:1px solid #e5e7eb;font-size:14px;vertical-align:top';
+  const rows = po.lines
+    .map(
+      (l) =>
+        `<tr><td style="${cell}">${esc(l.description)}${l.part_number ? `<br><span style="color:#6b7280;font-size:12px">${esc(l.part_number)}</span>` : ''}</td>` +
+        `<td style="${cell};text-align:right">${esc(qty(l.quantity))}</td>` +
+        `<td style="${cell};text-align:right">${l.unit_cost > 0 ? esc(money(l.unit_cost)) : '&ndash;'}</td></tr>`,
+    )
+    .join('');
+  const head = 'padding:6px;font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:.04em;border-bottom:1px solid #e5e7eb';
+  const html = `<!doctype html><html><body style="margin:0;background:#f4f5f7;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#111827">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="padding:24px 12px"><tr><td align="center">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;background:#ffffff;border-radius:16px;padding:28px">
+<tr><td>
+<p style="margin:0 0 16px;font-size:13px;font-weight:700;color:#4f46e5;letter-spacing:.04em;text-transform:uppercase">${esc(shop.name)}</p>
+<p style="margin:0 0 4px;font-size:20px;font-weight:700">Purchase order ${esc(po.number)}</p>
+<p style="margin:0 0 16px;font-size:13px;color:#6b7280">To ${esc(po.supplier_name)}</p>
+<p style="margin:0 0 12px;font-size:16px">${esc(hello)}</p>
+${intro.map((l) => `<p style="margin:0 0 12px;font-size:15px;line-height:1.5">${esc(l)}</p>`).join('\n')}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:8px 0 12px;border-collapse:collapse">
+<tr><th align="left" style="${head}">Part</th><th align="right" style="${head}">Qty</th><th align="right" style="${head}">Unit cost</th></tr>
+${rows}
+</table>
+${total > 0 ? `<p style="margin:0 0 12px;font-size:14px;text-align:right">Estimated total before tax: <strong>${esc(money(total))}</strong></p>` : ''}
+${notes ? `<p style="margin:12px 0;font-size:14px;line-height:1.5;background:#f9fafb;border-radius:10px;padding:12px"><strong>Notes:</strong> ${esc(notes)}</p>` : ''}
+<p style="margin:16px 0 0;font-size:14px">${esc(closing)}</p>
+<hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0">
+<p style="margin:0;font-size:13px;color:#374151"><strong>${esc(shop.name)}</strong>${contact.map((c) => `<br>${esc(c)}`).join('')}</p>
+</td></tr></table></td></tr></table></body></html>`;
+
+  return { subject: `Purchase order ${po.number} from ${shop.name}`, text, html };
+}
+
+export function purchaseOrderFileName(number: string, shopName: string): string {
+  const clean = (x: string) => x.replace(/[^A-Za-z0-9-]+/g, '-').replace(/^-+|-+$/g, '');
+  return `Purchase-order-${clean(number)}-${clean(shopName).slice(0, 40)}.pdf`;
 }

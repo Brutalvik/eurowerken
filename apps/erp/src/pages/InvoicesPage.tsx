@@ -7,6 +7,10 @@ import type { Invoice, OutboxRow } from '@/api/invoices';
 import { plateOf } from '@/api/repairOrders';
 import { useAuth } from '@/auth/AuthContext';
 import { useEnsureInvoicePdfs } from '@/api/invoicePdf';
+import { listInvoiceBalances, listMoneySince, PAYMENT_STATUS_LABEL, subscribePayments } from '@/api/payments';
+import type { InvoiceBalance, InvoicePaymentStatus, MoneyMovement } from '@/api/payments';
+import { PaymentStatusBadge } from '@/components/payments/PaymentStatusBadge';
+import { PillTabs } from '@/components/ui/PillTabs';
 import {
   EmailState,
   InvoicePdfActions,
@@ -44,9 +48,18 @@ function matches(inv: Invoice, query: string): boolean {
   return [inv.number, inv.bill_to.name ?? '', plateOf(inv.vehicle), inv.repair_order?.number ?? ''].some((x) => x.toLowerCase().includes(q));
 }
 
+type PayFilter = 'All' | 'Unpaid' | 'Partly paid' | 'Paid' | 'Refunded';
+const PAY_FILTERS: readonly PayFilter[] = ['All', 'Unpaid', 'Partly paid', 'Paid', 'Refunded'];
+
+function payFilterMatches(filter: PayFilter, inv: Invoice, b: InvoiceBalance | undefined): boolean {
+  if (filter === 'All') return true;
+  if (!b || inv.status === 'void') return false;
+  return PAYMENT_STATUS_LABEL[b.payment_status] === filter;
+}
+
 /**
  * Invoices: created automatically when a repair order is marked Ready for pickup and emailed with a PDF.
- * Payments are not built yet, so there is no Paid or Overdue.
+ * Balances and payment status come from migration 030 (payments); the database keeps them.
  */
 export function InvoicesPage() {
   const { user, can } = useAuth();
@@ -58,6 +71,11 @@ export function InvoicesPage() {
   const [search, setSearch] = useState(() => ((location.state as { q?: string } | null)?.q ?? ''));
   const [invoices, setInvoices] = useState<Invoice[] | null>(null);
   const [emails, setEmails] = useState<Map<string, OutboxRow>>(new Map());
+  // Payments (migration 030). Null while loading or when payments are not set up; the page works without them.
+  const [balances, setBalances] = useState<Map<string, InvoiceBalance> | null>(null);
+  const [money, setMoney] = useState<MoneyMovement[] | null>(null);
+  const [paymentsError, setPaymentsError] = useState<string | null>(null);
+  const [payFilter, setPayFilter] = useState<PayFilter>('All');
   const [loadError, setLoadError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [tz, setTz] = useState('America/Edmonton');
@@ -83,6 +101,16 @@ export function InvoicesPage() {
     } catch (err) {
       setLoadError(errorMessage(err, 'The invoices could not be loaded.'));
     }
+    try {
+      // Enough to cover this month in any time zone.
+      const since = new Date(Date.now() - 32 * 864e5).toISOString();
+      const [b, m] = await Promise.all([listInvoiceBalances(workshopId), listMoneySince(workshopId, since)]);
+      setBalances(b);
+      setMoney(m);
+      setPaymentsError(null);
+    } catch (err) {
+      setPaymentsError(errorMessage(err, 'Payments could not be loaded.'));
+    }
   }, [workshopId]);
 
   useEffect(() => {
@@ -91,10 +119,16 @@ export function InvoicesPage() {
     void getTimeZone(workshopId).then((t) => active && setTz(t)).catch(() => undefined);
     void load();
     // Several changes arrive together (an invoice and its email): read once after they settle.
-    const unsubscribe = subscribeInvoices(workshopId, () => {
+    const later = () => {
       if (timer.current) window.clearTimeout(timer.current);
       timer.current = window.setTimeout(() => void load(), 300);
-    });
+    };
+    const unsubscribeInvoices = subscribeInvoices(workshopId, later);
+    const unsubscribePayments = subscribePayments({ workshopId }, later);
+    const unsubscribe = () => {
+      unsubscribeInvoices();
+      unsubscribePayments();
+    };
     const onVisible = () => document.visibilityState === 'visible' && void load();
     document.addEventListener('visibilitychange', onVisible);
     return () => {
@@ -109,14 +143,35 @@ export function InvoicesPage() {
     const month = dayKeyOf(new Date(), tz).slice(0, 7);
     const all = invoices ?? [];
     const thisMonth = all.filter((i) => i.status === 'issued' && i.issued_at && dayKeyOf(i.issued_at, tz).slice(0, 7) === month);
+    // Work in cents so sums never drift.
+    const c = (n: number) => Math.round(n * 100);
+    let outstanding = 0;
+    let outstandingCount = 0;
+    for (const i of all) {
+      const b = balances?.get(i.id);
+      if (i.status === 'issued' && b && b.balance > 0) {
+        outstanding += c(b.balance);
+        outstandingCount++;
+      }
+    }
+    const paidThisMonth = (money ?? [])
+      .filter((m) => m.received_at && dayKeyOf(m.received_at, tz).slice(0, 7) === month)
+      .reduce((sum, m) => sum + (m.kind === 'refund' ? -c(m.amount) : c(m.amount)), 0);
     return {
-      amount: thisMonth.reduce((sum, i) => sum + i.total, 0),
+      amount: thisMonth.reduce((sum, i) => sum + c(i.total), 0) / 100,
       count: thisMonth.length,
-      void: all.filter((i) => i.status === 'void').length,
+      outstanding: outstanding / 100,
+      outstandingCount,
+      paid: paidThisMonth / 100,
     };
-  }, [invoices, tz]);
+  }, [invoices, balances, money, tz]);
 
-  const rows = useMemo(() => (invoices ?? []).filter((i) => matches(i, search)), [invoices, search]);
+  const rows = useMemo(
+    () => (invoices ?? []).filter((i) => matches(i, search) && payFilterMatches(payFilter, i, balances?.get(i.id))),
+    [invoices, search, payFilter, balances],
+  );
+
+  const paymentStatusOf = (i: Invoice): InvoicePaymentStatus | null => (i.status === 'void' ? null : balances?.get(i.id)?.payment_status ?? null);
 
   const columns: Column<Invoice>[] = [
     {
@@ -146,7 +201,28 @@ export function InvoicesPage() {
       className: 'whitespace-nowrap font-semibold tabular-nums text-fg',
       cell: (i) => (i.status === 'void' ? <s className="text-fg3">{formatCurrency(i.total)}</s> : formatCurrency(i.total)),
     },
-    { header: 'Status', mobile: 'corner', cell: (i) => <InvoiceStatusBadge status={i.status} /> },
+    {
+      header: 'Balance',
+      className: 'whitespace-nowrap tabular-nums text-fg',
+      cell: (i) => {
+        const b = balances?.get(i.id);
+        if (!b) return <span className="text-fg3">-</span>;
+        if (b.balance < 0) return <span className="text-warn">Credit {formatCurrency(-b.balance)}</span>;
+        return i.status === 'void' ? <span className="text-fg3">-</span> : formatCurrency(b.balance);
+      },
+    },
+    {
+      header: 'Status',
+      mobile: 'corner',
+      cell: (i) => {
+        const ps = paymentStatusOf(i);
+        return (
+          <span className="flex flex-wrap items-center gap-1">
+            {i.status === 'void' || !ps ? <InvoiceStatusBadge status={i.status} /> : <PaymentStatusBadge status={ps} />}
+          </span>
+        );
+      },
+    },
     {
       header: 'Email',
       cell: (i) => <EmailState row={emails.get(i.id)} tz={tz} compact pdfPending={i.status === 'issued' && i.email_pending} />,
@@ -179,10 +255,26 @@ export function InvoicesPage() {
     },
   ];
 
+  const paymentsReady = balances !== null && money !== null;
   const cards = [
-    { label: 'Invoiced this month', value: formatCurrency(summary.amount), color: 'text-accent', caption: 'Issued invoices, with GST' },
-    { label: 'Invoices this month', value: String(summary.count), color: 'text-fg', caption: 'Issued' },
-    { label: 'Void', value: String(summary.void), color: 'text-fg2', caption: 'Cancelled repairs' },
+    {
+      label: 'Outstanding',
+      value: paymentsReady ? formatCurrency(summary.outstanding) : paymentsError ? 'Not set up' : '...',
+      color: 'text-warn',
+      caption: paymentsReady ? `${summary.outstandingCount} invoice${summary.outstandingCount === 1 ? '' : 's'} with a balance` : 'Balances owed',
+    },
+    {
+      label: 'Paid this month',
+      value: paymentsReady ? formatCurrency(summary.paid) : paymentsError ? 'Not set up' : '...',
+      color: 'text-ok',
+      caption: 'Received, less refunds',
+    },
+    {
+      label: 'Invoiced this month',
+      value: formatCurrency(summary.amount),
+      color: 'text-accent',
+      caption: `${summary.count} issued invoice${summary.count === 1 ? '' : 's'}, with tax`,
+    },
   ];
 
   return (
@@ -223,6 +315,10 @@ export function InvoicesPage() {
             </div>
           )}
           <ErrorNote errors={actionError} />
+          {paymentsError && <p className="text-[11px] text-fg3">Balances are not shown: {paymentsError}</p>}
+          {invoices && invoices.length > 0 && balances && (
+            <PillTabs label="Filter by payment" options={PAY_FILTERS} value={payFilter} onChange={setPayFilter} />
+          )}
           {invoices && invoices.length > 0 && <ShowContactCheckbox checked={showContact} onChange={setShowContact} />}
           {!invoices && !loadError && (
             <p role="status" className="px-4 py-10 text-center text-xs text-fg2">
@@ -237,7 +333,7 @@ export function InvoicesPage() {
           )}
           {invoices && invoices.length > 0 && (
             <div className="-mx-4 -mb-4 border-t border-line sm:-mx-5 sm:-mb-5">
-              <DataTable columns={columns} rows={rows} getKey={(i) => i.id} emptyMessage="No invoices match your search." />
+              <DataTable columns={columns} rows={rows} getKey={(i) => i.id} emptyMessage={payFilter === 'All' ? 'No invoices match your search.' : `No ${payFilter.toLowerCase()} invoices match.`} />
             </div>
           )}
         </div>

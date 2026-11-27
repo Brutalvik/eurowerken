@@ -12,6 +12,7 @@ import { PillTabs } from '@/components/ui/PillTabs';
 import { SearchInput } from '@/components/ui/SearchInput';
 import { formatCurrency } from '@/lib/format';
 import { STOCK_LABEL, STOCK_TONE, stockStatus } from '@/lib/status';
+import { OnOrderLink, OpenOrdersLink, useOnOrder } from './inventory/OnOrder';
 import { ConfirmDialog, ErrorNote, PartForm } from './inventory/PartForm';
 
 const ALL = 'All';
@@ -34,6 +35,7 @@ export function InventoryPage() {
   const [deleting, setDeleting] = useState<PartRow | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const onOrder = useOnOrder(workshopId, canSeeCost);
 
   const load = useCallback(async () => {
     if (!workshopId) return;
@@ -130,10 +132,13 @@ export function InventoryPage() {
         const status = statusOf(p);
         const color = status === 'out' ? 'text-bad' : status === 'low' ? 'text-warn' : 'text-fg';
         return (
-          <span className={`font-display text-base font-semibold ${color}`}>
-            {p.stock}
-            <span className="ml-1 text-[10px] font-normal text-fg3">min {p.min_stock}</span>
-          </span>
+          <div className="flex flex-col items-start">
+            <span className={`font-display text-base font-semibold ${color}`}>
+              {p.stock}
+              <span className="ml-1 text-[10px] font-normal text-fg3">min {p.min_stock}</span>
+            </span>
+            <OnOrderLink partId={p.id} onOrder={onOrder.get(p.id)} />
+          </div>
         );
       },
     },
@@ -228,6 +233,7 @@ export function InventoryPage() {
         <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
           <SearchInput value={search} onChange={setSearch} placeholder="Search parts, SKUs, brands" />
           {categories.length > 0 && <PillTabs label="Part category" options={tabs} value={category} onChange={setCategory} />}
+          {canSeeCost && <OpenOrdersLink count={onOrder.size} />}
         </div>
         {canEdit && (
           <Button onClick={() => setEditing({ part: null })} disabled={!workshopId}>

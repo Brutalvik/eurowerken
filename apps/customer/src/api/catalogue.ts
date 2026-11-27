@@ -13,6 +13,7 @@ import { SERVICE_CATEGORY_LABELS, SERVICE_ICONS, publicImageUrl } from '@eurower
 import type { PartQuality, PartRow, ServiceCategoryId, ServiceIcon, ServiceRow, TeamMemberRow } from '@eurowerken/shared';
 import { supabase } from '@/lib/supabase';
 import { useSite } from '@/site/SiteContext';
+import { isPreview, previewServices, previewTeam, usePreviewData } from '@/site/preview';
 
 // Page-facing shapes ----------------------------------------------------------------
 
@@ -338,16 +339,26 @@ const keys = {
   partsByIds: (w: string, ids: string[]) => `parts-by-ids:${w}:${ids.join(',')}`,
 };
 
-/** Active services of the current workshop, in the workshop's order. */
+const noRetry = () => {};
+
+/** Active services of the current workshop, in the workshop's order. In the ERP's preview: the ones it sent. */
 export function useServices(): Loadable<Service[]> {
   const { workshop_id: w } = useSite();
-  return useLoadable(keys.services(w), () => fetchServices(w));
+  const preview = isPreview();
+  const sent = usePreviewData()?.services;
+  const fromPreview = useMemo(() => (preview ? previewServices(sent ?? []).map(mapService) : undefined), [preview, sent]);
+  const live = useLoadable(preview ? null : keys.services(w), () => fetchServices(w));
+  return fromPreview ? { data: fromPreview, loading: false, error: null, retry: noRetry } : live;
 }
 
-/** Public team members (technicians and advisors) of the current workshop. */
+/** Public team members (technicians and advisors) of the current workshop. In the ERP's preview: the ones it sent. */
 export function useTeam(): Loadable<Technician[]> {
   const { workshop_id: w } = useSite();
-  return useLoadable(keys.team(w), () => fetchTeam(w));
+  const preview = isPreview();
+  const sent = usePreviewData()?.team;
+  const fromPreview = useMemo(() => (preview ? previewTeam(sent ?? []).map(mapTeamMember) : undefined), [preview, sent]);
+  const live = useLoadable(preview ? null : keys.team(w), () => fetchTeam(w));
+  return fromPreview ? { data: fromPreview, loading: false, error: null, retry: noRetry } : live;
 }
 
 /** Published parts of the current workshop. */

@@ -13,4 +13,6 @@ interface ImportMeta {
 
 interface ImportMetaEnv {
   readonly VITE_DEFAULT_SITE_SLUG?: string;
+  /** The ERP's origin (for example https://erp.example.com), allowed to send the live preview its draft. */
+  readonly VITE_ERP_ORIGIN?: string;
 }

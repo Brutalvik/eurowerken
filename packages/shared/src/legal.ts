@@ -17,7 +17,7 @@ export const COMPANY = {
 /** Shows a "draft" note on the legal pages until the texts are reviewed. */
 export const LEGAL_DRAFT = true;
 
-export const LEGAL_EFFECTIVE_DATE = 'November 22, 2026';
+export const LEGAL_EFFECTIVE_DATE = 'November 27, 2026';
 
 /** One-line notice shown at the top of the Terms and Privacy pages. */
 /** Adds a closing full stop unless the text already ends with one ("Inc." does). */
@@ -81,36 +81,53 @@ export const TERMS: LegalDocument = {
       ],
     },
     {
-      heading: '5. Bookings, estimates and payments',
+      heading: '5. Bookings, inspections, estimates and approvals',
       paragraphs: [
-        'Appointment times, estimates and repair statuses come from the workshop. Estimates may change after inspection; the workshop will ask for your approval of additional work where required.',
-        'Card payments are processed by a third-party payment provider. We do not store full card numbers.',
+        'Appointment times, estimates, inspection results and repair statuses come from the workshop. Inspection findings (for example "needs attention" or "urgent", measurements, notes and photos) are the workshop\'s professional assessment of your vehicle at the time; they are not a guarantee of its condition.',
+        'Estimates may change after inspection. The workshop asks for your approval of additional work. When you approve or decline work online, we keep a record of the decision, the amount, the time, the account you were signed in with and the network address used, so that the workshop and you can rely on it later. These records cannot be changed.',
       ],
     },
     {
-      heading: '6. Availability and changes',
+      heading: '6. Invoices, taxes and payments',
+      paragraphs: [
+        'Invoices are issued by the workshop. Sales taxes (GST, HST, PST, QST or RST) are calculated from the tax settings the workshop chooses for its province and the tax registration numbers it enters. The workshop is responsible for those settings being correct and for remitting the taxes it collects.',
+        'Online and in-shop card payments are processed by Helcim Inc., a Canadian payment processor, under the workshop\'s own merchant account with Helcim. Card details are entered only on Helcim\'s secure payment page; neither we nor the workshop receive or store full card numbers. We keep a record of each payment (amount, method, date, card brand and last four digits, and the processor\'s transaction reference).',
+        'A payment is counted only after it has been confirmed with the processor. Refunds, disputes and chargebacks are handled by the workshop, through Helcim where the payment was made by card. Payments by cash, cheque, debit or e-transfer are recorded by the workshop staff who receive them.',
+      ],
+    },
+    {
+      heading: '7. Workshop tools: suppliers, purchasing, imports and exports',
+      paragraphs: [
+        'Purchase orders that a workshop sends to its parts suppliers through the platform are between the workshop and that supplier. The workshop is responsible for the orders, the supplier contact details it enters and the prices it agrees.',
+        'A workshop may import customer, vehicle and service history records from another system. By importing, the workshop confirms that it is allowed to transfer that information to the platform and to use it for its customers, in line with applicable privacy law.',
+        'A workshop can download a complete copy of its data at any time, free of charge, in common file formats (CSV), including after deciding to leave the platform, for as long as its account remains open and for 30 days after it is closed.',
+        'Customer emails about bookings, repair progress and invoices are sent on the workshop\'s behalf from an email account the workshop chooses. A workshop can turn progress and invoice emails off in its settings, and customers can turn off progress emails in their account.',
+      ],
+    },
+    {
+      heading: '8. Availability and changes',
       paragraphs: [
         'We work to keep the platform available and secure, but it is provided "as is" and may sometimes be unavailable. We may change or discontinue features. We will give reasonable notice of material changes to these terms by posting the new version with a new effective date.',
       ],
     },
     {
-      heading: '7. Liability',
+      heading: '9. Liability',
       paragraphs: [
         `To the extent the law allows, ${COMPANY.legalName} is not liable for indirect or consequential losses, or for the services, parts or advice provided by workshops. Nothing in these terms limits rights you have under consumer protection law that cannot be excluded.`,
       ],
     },
     {
-      heading: '8. Ending your use',
+      heading: '10. Ending your use',
       paragraphs: [
-        'You can stop using the platform at any time. We may suspend or close accounts that break these terms or put the platform or other users at risk.',
+        'You can stop using the platform at any time. We may suspend or close accounts that break these terms or put the platform or other users at risk. Before closing a workshop\'s account we give it the opportunity to export its data, except where the law or an urgent security risk prevents it.',
       ],
     },
     {
-      heading: '9. Law',
+      heading: '11. Law',
       paragraphs: [`These terms are governed by the laws of the Province of Alberta and the federal laws of Canada that apply there.`],
     },
     {
-      heading: '10. Contact',
+      heading: '12. Contact',
       paragraphs: [`For questions about these terms, ${contactLine()}.`],
     },
   ],
@@ -118,7 +135,7 @@ export const TERMS: LegalDocument = {
 
 export const PRIVACY: LegalDocument = {
   title: 'Privacy Policy',
-  intro: `This policy explains how ${COMPANY.legalName}, operator of ${COMPANY.product}, and the workshops that use ${COMPANY.product} handle personal information. We follow Alberta's Personal Information Protection Act (PIPA) and, where it applies, the federal Personal Information Protection and Electronic Documents Act (PIPEDA).`,
+  intro: `This policy explains how ${COMPANY.legalName}, operator of ${COMPANY.product}, and the workshops that use ${COMPANY.product} handle personal information. We follow Alberta's Personal Information Protection Act (PIPA), the federal Personal Information Protection and Electronic Documents Act (PIPEDA), and, for workshops and customers in those provinces, British Columbia's Personal Information Protection Act and Quebec's Act respecting the protection of personal information in the private sector.`,
   sections: [
     {
       heading: '1. Who is responsible',
@@ -131,17 +148,19 @@ export const PRIVACY: LegalDocument = {
       paragraphs: ['Depending on how you use the platform:'],
       bullets: [
         'Account details: name, email address, password (stored only in encrypted form), and your profile picture if you sign in with Google.',
-        'Vehicle and service details: make, model, year, VIN, service history, repair notes, inspection photos and videos.',
-        'Bookings, estimates, approvals, invoices, orders and messages with the workshop.',
+        'Vehicle and service details: make, model, year, VIN, plate, odometer, service history, repair notes, and inspection results with measurements, photos and videos.',
+        'Bookings, estimates, approvals (including the time, the account used and the network address of each online decision), invoices, orders and messages with the workshop.',
         'Contact details: phone number and addresses for bookings, shipping and invoices.',
-        'Payment records: amounts and status. Card details are handled by the payment provider, not stored by us.',
+        'Payment records: amount, method, date, status, card brand and last four digits, and the processor\'s transaction reference. Full card numbers are entered only on the payment processor\'s page (Helcim) and are never received or stored by us or the workshop.',
+        'Records a workshop imports from a system it used before, such as customer contact details, vehicles and past service history.',
+        'For workshops: business details, tax registration numbers, supplier contacts and purchase orders.',
         'Technical data: sign-in sessions, device and browser type, and basic logs needed to keep the platform secure.',
       ],
     },
     {
       heading: '3. Why we use it',
       paragraphs: [
-        'To provide the services you ask for (bookings, repair tracking, parts orders, invoices), to communicate with you about them, to secure accounts and prevent misuse, to meet legal and tax obligations, and to maintain and improve the platform. We do not sell personal information.',
+        'To provide the services you ask for (bookings, inspections, repair tracking, approvals, parts orders, invoices and payments), to communicate with you about them, to secure accounts and prevent misuse, to keep reliable records of approvals and payments, to meet legal and tax obligations, and to maintain and improve the platform. We do not sell personal information and do not use it for advertising.',
       ],
     },
     {
@@ -155,7 +174,8 @@ export const PRIVACY: LegalDocument = {
       paragraphs: ['We share personal information only:'],
       bullets: [
         'with the workshop you deal with, and within that workshop with staff whose role needs it;',
-        'with service providers who host or run parts of the platform for us (for example database hosting, sign-in, email and payment processing), under contracts that require them to protect it;',
+        'with service providers who host or run parts of the platform, under contracts or terms that require them to protect it: Supabase (database, file storage and sign-in), Vercel (website hosting), the email service the workshop chooses for its customer emails, and Helcim Inc. (card payment processing, for payments you make by card);',
+        'with a workshop\'s parts suppliers, limited to what a purchase order needs (usually no customer information);',
         'when the law requires it.',
       ],
     },
@@ -168,7 +188,8 @@ export const PRIVACY: LegalDocument = {
     {
       heading: '7. Security and retention',
       paragraphs: [
-        'We use access controls that keep each workshop\'s data separate, encrypted connections, and role-based permissions for staff. We keep personal information only as long as needed for the purposes above or as required by law (for example, tax records), then delete or anonymise it.',
+        'We use access controls that keep each workshop\'s data separate, encrypted connections, role-based permissions for staff, and encrypted storage for secrets such as a workshop\'s payment processor key. Approval and payment records cannot be edited once made.',
+        'We keep personal information only as long as needed for the purposes above or as required by law. Invoices, payments and the records behind them are kept for at least six years, as Canadian tax law requires; after that, or when a workshop closes its account and its 30-day export period ends, we delete or anonymise information we no longer need.',
       ],
     },
     {
@@ -180,7 +201,8 @@ export const PRIVACY: LegalDocument = {
     {
       heading: '9. Your rights',
       paragraphs: [
-        `You can ask to see the personal information held about you, ask for corrections, or ask questions about how it is handled. Contact the workshop you deal with, or ${contactLine()}. If you are not satisfied with the response, you may contact the Office of the Information and Privacy Commissioner of Alberta.`,
+        `You can ask to see the personal information held about you, ask for corrections, ask for a copy in a common format, or ask questions about how it is handled. Contact the workshop you deal with, or ${contactLine()}. Signed-in customers can see their repairs, inspections, invoices and service history at any time in My Garage, and change their notification and privacy choices in their account.`,
+        'If you are not satisfied with the response, you may contact the privacy commissioner for your province (in Alberta, the Office of the Information and Privacy Commissioner of Alberta; in British Columbia, the Office of the Information and Privacy Commissioner for British Columbia; in Quebec, the Commission d\'accès à l\'information) or the Office of the Privacy Commissioner of Canada.',
       ],
     },
     {

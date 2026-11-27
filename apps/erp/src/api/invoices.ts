@@ -9,6 +9,8 @@ import { useAuth } from '@/auth/AuthContext';
 import { supabase } from '@/lib/supabase';
 import type { AppointmentVehicle } from './appointments';
 import type { RepairStatus } from './repairOrders';
+import { invoiceTaxLines } from '@eurowerken/shared';
+import type { TaxLine } from '@eurowerken/shared';
 
 // Types ------------------------------------------------------------------------------------------
 
@@ -42,7 +44,12 @@ export interface Invoice {
   subtotal: number;
   gst_rate: number;
   gst: number;
+  /** Each tax charged (GST, PST, HST, QST, RST), from migration 029; one GST line for older invoices. */
+  taxes: TaxLine[];
   total: number;
+  /** Payments (migration 030): what has been paid and what is left. */
+  amount_paid: number;
+  balance: number;
   issued_at: string;
   updated_at: string;
   pdf_path: string | null;
@@ -148,7 +155,10 @@ function normalizeInvoice(row: Record<string, unknown>): Invoice {
     subtotal: num(row.subtotal),
     gst_rate: num(row.gst_rate),
     gst: num(row.gst),
+    taxes: invoiceTaxLines(row),
     total: num(row.total),
+    amount_paid: num(row.amount_paid),
+    balance: row.balance === null || row.balance === undefined ? num(row.total) - num(row.amount_paid) : num(row.balance),
     issued_at: String(row.issued_at ?? ''),
     updated_at: String(row.updated_at ?? ''),
     pdf_path: text(row.pdf_path),

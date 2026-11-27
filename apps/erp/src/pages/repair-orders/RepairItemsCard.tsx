@@ -1,6 +1,7 @@
 import { useEffect, useId, useState } from 'react';
 import type { FormEvent, KeyboardEvent } from 'react';
 import { ArrowDown, ArrowUp, Phone, Plus, Send, Trash2 } from 'lucide-react';
+import { formatTaxLabel } from '@eurowerken/shared';
 import type { PartRow, ServiceRow } from '@eurowerken/shared';
 import { errorMessage } from '@/api/appointments';
 import { parseNumber } from '@/api/catalogue';
@@ -16,6 +17,7 @@ import {
   updateRepairItem,
 } from '@/api/repairOrders';
 import type { Approval, ItemKind, RepairApproval, RepairItem, RepairOrder } from '@/api/repairOrders';
+import { useTaxSettings } from '@/api/taxes';
 import { Badge } from '@/components/ui/Badge';
 import type { Tone } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -62,7 +64,8 @@ export function RepairItemsCard({ order, items, services, parts, canEdit, select
   const [removing, setRemoving] = useState<RepairItem | null>(null);
   const [removeError, setRemoveError] = useState<string | null>(null);
   const editable = canEdit && order.status !== 'completed' && order.status !== 'cancelled';
-  const totals = repairTotals(items);
+  const tax = useTaxSettings();
+  const totals = repairTotals(items, tax.components);
 
   useEffect(() => {
     if (!selecting) setChosen(new Set());
@@ -81,11 +84,17 @@ export function RepairItemsCard({ order, items, services, parts, canEdit, select
     }
   }
 
-  async function saveField(item: RepairItem, patch: { quantity?: number; unit_price?: number }) {
+  async function saveField(item: RepairItem, patch: RowPatch) {
     const saved = await run(`save-${item.id}`, () => updateRepairItem(item, patch));
     if (saved) {
       onItems(items.map((x) => (x.id === saved.id ? saved : x)));
-      announce(`${saved.description} saved.`);
+      if (patch.taxable !== undefined) {
+        if (saved.taxable !== patch.taxable) {
+          setError('The tax setting of this line could not be saved. Apply migration 029 (npm run db:migrate).');
+          return;
+        }
+        announce(`${saved.description} is now ${saved.taxable ? 'taxed' : 'tax exempt'}.`);
+      } else announce(`${saved.description} saved.`);
     }
   }
 
@@ -221,10 +230,18 @@ export function RepairItemsCard({ order, items, services, parts, canEdit, select
             <dt className="text-fg2">Approved subtotal</dt>
             <dd className="font-medium tabular-nums text-fg">{formatCurrency(totals.subtotal)}</dd>
           </div>
-          <div className="flex justify-between gap-4">
-            <dt className="text-fg2">GST 5%</dt>
-            <dd className="tabular-nums text-fg">{formatCurrency(totals.gst)}</dd>
-          </div>
+          {totals.taxable !== totals.subtotal && (
+            <div className="flex justify-between gap-4">
+              <dt className="text-fg3">Taxable</dt>
+              <dd className="tabular-nums text-fg3">{formatCurrency(totals.taxable)}</dd>
+            </div>
+          )}
+          {totals.taxes.map((t) => (
+            <div key={t.code} className="flex justify-between gap-4">
+              <dt className="text-fg2">{formatTaxLabel(t)}</dt>
+              <dd className="tabular-nums text-fg">{formatCurrency(t.amount)}</dd>
+            </div>
+          ))}
           <div className="flex justify-between gap-4 border-t border-line pt-1.5">
             <dt className="font-semibold text-fg">Total</dt>
             <dd className="font-semibold tabular-nums text-fg">{formatCurrency(totals.total)}</dd>
@@ -236,6 +253,11 @@ export function RepairItemsCard({ order, items, services, parts, canEdit, select
             </div>
           )}
         </dl>
+        {tax.error && (
+          <p className="ml-auto max-w-xs text-right text-[11px] text-warn" role="status">
+            The shop's taxes could not be loaded, so GST 5% is shown. {tax.error}
+          </p>
+        )}
 
         {editable && <AddItemForm order={order} items={items} services={services} parts={parts} onAdded={(item) => {
           onItems([...items, item]);
@@ -258,6 +280,8 @@ export function RepairItemsCard({ order, items, services, parts, canEdit, select
   );
 }
 
+type RowPatch = { quantity?: number; unit_price?: number; taxable?: boolean };
+
 interface ItemRowProps {
   item: RepairItem;
   /** The recorded decision behind the item's current approval, if any. */
@@ -270,7 +294,7 @@ interface ItemRowProps {
   selecting: boolean;
   chosen: boolean;
   onChoose: (v: boolean) => void;
-  onSave: (patch: { quantity?: number; unit_price?: number }) => void;
+  onSave: (patch: RowPatch) => void;
   onMove: (direction: -1 | 1) => void;
   onRemove: () => void;
 }
@@ -321,6 +345,21 @@ function ItemRow({ item, record, tz, first, last, editable, busy, selecting, cho
           <div className="mt-1 flex flex-wrap items-center gap-1.5">
             <span className="text-[10px] uppercase tracking-wider text-fg3">{ITEM_KIND_LABEL[item.kind]}</span>
             <Badge tone={APPROVAL_TONE[item.approval]}>{APPROVAL_LABEL[item.approval]}</Badge>
+            {editable ? (
+              <label className="inline-flex cursor-pointer items-center gap-1 text-[10px] text-fg2 coarse:min-h-11">
+                <input
+                  type="checkbox"
+                  checked={item.taxable}
+                  disabled={busy !== null}
+                  onChange={(e) => onSave({ taxable: e.target.checked })}
+                  aria-label={`Charge tax on ${item.description}`}
+                  className="h-3.5 w-3.5 accent-[rgb(var(--accent))] coarse:h-5 coarse:w-5"
+                />
+                Taxable
+              </label>
+            ) : (
+              !item.taxable && <Badge tone="neutral">Tax exempt</Badge>
+            )}
           </div>
           {record && record.decision === item.approval && <ApprovalLine record={record} tz={tz} />}
         </div>

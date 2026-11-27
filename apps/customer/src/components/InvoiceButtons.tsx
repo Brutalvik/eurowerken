@@ -3,14 +3,24 @@ import { Download, Loader2, Printer } from 'lucide-react';
 import { makeInvoicePdf } from '@/api/invoices';
 import type { InvoiceSummary } from '@/api/invoices';
 import { useCustomerAuth } from '@/auth/CustomerAuthContext';
+import { PayInvoice } from './payments/PayInvoice';
 
 type Phase = { kind: 'idle' } | { kind: 'busy'; action: 'download' | 'print' } | { kind: 'done'; message: string } | { kind: 'error'; message: string };
 
+/** A guest's tracking details (tracking page): lets a visitor who is not signed in pay. */
+export interface InvoiceGuest {
+  slug: string;
+  code: string;
+  contact: string;
+}
+
 /**
- * Download PDF and Print for one invoice, plus the per-print choice to show the full phone and email.
+ * Pay now (when the shop takes payments online and a balance remains, or a Paid badge once settled), Download PDF and
+ * Print for one invoice, plus the per-print choice to show the full phone and email.
  * The PDF is built fresh on each click (pdf-lib loads only then). The choice starts from the account setting.
+ * Pass guest to pay as a visitor who is not signed in (the server checks the tracking code and contact).
  */
-export function InvoiceButtons({ invoice, compact = false }: { invoice: InvoiceSummary; compact?: boolean }) {
+export function InvoiceButtons({ invoice, compact = false, guest }: { invoice: InvoiceSummary; compact?: boolean; guest?: InvoiceGuest }) {
   const { account } = useCustomerAuth();
   const savedHide = account?.invoice_hide_contact ?? true;
   const [showContact, setShowContact] = useState(!savedHide);
@@ -42,6 +52,7 @@ export function InvoiceButtons({ invoice, compact = false }: { invoice: InvoiceS
 
   return (
     <div className={compact ? 'space-y-2' : 'space-y-3'}>
+      <PayInvoice compact={compact} source={guest ? { kind: 'guest', ...guest } : { kind: 'owner', invoiceId: invoice.id }} />
       <div className="flex flex-wrap gap-2">
         <button
           type="button"

@@ -10,10 +10,13 @@
  */
 import type { jsPDF } from 'jspdf';
 import { dayKeyOf, formatDateTime } from '@/api/appointments';
-import { REPAIR_STATUS_LABEL, lineTotal, repairTotals } from '@/api/repairOrders';
-import { HISTORY_ITEM_LABEL } from '@/api/serviceHistory';
+import { REPAIR_STATUS_LABEL, lineTotal } from '@/api/repairOrders';
+import { formatTaxLabel } from '@eurowerken/shared';
+import type { TaxComponent } from '@eurowerken/shared';
+import { HISTORY_ITEM_LABEL, historyRepairTotals } from '@/api/serviceHistory';
 import type { HistoryRepair, HistorySummary, ServiceHistory } from '@/api/serviceHistory';
 import { formatCurrency } from '@/lib/format';
+import { normalizeImported } from './ImportedRecords';
 
 export interface BuiltPdf {
   doc: jsPDF;
@@ -243,7 +246,7 @@ function tableHeader(w: Writer) {
   w.y += h;
 }
 
-function itemsTable(w: Writer, r: HistoryRepair) {
+function itemsTable(w: Writer, r: HistoryRepair, taxes: TaxComponent[]) {
   const { doc } = w;
   const lh = w.lineHeight(TABLE_SIZE);
   w.ensure(16 + lh + 10);
@@ -293,10 +296,10 @@ function itemsTable(w: Writer, r: HistoryRepair) {
     }
   }
 
-  const t = repairTotals(r.items);
+  const t = historyRepairTotals(r, { tax_components: taxes });
   const rows: [string, string, boolean][] = [
     ['Approved work', formatCurrency(t.subtotal), false],
-    ['GST (5%)', formatCurrency(t.gst), false],
+    ...t.taxes.map((x): [string, string, boolean] => [formatTaxLabel(x, 'paren'), formatCurrency(x.amount), false]),
     ['Total', formatCurrency(t.total), true],
   ];
   if (t.pending > 0) rows.push(['Waiting for approval (not included)', formatCurrency(t.pending), false]);
@@ -340,7 +343,7 @@ function firstPageHeader(w: Writer, history: ServiceHistory, summary: HistorySum
   w.gap(10);
 }
 
-function repairSection(w: Writer, r: HistoryRepair, tz: string) {
+function repairSection(w: Writer, r: HistoryRepair, tz: string, taxes: TaxComponent[]) {
   const { doc } = w;
   w.ensure(90);
   w.rule();
@@ -364,7 +367,7 @@ function repairSection(w: Writer, r: HistoryRepair, tz: string) {
 
   if (r.items.length > 0) {
     w.heading('Work');
-    itemsTable(w, r);
+    itemsTable(w, r, taxes);
   }
 
   if (r.approvals.length > 0) {
@@ -427,8 +430,24 @@ export async function buildHistoryPdf(
   doc.setProperties({ title: clean(`Service history - ${summary.label}`), creator: clean(history.workshop.name || 'EuroWerken') });
   const w = new Writer(doc);
   firstPageHeader(w, history, summary, tz, logo);
-  if (history.repairs.length === 0) w.text('No repairs on record.', { color: MUTED });
-  for (const r of history.repairs) repairSection(w, r, tz);
+  if (history.repairs.length === 0 && history.imported.length === 0) w.text('No repairs on record.', { color: MUTED });
+  for (const r of history.repairs) repairSection(w, r, tz, history.tax_components);
+  // Visits imported from the shop's previous system: one line each, newest first.
+  const imported = normalizeImported(history.imported).sort((a, b) => b.service_date.localeCompare(a.service_date));
+  if (imported.length > 0) {
+    w.heading(`Earlier visits (imported${imported[0].source_system ? ` from ${imported[0].source_system}` : ''})`);
+    for (const r of imported) {
+      const parts = [
+        r.service_date,
+        r.ro_number ? `RO ${r.ro_number}` : '',
+        r.mileage_km !== null ? `${Math.round(r.mileage_km).toLocaleString('en-CA')} km` : '',
+        r.total !== null ? formatCurrency(r.total) : '',
+      ].filter(Boolean);
+      w.text(parts.join('   |   '), { size: 8.5, bold: true });
+      if (r.description) w.text(r.description, { size: 8.5, color: MUTED });
+      w.gap(4);
+    }
+  }
   decorate(doc, history, summary);
   return { doc, pages: doc.getNumberOfPages() };
 }

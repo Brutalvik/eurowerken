@@ -64,7 +64,7 @@ export function ApprovalLine({ record, tz }: { record: RepairApproval; tz: strin
         <dl className="mt-1 grid gap-x-3 gap-y-0.5 rounded-lg border border-line bg-surface2/50 p-2 text-fg2 sm:grid-cols-[auto_minmax(0,1fr)]">
           <dt className="text-fg3">Amount</dt>
           <dd className="tabular-nums">
-            {formatCurrency(record.amount)} ({formatCurrency(record.amount_with_tax)} with GST)
+            {formatCurrency(record.amount)} ({formatCurrency(record.amount_with_tax)} with tax)
           </dd>
           {record.method === 'online' ? (
             <>
@@ -279,7 +279,7 @@ export function PhoneApprovalDialog({ open, order, pending, intro, onClose, onDo
               ))}
             </ul>
             <p className="text-right text-[11px] text-fg2">
-              Ticked: {formatCurrency(Math.round(total * 100) / 100)} before GST
+              Ticked: {formatCurrency(Math.round(total * 100) / 100)} before tax
             </p>
           </fieldset>
         )}

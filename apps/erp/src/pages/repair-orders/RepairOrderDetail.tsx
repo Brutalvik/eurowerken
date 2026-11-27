@@ -50,6 +50,8 @@ import { RepairInvoiceCard } from './RepairInvoiceCard';
 import { RepairItemsCard } from './RepairItemsCard';
 import { MediaCard } from './RepairMediaCard';
 import { MessagesCard, TimelineCard } from './RepairThreadCards';
+import { InspectionCard } from './InspectionCard';
+import { OrderPartsButton } from './OrderPartsButton';
 
 const URGENCY_LABEL = { routine: 'Routine', soon: 'Soon', urgent: 'Urgent' } as const;
 
@@ -246,11 +248,13 @@ export function RepairOrderDetail() {
             />
           </div>
           <ApprovalHistoryCard records={approvals} items={detail.items} tz={tz} error={approvalsError} />
+          <InspectionCard order={order} tz={tz} canEdit={canEdit} announce={announce} />
           <MediaCard order={order} media={detail.media} canEdit={canEdit} onMedia={(media) => setDetail((d) => (d ? { ...d, media } : d))} announce={announce} />
         </div>
         <div className="min-w-0 space-y-4">
           <JobCard key={order.id} order={order} tz={tz} technicians={technicians} canEdit={canEdit} onOrder={setOrder} announce={announce} />
           <RepairInvoiceCard repairOrderId={order.id} status={order.status} tz={tz} announce={announce} />
+          <OrderPartsButton repairOrderId={order.id} order={order} items={detail.items} />
           <MessagesCard
             order={order}
             messages={detail.messages}

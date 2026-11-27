@@ -8,6 +8,7 @@ import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { AlertCircle, CheckCircle2, Circle, Clock, ImageIcon, Loader2, LogIn, NotebookPen, Phone, RotateCcw, Search, ShieldCheck, User, UserPlus, Wrench, XCircle } from 'lucide-react';
+import { formatTaxLabel } from '@eurowerken/shared';
 import { DEFAULT_TIME_ZONE } from '@/api/booking';
 import {
   STATUS_LABEL,
@@ -24,6 +25,7 @@ import {
   trackRepair,
 } from '@/api/repairs';
 import type { ItemDecision, RepairEvent, RepairItem, RepairMedia, RepairStatus, RepairSummary, RepairTechnician, TrackedRepair } from '@/api/repairs';
+import { useWorkshopTaxes } from '@/api/taxes';
 import { useCustomerAuth } from '@/auth/CustomerAuthContext';
 import { Photo } from '@/components/Photo';
 import { Pill } from '@/components/ui';
@@ -582,7 +584,8 @@ export function ItemsSummary({ items }: { items: RepairItem[] }) {
 }
 
 export function Totals({ items }: { items: RepairItem[] }) {
-  const t = repairTotals(items);
+  const { components } = useWorkshopTaxes();
+  const t = repairTotals(items, components);
   return (
     <div className="mt-4 border-t border-line pt-4">
       <dl className="space-y-1.5 text-sm">
@@ -590,10 +593,18 @@ export function Totals({ items }: { items: RepairItem[] }) {
           <dt className="text-fg2">Approved work</dt>
           <dd className="tabular-nums text-fg">{formatMoney(t.subtotal)}</dd>
         </div>
-        <div className="flex justify-between gap-4">
-          <dt className="text-fg2">GST (5%)</dt>
-          <dd className="tabular-nums text-fg">{formatMoney(t.gst)}</dd>
-        </div>
+        {t.taxable !== t.subtotal && (
+          <div className="flex justify-between gap-4">
+            <dt className="text-fg3">Taxed work</dt>
+            <dd className="tabular-nums text-fg3">{formatMoney(t.taxable)}</dd>
+          </div>
+        )}
+        {t.taxes.map((x) => (
+          <div key={x.code} className="flex justify-between gap-4">
+            <dt className="text-fg2">{formatTaxLabel(x, 'paren')}</dt>
+            <dd className="tabular-nums text-fg">{formatMoney(x.amount)}</dd>
+          </div>
+        ))}
         <div className="flex items-baseline justify-between gap-4 pt-1">
           <dt className="font-medium text-fg">Total</dt>
           <dd className="font-display text-xl font-bold tabular-nums text-fg">{formatMoney(t.total)}</dd>

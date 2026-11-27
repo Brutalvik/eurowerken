@@ -9,6 +9,9 @@ import { supabase } from '@/lib/supabase';
 import { friendlyError } from './catalogue';
 import type { AppointmentVehicle, Urgency } from './appointments';
 import { CUSTOMER_SITE_URL } from '@/config/customerSite';
+import { FALLBACK_TAX_COMPONENTS, computeTaxes, sumTaxes } from '@eurowerken/shared';
+import type { TaxComponent, TaxLine } from '@eurowerken/shared';
+import { getTaxSettings } from './taxes';
 
 // Types ------------------------------------------------------------------------------------------
 
@@ -70,6 +73,8 @@ export interface RepairItem {
   service_id: string | null;
   part_id: string | null;
   approval: Approval;
+  /** False for an exempt line: in the subtotal, not taxed (migration 029; true before it). */
+  taxable: boolean;
   sort_order: number;
   created_at: string;
 }
@@ -169,12 +174,19 @@ export interface RepairTotals {
   subtotal: number;
   /** Items waiting for the customer (not in the subtotal). */
   pending: number;
-  /** GST on the approved subtotal. */
+  /** Approved, taxable items (the base every tax is charged on). */
+  taxable: number;
+  /** Each of the shop's taxes on the taxable amount, in order. */
+  taxes: TaxLine[];
+  /** All taxes together. */
+  tax: number;
+  /** @deprecated Same as `tax` (all taxes together), kept for older callers. */
   gst: number;
-  /** Approved subtotal plus GST. */
+  /** Approved subtotal plus all taxes. */
   total: number;
 }
 
+/** @deprecated Taxes come from the shop's settings (api/taxes.ts useTaxSettings); this is only the fallback rate. */
 export const GST_RATE = 0.05;
 export const MEDIA_BUCKET = 'repair-media';
 export const MAX_MEDIA_BYTES = 50 * 1024 * 1024;
@@ -233,7 +245,13 @@ function normalizeOrder(row: Record<string, unknown>): RepairOrder {
 }
 
 function normalizeItem(row: Record<string, unknown>): RepairItem {
-  return { ...(row as unknown as RepairItem), quantity: num(row.quantity), unit_price: num(row.unit_price), sort_order: num(row.sort_order) };
+  return {
+    ...(row as unknown as RepairItem),
+    quantity: num(row.quantity),
+    unit_price: num(row.unit_price),
+    sort_order: num(row.sort_order),
+    taxable: row.taxable !== false,
+  };
 }
 
 const byOrder = (a: RepairItem, b: RepairItem) => a.sort_order - b.sort_order || a.created_at.localeCompare(b.created_at);
@@ -245,17 +263,36 @@ export function lineTotal(item: Pick<RepairItem, 'quantity' | 'unit_price'>): nu
   return cents(item.quantity * item.unit_price);
 }
 
-/** Approved subtotal, GST 5% on it, the total, and the amount still waiting for the customer. */
-export function repairTotals(items: Pick<RepairItem, 'quantity' | 'unit_price' | 'approval'>[]): RepairTotals {
+type TotalsItem = Pick<RepairItem, 'quantity' | 'unit_price' | 'approval'> & { taxable?: boolean };
+
+/**
+ * Approved subtotal, each of the shop's taxes on the approved taxable lines, the total, and the amount still waiting
+ * for the customer. Same math as the invoice in the database (each tax rounded half-up to the cent). Without
+ * components it uses GST 5% (the fallback); pass useTaxSettings().components.
+ */
+export function repairTotals(items: TotalsItem[], components: readonly TaxComponent[] = FALLBACK_TAX_COMPONENTS): RepairTotals {
   let subtotal = 0;
+  let taxable = 0;
   let pending = 0;
   for (const i of items) {
-    if (i.approval === 'approved') subtotal += lineTotal(i);
-    else if (i.approval === 'pending') pending += lineTotal(i);
+    if (i.approval === 'approved') {
+      // Sum in cents so many lines never drift.
+      const c = Math.round(lineTotal(i) * 100);
+      subtotal += c;
+      if (i.taxable !== false) taxable += c;
+    } else if (i.approval === 'pending') pending += Math.round(lineTotal(i) * 100);
   }
-  subtotal = cents(subtotal);
-  const gst = cents(subtotal * GST_RATE);
-  return { subtotal, pending: cents(pending), gst, total: cents(subtotal + gst) };
+  const taxes = computeTaxes(taxable / 100, components);
+  const tax = sumTaxes(taxes);
+  return {
+    subtotal: subtotal / 100,
+    taxable: taxable / 100,
+    pending: pending / 100,
+    taxes,
+    tax,
+    gst: tax,
+    total: (subtotal + Math.round(tax * 100)) / 100,
+  };
 }
 
 export function plateOf(v: AppointmentVehicle): string {
@@ -319,7 +356,8 @@ export function mediaUrl(path: string): string {
 
 // Reading ---------------------------------------------------------------------------------------------
 
-const LIST_SELECT = '*, technician:team_members(name), items:repair_order_items(quantity, unit_price, approval)';
+// Items with * so the list still loads before migration 029 adds `taxable`.
+const LIST_SELECT = '*, technician:team_members(name), items:repair_order_items(*)';
 
 export interface RepairListFilter {
   status?: RepairStatus | 'all';
@@ -330,15 +368,17 @@ export interface RepairListFilter {
 export async function listRepairOrders(workshopId: string, filter: RepairListFilter = {}): Promise<RepairOrderSummary[]> {
   let q = supabase.from('repair_orders').select(LIST_SELECT).eq('workshop_id', workshopId).order('created_at', { ascending: false }).limit(1000);
   if (filter.status && filter.status !== 'all') q = q.eq('status', filter.status);
-  const { data, error } = await q;
+  // The shop's taxes for the totals (cached); GST 5% if they cannot be read.
+  const [{ data, error }, taxSettings] = await Promise.all([q, getTaxSettings(workshopId).catch(() => null)]);
   if (error) fail(error);
+  const components = taxSettings?.components ?? FALLBACK_TAX_COMPONENTS;
   const rows = ((data ?? []) as Record<string, unknown>[]).map((row) => {
     const tech = row.technician as { name?: string } | null;
     const items = Array.isArray(row.items) ? (row.items as Record<string, unknown>[]) : [];
     return {
       ...normalizeOrder(row),
       technician_name: tech?.name ?? null,
-      totals: repairTotals(items.map((i) => ({ quantity: num(i.quantity), unit_price: num(i.unit_price), approval: i.approval as Approval }))),
+      totals: repairTotals(items.map((i) => ({ quantity: num(i.quantity), unit_price: num(i.unit_price), approval: i.approval as Approval, taxable: i.taxable !== false })), components),
     };
   });
   return filter.search ? rows.filter((o) => matchesRepairSearch(o, filter.search ?? '')) : rows;
@@ -510,6 +550,8 @@ export interface ItemPatch {
   unit_price?: number;
   /** Only back to pending: approved and declined are recorded with recordPhoneApproval or by the customer online. */
   approval?: 'pending';
+  /** False for an exempt line (migration 029). */
+  taxable?: boolean;
 }
 
 export async function updateRepairItem(item: RepairItem, patch: ItemPatch): Promise<RepairItem> {

@@ -4,6 +4,7 @@ import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { safeNext, useCustomerAuth } from '@/auth/CustomerAuthContext';
 import { EMAIL_NOT_CONFIRMED } from '@/lib/errors';
 import { sitePath, useSite } from '@/site/SiteContext';
+import { PREVIEW_DISABLED_NOTE, isPreview } from '@/site/preview';
 import {
   AuthAlert,
   AuthField,
@@ -76,6 +77,10 @@ export function LoginPage() {
   async function onSubmit(ev: FormEvent) {
     ev.preventDefault();
     setFormError(null);
+    if (isPreview()) {
+      setFormError(PREVIEW_DISABLED_NOTE);
+      return;
+    }
     const found = validate();
     setErrors(found);
     if (Object.keys(found).length > 0) {
@@ -123,6 +128,10 @@ export function LoginPage() {
   }
 
   async function onGoogle() {
+    if (isPreview()) {
+      setFormError(PREVIEW_DISABLED_NOTE);
+      return;
+    }
     setBusy(true);
     setFormError(null);
     const err = await signInWithGoogle(next);

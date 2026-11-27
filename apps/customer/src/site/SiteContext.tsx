@@ -1,8 +1,9 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
-import { brightenForDark, hexToRgbTriplet, readableOn } from '@eurowerken/shared';
+import { brightenForDark, hexToRgbTriplet, normalizeSiteTheme, readableOn, siteFont, siteRadiusScale } from '@eurowerken/shared';
 import type { WorkshopSite } from '@eurowerken/shared';
 import { supabase, supabaseConfigured } from '@/lib/supabase';
+import { isPreview, usePreviewData } from './preview';
 
 type SiteState =
   | { status: 'loading' }
@@ -12,11 +13,24 @@ type SiteState =
 
 const SiteContext = createContext<WorkshopSite | null>(null);
 
-/** Loads the published site for /:slug and applies the workshop's brand colour. */
+const FONT_LINK_ATTR = 'data-ew-site-font';
+
+/**
+ * Loads the published site for /:slug and applies the workshop's design (brand colour, fonts, corners). In the ERP's
+ * live preview the site comes from the ERP's messages instead, and is never queried.
+ */
 export function useSiteLoader(slug: string | undefined): SiteState {
-  const [state, setState] = useState<SiteState>({ status: 'loading' });
+  const preview = isPreview();
+  const previewData = usePreviewData();
+  const [loaded, setState] = useState<SiteState>({ status: 'loading' });
+  const state: SiteState = preview
+    ? previewData
+      ? { status: 'ready', site: previewData.site }
+      : { status: 'loading' }
+    : loaded;
 
   useEffect(() => {
+    if (preview) return;
     if (!slug || !supabaseConfigured) {
       setState(supabaseConfigured ? { status: 'not-found' } : { status: 'error', message: 'Supabase is not configured.' });
       return;
@@ -38,7 +52,7 @@ export function useSiteLoader(slug: string | undefined): SiteState {
     return () => {
       cancelled = true;
     };
-  }, [slug]);
+  }, [slug, preview]);
 
   const site = state.status === 'ready' ? state.site : null;
 
@@ -59,6 +73,52 @@ export function useSiteLoader(slug: string | undefined): SiteState {
     }
     return () => names.forEach((n) => root.style.removeProperty(n));
   }, [site?.accent_color]);
+
+  // Fonts: the design's display and body fonts, loaded from Google Fonts. 'modern' (Poppins and Inter) is already
+  // loaded by index.html. One link element is reused, so switching fonts in the preview does not stack them.
+  const theme = normalizeSiteTheme(site?.theme);
+  const fontId = site ? theme.font : null;
+  useEffect(() => {
+    if (!fontId) return;
+    const root = document.documentElement;
+    const font = siteFont(fontId);
+    root.style.setProperty('--font-display', font.display);
+    root.style.setProperty('--font-sans', font.body);
+    let link = document.head.querySelector<HTMLLinkElement>(`link[${FONT_LINK_ATTR}]`);
+    if (font.id === 'modern') {
+      link?.remove();
+    } else {
+      const href = `https://fonts.googleapis.com/css2?${font.googleQuery}&display=swap`;
+      if (!link) {
+        link = document.createElement('link');
+        link.rel = 'stylesheet';
+        link.setAttribute(FONT_LINK_ATTR, '');
+        document.head.appendChild(link);
+      }
+      if (link.getAttribute('href') !== href) link.href = href;
+    }
+    return () => {
+      root.style.removeProperty('--font-display');
+      root.style.removeProperty('--font-sans');
+    };
+  }, [fontId]);
+  useEffect(
+    () => () => {
+      document.head.querySelector(`link[${FONT_LINK_ATTR}]`)?.remove();
+    },
+    [],
+  );
+
+  // Corners: tailwind.config.js multiplies every rounded-* size by --site-radius.
+  const radius = site ? siteRadiusScale(theme.radius) : null;
+  useEffect(() => {
+    if (radius === null) return;
+    const root = document.documentElement;
+    root.style.setProperty('--site-radius', String(radius));
+    return () => {
+      root.style.removeProperty('--site-radius');
+    };
+  }, [radius]);
 
   useEffect(() => {
     if (site) document.title = `${site.display_name}${site.tagline ? ` | ${site.tagline}` : ''}`;

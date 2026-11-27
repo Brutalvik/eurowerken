@@ -44,7 +44,7 @@ const TEXT_FIELDS: { key: keyof Draft; label: string; placeholder?: string; hint
  * The workshop's public customer website: address, name, colours, hero text
  * and contact details. Only full Settings access can save (enforced by RLS).
  */
-export function WebsiteCard() {
+export function WebsiteCard({ onSaved }: { onSaved?: (site: WorkshopSite) => void } = {}) {
   const { user, can } = useAuth();
   const canEdit = can('settings', 'full');
   const [site, setSite] = useState<WorkshopSite | null>(null);
@@ -122,6 +122,7 @@ export function WebsiteCard() {
       return;
     }
     setSite(data as WorkshopSite);
+    onSaved?.(data as WorkshopSite);
     setSaved(true);
   }
 

@@ -29,9 +29,11 @@ export default {
         sidebar: token('sidebar'),
         ink: token('ink'),
       },
+      // The customer site sets --font-sans / --font-display from the shop's design; everywhere else they are unset
+      // and the fallbacks inside var() apply.
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
-        display: ['Poppins', 'Inter', 'system-ui', 'sans-serif'],
+        sans: ['var(--font-sans, Inter)', 'system-ui', 'sans-serif'],
+        display: ['var(--font-display, Poppins)', 'Inter', 'system-ui', 'sans-serif'],
       },
     },
   },

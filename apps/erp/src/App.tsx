@@ -31,6 +31,12 @@ const RepairOrderDetail = lazy(() => import('@/pages/repair-orders/RepairOrderDe
 const ServiceHistoryPage = lazy(() => import('@/pages/ServiceHistoryPage').then((m) => ({ default: m.ServiceHistoryPage })));
 const SalesPage = lazy(() => import('@/pages/SalesPage').then((m) => ({ default: m.SalesPage })));
 const SettingsPage = lazy(() => import('@/pages/SettingsPage').then((m) => ({ default: m.SettingsPage })));
+const WebsiteSetupPage = lazy(() =>
+  import('@/pages/settings/website/WebsiteSetupPage').then((m) => ({ default: m.WebsiteSetupPage })),
+);
+const PurchasingPage = lazy(() => import('@/pages/purchasing/PurchasingPage').then((m) => ({ default: m.PurchasingPage })));
+const PurchaseOrderPage = lazy(() => import('@/pages/purchasing/PurchaseOrderPage').then((m) => ({ default: m.PurchaseOrderPage })));
+const InspectionPage = lazy(() => import('@/pages/inspections/InspectionPage').then((m) => ({ default: m.InspectionPage })));
 const UsersPage = lazy(() => import('@/pages/UsersPage').then((m) => ({ default: m.UsersPage })));
 
 function guarded(module: ModuleId, page: ReactNode) {
@@ -80,8 +86,13 @@ export default function App() {
         {/* Not a module of its own: Appointments follows repair-orders access (src/config/nav.ts). */}
         <Route path="appointments" element={guarded('repair-orders', <AppointmentsPage />)} />
         <Route path="inventory" element={guarded('inventory', <InventoryPage />)} />
+        {/* Not a module of its own: Purchasing follows inventory access (src/config/nav.ts). A purchase order also
+            opens for staff who reached it from a repair order; the database decides what each user may see. */}
+        <Route path="purchasing" element={guarded('inventory', <PurchasingPage />)} />
+        <Route path="purchasing/:id" element={<PurchaseOrderPage />} />
         <Route path="repair-orders" element={guarded('repair-orders', <RepairOrdersPage />)} />
         <Route path="repair-orders/:id" element={guarded('repair-orders', <RepairOrderDetail />)} />
+        <Route path="repair-orders/:repairOrderId/inspections/:inspectionId" element={guarded('repair-orders', <InspectionPage />)} />
         {/* Not a module of its own: Service history follows repair-orders access (src/config/nav.ts). */}
         <Route path="service-history" element={guarded('repair-orders', <ServiceHistoryPage />)} />
         <Route path="customers" element={guarded('customers', <CustomersPage />)} />
@@ -90,6 +101,7 @@ export default function App() {
         <Route path="reports" element={guarded('reports', <ReportsPage />)} />
         <Route path="users" element={guarded('users', <UsersPage />)} />
         <Route path="settings" element={guarded('settings', <SettingsPage />)} />
+        <Route path="settings/website/setup" element={guarded('settings', <WebsiteSetupPage />)} />
         {/* Platform super admins only; AdminPage shows "not found" to everyone else. */}
         <Route path="admin" element={<AdminPage />} />
         {/* The usage guide: every signed-in role, not guarded by a module. */}

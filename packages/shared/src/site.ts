@@ -28,6 +28,14 @@ export interface WorkshopSite {
   own_website_url?: string | null;
   /** Customer site navigation (migration 007): the liquid-glass tab bar or the classic header menu. */
   nav_style?: NavStyle;
+  /** Design (migration 028): { preset, font, radius, mode }. Read through normalizeSiteTheme. */
+  theme?: unknown;
+  /** Home page sections in order, each on or off (migration 028). Read through normalizeSiteSections. */
+  sections?: unknown;
+  /** Hero background photo (migration 028); null uses the built-in picture. */
+  hero_image_url?: string | null;
+  /** When the shop finished "Deploy your website"; null while the site has never been set up (migration 028). */
+  setup_completed_at?: string | null;
   published: boolean;
   updated_at: string;
 }

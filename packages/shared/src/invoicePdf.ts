@@ -8,6 +8,8 @@
  */
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import type { PDFFont, PDFImage, PDFPage, RGB } from 'pdf-lib';
+import { formatTaxLabel, invoiceTaxLines, parseRegistration, registrationLines } from './taxes';
+import type { TaxLine, TaxRegistration } from './taxes';
 
 // Data ---------------------------------------------------------------------------------------------------------------
 
@@ -37,6 +39,8 @@ export interface InvoiceLineItem {
   description: string;
   quantity: number;
   unit_price: number;
+  /** False for a tax-exempt line (migration 029): marked "(no tax)". */
+  taxable?: boolean;
 }
 
 export interface InvoiceNote {
@@ -68,11 +72,21 @@ export interface InvoiceDocument {
   declined: InvoiceLineItem[];
   /** The technician's notes the customer may see. */
   notes: InvoiceNote[];
+  /** Compatibility: the combined rate. Used only when `taxes` is absent (one GST line). */
   gst_rate: number;
   /** Totals as stored on the invoice; recomputed from lines when absent. */
   subtotal?: number;
+  /** Compatibility: the total tax. Used only when `taxes` is absent. */
   gst?: number;
   total?: number;
+  /** Each tax as charged (invoices.taxes, migration 029). Absent or empty: one GST line from gst / gst_rate. */
+  taxes?: TaxLine[];
+  /** The shop's tax registration numbers, printed under its details. */
+  registration?: TaxRegistration | null;
+  /** Payments (when the invoices table has them): with amount_paid > 0, "Paid" and "Balance due" rows print. */
+  amount_paid?: number | null;
+  balance?: number | null;
+  payment_status?: string | null;
 }
 
 // Privacy ---------------------------------------------------------------------------------------------------------------
@@ -225,7 +239,14 @@ export async function renderInvoicePdf(d: InvoiceDocument, opts: { hideContact: 
   const lines = d.lines;
   const subtotal = d.subtotal ?? Math.round(lines.reduce((a, l) => a + l.quantity * l.unit_price, 0) * 100) / 100;
   const gst = d.gst ?? Math.round(subtotal * d.gst_rate * 100) / 100;
-  const total = d.total ?? subtotal + gst;
+  const taxLines: TaxLine[] = d.taxes && d.taxes.length ? d.taxes : [{ code: 'GST', label: 'GST', rate: d.gst_rate, amount: gst }];
+  const taxTotal = Math.round(taxLines.reduce((a, l) => a + Math.round(l.amount * 100), 0)) / 100;
+  const total = d.total ?? Math.round((subtotal + taxTotal) * 100) / 100;
+  const paid = Number(d.amount_paid) || 0;
+  const showPaid = paid > 0;
+  const balance = d.balance !== null && d.balance !== undefined && Number.isFinite(Number(d.balance))
+    ? Number(d.balance)
+    : Math.round((total - paid) * 100) / 100;
 
   let page: PDFPage = pdf.addPage([W, H]);
   let y = 0;
@@ -279,10 +300,14 @@ export async function renderInvoicePdf(d: InvoiceDocument, opts: { hideContact: 
     t(fit(line, font, 8.5, 300), M, y, 8.5, font, MUTED);
     y -= 11.5;
   }
+  for (const line of registrationLines(d.registration)) {
+    t(fit(line, font, 8, 300), M, y, 8, font, MUTED);
+    y -= 11;
+  }
   const meta: [string, string][] = [
     ['Issued', dateOnly(d.issued_at, d.timeZone)],
     ['Repair order', d.repair.number],
-    ['Payment', 'Due at pickup'],
+    ['Payment', showPaid && balance <= 0 ? 'Paid' : 'Due at pickup'],
   ];
   let my = H - 46 - (d.void ? 52 : 38);
   for (const [k, v] of meta) {
@@ -372,7 +397,7 @@ export async function renderInvoicePdf(d: InvoiceDocument, opts: { hideContact: 
     t((KIND_TITLE[g.k] ?? 'Other').toUpperCase(), M + 8, y, 7, bold, MUTED);
     y -= 13;
     for (const l of g.items) {
-      const desc = wrap(l.description, font, 9, descW);
+      const desc = wrap(l.taxable === false ? `${l.description} (no tax)` : l.description, font, 9, descW);
       const h = desc.length * 11.5 + 9;
       if (y - h < 70) {
         continuation();
@@ -390,7 +415,7 @@ export async function renderInvoicePdf(d: InvoiceDocument, opts: { hideContact: 
   }
 
   // 5. Totals --------------------------------------------------------------------------------------------------------------
-  room(92);
+  room(62 + 15 * (taxLines.length + 1) + (showPaid ? 34 : 0));
   y -= 6;
   const bx = W - M - 220;
   const row = (label: string, value: string) => {
@@ -400,12 +425,19 @@ export async function renderInvoicePdf(d: InvoiceDocument, opts: { hideContact: 
   };
   page.drawLine({ start: { x: bx, y: y + 10 }, end: { x: W - M, y: y + 10 }, thickness: 0.6, color: RULE });
   row('Subtotal', money(subtotal));
-  row(`GST (${Math.round(d.gst_rate * 1000) / 10}%)`, money(gst));
+  for (const l of taxLines) row(formatTaxLabel(l, 'paren'), money(l.amount));
   y -= 4;
   page.drawRectangle({ x: bx, y: y - 16, width: W - M - bx, height: 28, color: accent });
   t('TOTAL', bx + 12, y - 6, 10, bold, rgb(1, 1, 1));
   tr(money(total), cAmt, y - 7, 14, bold, rgb(1, 1, 1));
-  y -= 44;
+  y -= 36;
+  if (showPaid) {
+    row('Paid', `-${money(paid)}`);
+    t('Balance due', bx + 12, y, 10, bold, INK);
+    tr(money(Math.max(balance, 0)), cAmt, y, 10, bold, INK);
+    y -= 19;
+  }
+  y -= 8;
 
   // 6. Technician notes --------------------------------------------------------------------------------------------------
   if (d.notes.length) {
@@ -491,6 +523,13 @@ interface Db {
 
 type Row = Record<string, unknown>;
 
+/** A numeric column that may not exist yet (null when absent or not a number). */
+function optionalNumber(v: unknown): number | null {
+  if (v === null || v === undefined || v === '') return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
 /**
  * Everything the invoice shows, read with the caller's own access: staff of the workshop, or the customer the
  * invoice belongs to. Throws with a short message when the invoice cannot be read.
@@ -500,12 +539,14 @@ export async function loadInvoiceDocument(db: Db, invoiceId: string): Promise<In
   if (error) throw new Error(error.message);
   if (!inv) throw new Error('Invoice not found.');
   const i = inv as Row;
-  const [ro, items, events, site, booking] = await Promise.all([
+  const [ro, items, events, site, booking, taxes] = await Promise.all([
     db.from('repair_orders').select('number, tracking_code, created_at, completed_at, customer_notes, technician_id').eq('id', i.repair_order_id).maybeSingle(),
     db.from('repair_order_items').select('kind, description, quantity, unit_price, approval, sort_order, created_at').eq('repair_order_id', i.repair_order_id),
     db.from('repair_order_events').select('kind, title, body, created_at, visible_to_customer').eq('repair_order_id', i.repair_order_id).eq('kind', 'note').eq('visible_to_customer', true).order('created_at'),
     db.from('workshop_sites').select('*').eq('workshop_id', i.workshop_id).maybeSingle(),
     db.from('booking_settings').select('time_zone').eq('workshop_id', i.workshop_id).maybeSingle(),
+    // Migration 029; before it (or without access) the invoice simply prints no registration numbers.
+    db.from('workshop_tax_settings').select('registration').eq('workshop_id', i.workshop_id).maybeSingle(),
   ]);
   const r = (ro.data ?? {}) as Row;
   let technician: string | null = null;
@@ -519,6 +560,7 @@ export async function loadInvoiceDocument(db: Db, invoiceId: string): Promise<In
     description: String(l.description ?? ''),
     quantity: Number(l.quantity) || 0,
     unit_price: Number(l.unit_price) || 0,
+    ...(l.taxable === false ? { taxable: false } : {}),
   });
   const allItems = ((items.data ?? []) as Row[]).sort(
     (a, b) => (Number(a.sort_order) || 0) - (Number(b.sort_order) || 0) || String(a.created_at).localeCompare(String(b.created_at)),
@@ -551,10 +593,15 @@ export async function loadInvoiceDocument(db: Db, invoiceId: string): Promise<In
     lines: ((i.lines ?? []) as Row[]).map(toLine),
     declined: allItems.filter((l) => l.approval === 'declined').map(toLine),
     notes: ((events.data ?? []) as Row[]).map((e) => ({ title: String(e.title ?? ''), body: (e.body as string) ?? null, at: String(e.created_at) })),
-    gst_rate: Number(i.gst_rate) || 0.05,
+    gst_rate: i.gst_rate === null || i.gst_rate === undefined ? 0.05 : Number(i.gst_rate) || 0,
     subtotal: Number(i.subtotal) || 0,
     gst: Number(i.gst) || 0,
     total: Number(i.total) || 0,
+    taxes: invoiceTaxLines(i),
+    registration: taxes && !taxes.error ? parseRegistration(((taxes.data ?? {}) as Row).registration) : null,
+    amount_paid: optionalNumber(i.amount_paid),
+    balance: optionalNumber(i.balance),
+    payment_status: typeof i.payment_status === 'string' ? i.payment_status : null,
   };
 }
 

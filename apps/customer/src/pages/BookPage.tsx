@@ -18,6 +18,7 @@ import { listVehicles } from '@/api/vehicles';
 import { useCustomerAuth } from '@/auth/CustomerAuthContext';
 import { Breadcrumbs } from '@/components/ui';
 import { sitePath, useSite } from '@/site/SiteContext';
+import { PREVIEW_DISABLED_NOTE, isPreview } from '@/site/preview';
 import { SummaryCard, estimateText, totalText } from './book/BookingSummary';
 import type { SummaryData } from './book/BookingSummary';
 import { Confirmation } from './book/Confirmation';
@@ -275,6 +276,10 @@ export function BookPage() {
 
   async function confirmBooking() {
     if (submittingRef.current) return;
+    if (isPreview()) {
+      setSubmitError(PREVIEW_DISABLED_NOTE);
+      return;
+    }
     submittingRef.current = true;
     setSubmitting(true);
     setSubmitError(null);

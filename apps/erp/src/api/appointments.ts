@@ -1492,6 +1492,8 @@ export interface KnownCar {
   nickname: string | null;
   /** In the customer's garage on the website (else seen on a past booking or repair here). */
   from_garage: boolean;
+  /** Where the car is known from: their online garage, a visit here, or records imported from another system. */
+  source: 'garage' | 'visit' | 'imported';
   last_seen: string | null;
 }
 
@@ -1501,6 +1503,8 @@ export interface KnownCustomer {
   email: string | null;
   phone: string | null;
   has_account: boolean;
+  /** The system the customer was imported from (migration 033), if any. */
+  imported_from: string | null;
   vehicles: KnownCar[];
 }
 
@@ -1527,6 +1531,7 @@ export async function findCustomer(email: string, phone: string): Promise<KnownC
     email: str(d.email),
     phone: str(d.phone),
     has_account: d.has_account === true,
+    imported_from: str(d.imported_from),
     vehicles: cars.map((c) => ({
       vehicle_id: str(c.vehicle_id),
       make: str(c.make),
@@ -1536,6 +1541,7 @@ export async function findCustomer(email: string, phone: string): Promise<KnownC
       vin: str(c.vin),
       nickname: str(c.nickname),
       from_garage: c.from_garage === true,
+      source: c.source === 'imported' ? 'imported' : c.from_garage === true || c.source === 'garage' ? 'garage' : 'visit',
       last_seen: str(c.last_seen),
     })),
   };

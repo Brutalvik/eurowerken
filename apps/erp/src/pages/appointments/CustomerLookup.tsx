@@ -83,7 +83,7 @@ export function LookupNote({ state }: { state: LookupState }) {
           <UserCheck className="h-3.5 w-3.5 text-ok" aria-hidden />
           <span>
             Found <strong className="text-fg">{state.customer.name || 'this customer'}</strong>
-            {state.customer.has_account ? ' (has an account)' : ' (earlier visits)'} · {state.customer.vehicles.length}{' '}
+            {state.customer.has_account ? ' (has an account)' : state.customer.imported_from ? ` (imported from ${state.customer.imported_from})` : ' (earlier visits)'} · {state.customer.vehicles.length}{' '}
             {state.customer.vehicles.length === 1 ? 'car' : 'cars'} on file
           </span>
         </>
@@ -136,7 +136,7 @@ export function CarPicker({
                     <span className="block text-[11px] text-fg2">
                       {[car.plate && `Plate ${car.plate}`, car.vin && `VIN ${car.vin}`].filter(Boolean).join(' · ') || 'No plate or VIN on file'}
                     </span>
-                    <span className="mt-0.5 block text-[10px] text-fg3">{car.from_garage ? 'In their garage on your website' : 'From an earlier visit'}</span>
+                    <span className="mt-0.5 block text-[10px] text-fg3">{car.source === 'garage' ? 'In their garage on your website' : car.source === 'imported' ? `Imported${customer.imported_from ? ` from ${customer.imported_from}` : ''}` : 'From an earlier visit'}</span>
                   </span>
                   {isSel && <Check className="h-4 w-4 shrink-0 text-accent" aria-label="In the form now" />}
                 </button>

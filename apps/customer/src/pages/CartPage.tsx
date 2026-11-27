@@ -8,8 +8,10 @@ import { useCart, useResolvedCart } from '@/cart/CartContext';
 import type { CartLine } from '@/cart/CartContext';
 import { formatMoney } from '@/lib/format';
 import { sitePath, useSite } from '@/site/SiteContext';
+import { useWorkshopTaxes } from '@/api/taxes';
+import { computeTaxes, formatTaxLabel, sumTaxes } from '@eurowerken/shared';
+import type { TaxComponent } from '@eurowerken/shared';
 
-const GST_RATE = 0.05;
 const PROMO_CODE = 'WELCOME10';
 const PROMO_RATE = 0.1;
 
@@ -77,14 +79,17 @@ interface Totals {
   discount: number;
   shipping: number;
   tax: number;
+  /** "Estimated tax (GST 5%, PST 7%)" */
+  taxLabel: string;
   total: number;
 }
 
-function computeTotals(lines: CartLine[], subtotal: number, promo: boolean, shippingId: ShippingId): Totals {
+function computeTotals(lines: CartLine[], subtotal: number, promo: boolean, shippingId: ShippingId, components: readonly TaxComponent[]): Totals {
   const discount = promo ? Math.round(subtotal * PROMO_RATE * 100) / 100 : 0;
   const shipping = SHIPPING.find((s) => s.id === shippingId)?.price ?? 0;
-  const tax = Math.round((subtotal - discount + shipping) * GST_RATE * 100) / 100;
+  const tax = sumTaxes(computeTaxes(Math.round((subtotal - discount + shipping) * 100) / 100, components));
   return {
+    taxLabel: `Estimated tax (${components.map((c) => formatTaxLabel(c)).join(', ')})`,
     itemCount: lines.reduce((n, l) => n + l.qty, 0),
     subtotal,
     discount,
@@ -192,7 +197,8 @@ function Checkout({ lines, subtotal, onPlaced }: { lines: CartLine[]; subtotal: 
   const [promoError, setPromoError] = useState('');
   const formRef = useRef<HTMLFormElement>(null);
 
-  const totals = computeTotals(lines, subtotal, promoApplied, shippingId);
+  const { components: taxComponents } = useWorkshopTaxes();
+  const totals = computeTotals(lines, subtotal, promoApplied, shippingId, taxComponents);
 
   function setField(key: keyof Shipping, value: string) {
     const next = { ...shipping, [key]: value };
@@ -296,7 +302,7 @@ function Checkout({ lines, subtotal, onPlaced }: { lines: CartLine[]; subtotal: 
                 value={totals.shipping === 0 ? 'Free' : formatMoney(totals.shipping)}
                 tone={totals.shipping === 0 ? 'text-ok' : undefined}
               />
-              <SummaryRow label="Estimated tax (5% GST)" value={formatMoney(totals.tax)} />
+              <SummaryRow label={totals.taxLabel} value={formatMoney(totals.tax)} />
             </dl>
             <div className="mt-5 flex items-baseline justify-between border-t border-line pt-5">
               <span className="font-semibold text-fg">Total</span>
@@ -618,7 +624,7 @@ function OrderConfirmation({ order }: { order: PlacedOrder }) {
           <SummaryRow label="Subtotal" value={formatMoney(totals.subtotal)} />
           {totals.discount > 0 && <SummaryRow label="Discount (WELCOME10)" value={`-${formatMoney(totals.discount)}`} tone="text-ok" />}
           <SummaryRow label={`Shipping (${order.shippingLabel})`} value={totals.shipping === 0 ? 'Free' : formatMoney(totals.shipping)} />
-          <SummaryRow label="Estimated tax (5% GST)" value={formatMoney(totals.tax)} />
+          <SummaryRow label={totals.taxLabel} value={formatMoney(totals.tax)} />
           <div className="flex justify-between gap-4 border-t border-line pt-3">
             <dt className="font-semibold text-fg">Total</dt>
             <dd className="font-display text-lg font-bold tabular-nums text-fg">{formatMoney(totals.total)}</dd>

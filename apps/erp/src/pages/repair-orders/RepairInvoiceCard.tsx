@@ -14,6 +14,8 @@ import { Card } from '@/components/ui/Card';
 import { formatCurrency } from '@/lib/format';
 import { ErrorNote } from '../inventory/PartForm';
 import { SectionTitle, textLink } from './common';
+import { formatTaxLabel } from '@eurowerken/shared';
+import { PaymentPanel } from '@/components/payments/PaymentPanel';
 
 interface Props {
   repairOrderId: string;
@@ -173,15 +175,19 @@ function InvoiceCard({ repairOrderId, status, invoice, outbox, loaded, loadError
                 <dt className="text-fg2">Subtotal</dt>
                 <dd className="text-fg">{formatCurrency(invoice.subtotal)}</dd>
               </div>
-              <div className="flex justify-between gap-3">
-                <dt className="text-fg2">GST ({Math.round(invoice.gst_rate * 1000) / 10}%)</dt>
-                <dd className="text-fg">{formatCurrency(invoice.gst)}</dd>
-              </div>
+              {invoice.taxes.map((t) => (
+                <div key={`${t.code}-${t.label}`} className="flex justify-between gap-3">
+                  <dt className="text-fg2">{formatTaxLabel(t, 'paren')}</dt>
+                  <dd className="text-fg">{formatCurrency(t.amount)}</dd>
+                </div>
+              ))}
               <div className="flex justify-between gap-3 border-t border-line pt-1 font-semibold">
                 <dt className="text-fg">Total</dt>
                 <dd className="text-fg">{formatCurrency(invoice.total)}</dd>
               </div>
             </dl>
+
+            <PaymentPanel invoice={invoice} tz={tz} onChange={onRetry} />
 
             <div>
               <p className="mb-1 text-[10px] font-medium uppercase tracking-wider text-fg3">Invoice email</p>

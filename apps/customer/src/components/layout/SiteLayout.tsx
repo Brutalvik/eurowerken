@@ -1,8 +1,12 @@
+import { useEffect } from 'react';
 import { Outlet, useLocation, useParams } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
+import { normalizeSiteTheme } from '@eurowerken/shared';
 import { CustomerAuthProvider } from '@/auth/CustomerAuthContext';
 import { CartProvider } from '@/cart/CartContext';
 import { SiteProvider, useSiteLoader } from '@/site/SiteContext';
+import { isPreview } from '@/site/preview';
+import { useTheme } from '@/theme/ThemeProvider';
 import { SiteNotFound } from '@/pages/SiteNotFound';
 import { PageBoundary } from './PageBoundary';
 import { SiteFooter } from './SiteFooter';
@@ -15,11 +19,20 @@ export function SiteLayout() {
   const { slug } = useParams();
   const state = useSiteLoader(slug);
   const { pathname } = useLocation();
+  const { setDefaultMode } = useTheme();
+
+  // The site's light or dark default, used until the visitor picks one themselves.
+  const defaultMode = state.status === 'ready' ? normalizeSiteTheme(state.site.theme).mode : null;
+  useEffect(() => {
+    if (defaultMode) setDefaultMode(defaultMode);
+  }, [defaultMode, setDefaultMode]);
+  useEffect(() => () => setDefaultMode('light'), [setDefaultMode]);
 
   if (state.status === 'loading') {
     return (
       <div className="flex min-h-[100dvh] items-center justify-center bg-bg" role="status" aria-label="Loading">
         <Loader2 className="h-6 w-6 animate-spin text-accent" aria-hidden />
+        {isPreview() && <PreviewBadge />}
       </div>
     );
   }
@@ -62,10 +75,20 @@ export function SiteLayout() {
             <SiteTabBar />
           </>
         )}
+        {isPreview() && <PreviewBadge />}
       </div>
       </CartProvider>
       </CustomerAlertsProvider>
       </CustomerAuthProvider>
     </SiteProvider>
+  );
+}
+
+/** Shown only in the ERP's live preview. */
+function PreviewBadge() {
+  return (
+    <p className="pointer-events-none fixed bottom-3 left-3 z-[60] rounded-full bg-ink/85 px-3 py-1.5 text-[11px] font-semibold text-bg shadow-lg backdrop-blur">
+      Preview of your website — not live
+    </p>
   );
 }

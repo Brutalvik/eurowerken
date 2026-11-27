@@ -1,14 +1,17 @@
-import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useId, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Car, Download, EyeOff, History, Mail, MessageSquare, Phone, Printer, Video } from 'lucide-react';
 import { errorMessage, formatDateTime, getTimeZone, telHref } from '@/api/appointments';
-import { ITEM_KIND_LABEL, REPAIR_STATUS_LABEL, REPAIR_STATUS_TONE, lineTotal, mediaUrl, plateOf, repairTotals } from '@/api/repairOrders';
+import { ITEM_KIND_LABEL, REPAIR_STATUS_LABEL, REPAIR_STATUS_TONE, lineTotal, mediaUrl, plateOf } from '@/api/repairOrders';
 import type { Approval } from '@/api/repairOrders';
+import { formatTaxLabel } from '@eurowerken/shared';
+import type { TaxComponent } from '@eurowerken/shared';
 import {
   HISTORY_ITEM_LABEL,
   MIN_QUERY,
   getServiceHistory,
+  historyRepairTotals,
   historySummary,
   historyVehicleLabel,
   searchServiceHistory,
@@ -26,6 +29,7 @@ import { formatCurrency } from '@/lib/format';
 import { Dialog, ErrorNote } from './inventory/PartForm';
 import { SectionTitle, textLink } from './repair-orders/common';
 import type { BuiltPdf } from './service-history/historyPdf';
+import { ImportedRecords } from './service-history/ImportedRecords';
 
 const DEBOUNCE_MS = 300;
 const PAGE_WARNING = 50;
@@ -281,7 +285,7 @@ function VehicleView({ vehicleKey, tz, onBack }: { vehicleKey: string; tz: strin
     setLoading(true);
     setError(null);
     try {
-      const h = await getServiceHistory(vehicleKey);
+      const h = await getServiceHistory(vehicleKey, user?.workshop?.id ?? null);
       if (mine === request.current) setHistory(h);
     } catch (err) {
       if (mine === request.current) setError(errorMessage(err, 'The service history could not be loaded.'));
@@ -379,7 +383,7 @@ function VehicleView({ vehicleKey, tz, onBack }: { vehicleKey: string; tz: strin
     );
   }
 
-  if (!history || history.repairs.length === 0) {
+  if (!history || (history.repairs.length === 0 && history.imported.length === 0)) {
     return (
       <div className="min-w-0 space-y-4">
         {back}
@@ -448,8 +452,9 @@ function VehicleView({ vehicleKey, tz, onBack }: { vehicleKey: string; tz: strin
 
       <h2 className="sr-only">Repairs, newest first</h2>
       {history.repairs.map((r) => (
-        <RepairHistoryCard key={r.id} repair={r} tz={tz} />
+        <RepairHistoryCard key={r.id} repair={r} tz={tz} shopTaxes={history.tax_components} />
       ))}
+      <ImportedRecords records={history.imported} tz={tz} />
 
       <Dialog
         open={pending !== null}
@@ -485,9 +490,9 @@ function TeamOnly() {
   );
 }
 
-function RepairHistoryCard({ repair: r, tz }: { repair: HistoryRepair; tz: string }) {
+function RepairHistoryCard({ repair: r, tz, shopTaxes }: { repair: HistoryRepair; tz: string; shopTaxes: TaxComponent[] }) {
   const id = useId();
-  const totals = repairTotals(r.items);
+  const totals = historyRepairTotals(r, { tax_components: shopTaxes });
   const photos = r.media.filter((m) => m.kind === 'photo');
   const videos = r.media.filter((m) => m.kind === 'video');
 
@@ -573,8 +578,12 @@ function RepairHistoryCard({ repair: r, tz }: { repair: HistoryRepair; tz: strin
               <dl className="ml-auto grid max-w-xs grid-cols-[1fr_auto] gap-x-4 gap-y-0.5 text-xs">
                 <dt className="text-fg2">Approved work</dt>
                 <dd className="text-right tabular-nums text-fg">{formatCurrency(totals.subtotal)}</dd>
-                <dt className="text-fg2">GST (5%)</dt>
-                <dd className="text-right tabular-nums text-fg">{formatCurrency(totals.gst)}</dd>
+                {totals.taxes.map((t) => (
+                  <Fragment key={t.code}>
+                    <dt className="text-fg2">{formatTaxLabel(t, 'paren')}</dt>
+                    <dd className="text-right tabular-nums text-fg">{formatCurrency(t.amount)}</dd>
+                  </Fragment>
+                ))}
                 <dt className="font-semibold text-fg">Total</dt>
                 <dd className="text-right font-semibold tabular-nums text-fg">{formatCurrency(totals.total)}</dd>
                 {totals.pending > 0 && (

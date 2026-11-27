@@ -25,6 +25,11 @@ import {
   Wrench,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
+import { taxesSection } from './sections/taxes';
+import { paymentsSection } from './sections/payments';
+import { purchasingSection } from './sections/purchasing';
+import { inspectionsSection } from './sections/inspections';
+import { DATA_SECTION } from './sections/data';
 
 export type CalloutKind = 'tip' | 'warning' | 'note';
 
@@ -635,6 +640,7 @@ export const GUIDE: GuideChapter[] = [
           },
         ],
       },
+      inspectionsSection,
     ],
   },
 
@@ -807,6 +813,7 @@ export const GUIDE: GuideChapter[] = [
           },
         ],
       },
+      purchasingSection,
     ],
   },
 
@@ -954,8 +961,8 @@ export const GUIDE: GuideChapter[] = [
         page: { to: '/settings', label: 'Open Settings' },
         steps: [
           {
-            title: 'Seven tabs',
-            body: 'Settings has the tabs **Website**, **Services**, **Team**, **Booking**, **Notifications**, **Documents** and **Workshop**. The open tab is part of the page address, so you can bookmark it.',
+            title: 'The tabs',
+            body: 'Settings has the tabs **Website**, **Services**, **Team**, **Booking**, **Taxes**, **Payments**, **Inspections**, **Notifications**, **Documents** and **Data**. The open tab is part of the page address, so you can bookmark it.',
           },
         ],
       },
@@ -976,17 +983,6 @@ export const GUIDE: GuideChapter[] = [
             title: 'Turn it off',
             body: 'Untick **Show the logo on invoices and other PDFs** to show only your shop name.',
             callout: { kind: 'note', text: 'Only staff with full access to Settings can change the logo.' },
-          },
-        ],
-      },
-      {
-        id: 'settings-workshop',
-        title: 'Workshop',
-        steps: [
-          {
-            title: 'Workshop profile and invoicing',
-            body: 'The **Workshop** tab has **Workshop profile** (business name, contact email, phone) and **Invoicing** defaults (tax label, tax rate, payment terms).',
-            callout: { kind: 'warning', text: 'These are not saved to the database yet ("Saved locally. Not yet connected to a backend."). They will be used by invoices, which are coming soon.' },
           },
         ],
       },
@@ -1069,6 +1065,43 @@ export const GUIDE: GuideChapter[] = [
           {
             title: 'Where it is used',
             body: 'Each new repair order takes this rate. Labour line items fill it in per hour, and the Line items card shows it.',
+          },
+        ],
+      },
+      {
+        id: 'settings-website-deploy',
+        title: 'Website: deploy your website',
+        summary: 'A guided setup for your customer website, with a live preview of the real site. Only staff with full access to Settings can use it.',
+        page: { to: '/settings', label: 'Open Settings, Website' },
+        steps: [
+          {
+            title: 'Start the setup',
+            body: 'Go to **Settings**, **Website**. Until your site is set up you see "Your customer website isn\'t live yet". Press **Deploy your website**.',
+            callout: { kind: 'note', text: 'Staff without full access to Settings see "Ask a manager to set it up".' },
+          },
+          {
+            title: 'Go through the steps',
+            body: 'The steps are **Welcome**, **Web address and name**, **Colours and style**, **Layout**, **Home page**, **Content** and **Review and deploy**. Press **Next** and **Back**, or pick a step in the list to go back to it. Booking, tracking, My Garage, sign-in and invoices are always included.',
+          },
+          {
+            title: 'Choose a style',
+            body: 'In **Colours and style**, pick a ready-made style, or **Custom** to choose your own brand colour, font, corners and default mode. In **Home page**, turn sections on or off and use the arrows to put them in order; the hero always comes first.',
+          },
+          {
+            title: 'Watch the preview',
+            body: 'The preview shows your real website with your choices. Switch between **Desktop** and **Phone**. On a small screen, press **Preview** to show it. If it says the preview could not load, the customer site is not running at its address.',
+          },
+          {
+            title: 'Your progress is saved',
+            body: 'Each time you press **Next**, your choices are saved without making anything public, so you can leave and carry on later.',
+          },
+          {
+            title: 'Deploy',
+            body: 'On **Review and deploy**, check everything (press **Edit** to change a line) and press **Deploy website**. "Your website is live" shows your address with **Copy** and **Open**.',
+          },
+          {
+            title: 'Change the design later',
+            body: 'Once live, **Settings**, **Website** shows a **Design** panel. Press **Change design** to open the setup at the colours step, change anything, and press **Save changes** on the last step. **Preview** opens your live site in a new tab.',
           },
         ],
       },
@@ -1169,6 +1202,8 @@ export const GUIDE: GuideChapter[] = [
           },
         ],
       },
+      taxesSection,
+      DATA_SECTION,
     ],
   },
 
@@ -1286,7 +1321,7 @@ export const GUIDE: GuideChapter[] = [
         steps: [
           {
             title: 'Created at Ready for pickup',
-            body: 'When a repair order is marked **Ready for pickup**, its invoice is created by itself from the approved items, with GST, and numbered INV-0001, INV-0002 and so on. Marking the same repair ready again updates that invoice and sends it again.',
+            body: 'When a repair order is marked **Ready for pickup**, its invoice is created by itself from the approved items, with your province\'s sales taxes, and numbered INV-0001, INV-0002 and so on. Marking the same repair ready again updates that invoice and sends it again.',
           },
           {
             title: 'Emailed as a PDF',
@@ -1340,6 +1375,7 @@ export const GUIDE: GuideChapter[] = [
           },
         ],
       },
+      paymentsSection,
     ],
   },
 

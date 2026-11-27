@@ -234,7 +234,7 @@ function RepairRecord({
               <span className="font-semibold">Invoice {invoice.number}</span>
               <span className="text-fg3"> · </span>
               <span className="tabular-nums">{formatMoney(invoice.total)}</span>
-              <span className="sr-only"> including GST</span>
+              <span className="sr-only"> including tax</span>
             </span>
           </p>
           <InvoiceButtons invoice={invoice} compact />

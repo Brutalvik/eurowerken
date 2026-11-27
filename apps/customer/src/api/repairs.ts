@@ -10,7 +10,8 @@
  * repairs with their account email; the server also accepts the owner's session.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { publicImageUrl } from '@eurowerken/shared';
+import { FALLBACK_TAX_COMPONENTS, computeTaxes, publicImageUrl, sumTaxes } from '@eurowerken/shared';
+import type { TaxComponent, TaxLine } from '@eurowerken/shared';
 import { friendlyError } from '@/lib/errors';
 import { supabase } from '@/lib/supabase';
 import { useSite } from '@/site/SiteContext';
@@ -73,6 +74,8 @@ export interface RepairItem {
   quantity: number;
   unit_price: number;
   approval: ItemApproval;
+  /** False for a tax-exempt line (migration 029; always true before it). */
+  taxable: boolean;
   /** The recorded decision, or null while none is recorded (pending, or decided before records began). */
   decision: ItemDecision | null;
 }
@@ -171,6 +174,7 @@ export function vehicleName(v: RepairVehicle | null | undefined): string {
 
 // Money ------------------------------------------------------------------------------------
 
+/** @deprecated The workshop's taxes come from useWorkshopTaxes() (api/taxes.ts); this is only the fallback rate. */
 export const GST_RATE = 0.05;
 
 function cents(n: number): number {
@@ -184,6 +188,13 @@ export function itemAmount(item: Pick<RepairItem, 'quantity' | 'unit_price'>): n
 export interface RepairTotals {
   /** Approved items, before tax. */
   subtotal: number;
+  /** Approved items that are taxed. */
+  taxable: number;
+  /** Each of the workshop's taxes, in order. */
+  taxes: TaxLine[];
+  /** All taxes together. */
+  tax: number;
+  /** @deprecated Same as `tax` (all taxes together). */
   gst: number;
   total: number;
   /** Items waiting for the customer's decision, before tax. */
@@ -191,20 +202,37 @@ export interface RepairTotals {
   pendingCount: number;
 }
 
-export function repairTotals(items: RepairItem[]): RepairTotals {
+/**
+ * Approved work, each of the workshop's taxes on the taxed lines (rounded to the cent like the invoice), the total,
+ * and what still waits for the customer. Without components it uses GST 5%; pass useWorkshopTaxes().components.
+ */
+export function repairTotals(items: Pick<RepairItem, 'quantity' | 'unit_price' | 'approval' | 'taxable'>[], components: readonly TaxComponent[] = FALLBACK_TAX_COMPONENTS): RepairTotals {
   let subtotal = 0;
+  let taxable = 0;
   let pending = 0;
   let pendingCount = 0;
   for (const i of items) {
-    if (i.approval === 'approved') subtotal += itemAmount(i);
-    else if (i.approval === 'pending') {
+    if (i.approval === 'approved') {
+      const c = Math.round(itemAmount(i) * 100);
+      subtotal += c;
+      if (i.taxable !== false) taxable += c;
+    } else if (i.approval === 'pending') {
       pending += itemAmount(i);
       pendingCount += 1;
     }
   }
-  subtotal = cents(subtotal);
-  const gst = cents(subtotal * GST_RATE);
-  return { subtotal, gst, total: cents(subtotal + gst), pending: cents(pending), pendingCount };
+  const taxes = computeTaxes(taxable / 100, components);
+  const tax = sumTaxes(taxes);
+  return {
+    subtotal: subtotal / 100,
+    taxable: taxable / 100,
+    taxes,
+    tax,
+    gst: tax,
+    total: (subtotal + Math.round(tax * 100)) / 100,
+    pending: cents(pending),
+    pendingCount,
+  };
 }
 
 // URLs ---------------------------------------------------------------------------------------
@@ -292,7 +320,13 @@ function parseTracked(data: unknown): TrackedRepair | null {
       linked_to_account: r.linked_to_account === true,
       technician: r.technician ?? null,
     },
-    items: arr<RepairItem>(d.items).map((i) => ({ ...i, quantity: Number(i.quantity) || 0, unit_price: Number(i.unit_price) || 0, decision: parseDecision(i.decision) })),
+    items: arr<RepairItem>(d.items).map((i) => ({
+      ...i,
+      quantity: Number(i.quantity) || 0,
+      unit_price: Number(i.unit_price) || 0,
+      taxable: (i as { taxable?: unknown }).taxable !== false,
+      decision: parseDecision(i.decision),
+    })),
     events: arr<RepairEvent>(d.events),
     media: arr<RepairMedia>(d.media),
     messages: arr<RepairMessage>(d.messages),

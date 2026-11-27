@@ -7,8 +7,11 @@
 import { supabase } from '@/lib/supabase';
 import { vehicleLabel } from './appointments';
 import type { AppointmentVehicle } from './appointments';
-import { plateOf } from './repairOrders';
-import type { Approval, ItemKind, RepairStatus } from './repairOrders';
+import { FALLBACK_TAX_COMPONENTS, invoiceTaxComponents } from '@eurowerken/shared';
+import type { TaxComponent } from '@eurowerken/shared';
+import { plateOf, repairTotals } from './repairOrders';
+import type { Approval, ItemKind, RepairStatus, RepairTotals } from './repairOrders';
+import { getTaxSettings } from './taxes';
 
 // Types ------------------------------------------------------------------------------------------
 
@@ -40,6 +43,8 @@ export interface HistoryItem {
   quantity: number;
   unit_price: number;
   approval: Approval;
+  /** False for an exempt line (migration 029). */
+  taxable: boolean;
 }
 
 export interface HistoryEvent {
@@ -99,6 +104,8 @@ export interface HistoryRepair {
   media: HistoryMedia[];
   messages: HistoryMessage[];
   approvals: HistoryApproval[];
+  /** The taxes of the repair's issued invoice (the rates it was billed at), or null without an invoice. */
+  invoice_taxes: TaxComponent[] | null;
 }
 
 export interface ServiceHistory {
@@ -106,6 +113,15 @@ export interface ServiceHistory {
   workshop: HistoryWorkshop;
   /** Newest first. */
   repairs: HistoryRepair[];
+  /** The shop's current taxes, for repairs without an invoice (GST 5% when they cannot be read). */
+  tax_components: TaxComponent[];
+  /** Visits imported from the shop's previous system (migration 033), raw; render with <ImportedRecords>. */
+  imported: Record<string, unknown>[];
+}
+
+/** A repair's totals: at its invoice's tax rates if it has one, else at the shop's current rates. */
+export function historyRepairTotals(r: HistoryRepair, h: Pick<ServiceHistory, 'tax_components'>): RepairTotals {
+  return repairTotals(r.items, r.invoice_taxes ?? h.tax_components);
 }
 
 /** What a line item means in the history: approved work was done, declined was not. */
@@ -183,6 +199,7 @@ function normalizeRepair(r: Record<string, unknown>): HistoryRepair {
       quantity: num(i.quantity),
       unit_price: num(i.unit_price),
       approval: (i.approval as Approval) ?? 'pending',
+      taxable: i.taxable !== false,
     })),
     events: arr(r.events).map((e) => ({
       id: str(e.id),
@@ -215,6 +232,7 @@ function normalizeRepair(r: Record<string, unknown>): HistoryRepair {
       customer_email: strOrNull(a.customer_email),
       note: strOrNull(a.note),
     })),
+    invoice_taxes: null,
   };
 }
 
@@ -228,12 +246,37 @@ export async function searchServiceHistory(query: string): Promise<HistoryVehicl
   return arr(data).map(normalizeVehicle);
 }
 
+/**
+ * Taxes for the history (migration 029): which lines are exempt, each repair's invoice rates and the shop's current
+ * rates. Any of these that cannot be read (older database, no Invoices access) falls back quietly: lines taxed, the
+ * shop's rates, GST 5%.
+ */
+async function addTaxes(repairs: HistoryRepair[], workshopId: string | null | undefined): Promise<TaxComponent[]> {
+  const ids = repairs.map((r) => r.id).filter(Boolean);
+  const [items, invoices, settings] = await Promise.all([
+    ids.length ? supabase.from('repair_order_items').select('*').in('repair_order_id', ids) : Promise.resolve({ data: [], error: null }),
+    ids.length ? supabase.from('invoices').select('*').in('repair_order_id', ids).eq('status', 'issued') : Promise.resolve({ data: [], error: null }),
+    workshopId ? getTaxSettings(workshopId).catch(() => null) : Promise.resolve(null),
+  ]);
+  const taxable = new Map<string, boolean>();
+  if (!items.error) for (const i of arr(items.data)) if (typeof i.taxable === 'boolean') taxable.set(str(i.id), i.taxable);
+  const invoiceTaxes = new Map<string, TaxComponent[]>();
+  if (!invoices.error) for (const inv of arr(invoices.data)) invoiceTaxes.set(str(inv.repair_order_id), invoiceTaxComponents(inv));
+  for (const r of repairs) {
+    r.items = r.items.map((i) => ({ ...i, taxable: taxable.get(i.id) ?? i.taxable }));
+    r.invoice_taxes = invoiceTaxes.get(r.id) ?? null;
+  }
+  return settings?.components ?? FALLBACK_TAX_COMPONENTS;
+}
+
 /** Every repair of one vehicle, newest first, with everything the team can see (team-only parts marked). */
-export async function getServiceHistory(key: string): Promise<ServiceHistory> {
+export async function getServiceHistory(key: string, workshopId?: string | null): Promise<ServiceHistory> {
   const { data, error } = await supabase.rpc('service_history', { p_key: key });
   if (error) throw setupError(error);
   const row = (data && typeof data === 'object' ? data : {}) as Record<string, unknown>;
   const w = (row.workshop && typeof row.workshop === 'object' ? row.workshop : {}) as Record<string, unknown>;
+  const repairs = arr(row.repairs).map(normalizeRepair);
+  const taxComponents = await addTaxes(repairs, workshopId);
   return {
     vehicle_key: str(row.vehicle_key) || key,
     workshop: {
@@ -243,7 +286,9 @@ export async function getServiceHistory(key: string): Promise<ServiceHistory> {
       email: strOrNull(w.email),
       address: strOrNull(w.address),
     },
-    repairs: arr(row.repairs).map(normalizeRepair),
+    repairs,
+    tax_components: taxComponents,
+    imported: Array.isArray(row.imported) ? (row.imported as Record<string, unknown>[]) : [],
   };
 }
 
@@ -260,6 +305,21 @@ export function historyVehicleLabel(v: AppointmentVehicle): string {
 
 /** The vehicle and owner as the latest repair has them; VIN and plate from the newest repair that has one. */
 export function historySummary(h: ServiceHistory) {
+  // A vehicle known only from imported visits: describe it from the newest of those.
+  if (h.repairs.length === 0 && h.imported.length > 0) {
+    const newest = [...h.imported].sort((a, b) => String(b.service_date ?? '').localeCompare(String(a.service_date ?? '')))[0];
+    const v = (newest.vehicle && typeof newest.vehicle === 'object' ? newest.vehicle : {}) as AppointmentVehicle;
+    return {
+      label: vehicleLabel(v) || 'Vehicle',
+      vin: vinOf(v),
+      plate: plateOf(v).toUpperCase(),
+      owner: String(newest.customer_name ?? ''),
+      email: null as string | null,
+      phone: null as string | null,
+      visits: h.imported.length,
+      latestNumber: String(newest.ro_number ?? ''),
+    };
+  }
   const latest = h.repairs[0];
   const vin = h.repairs.map((r) => vinOf(r.vehicle)).find(Boolean) ?? '';
   const plate = h.repairs.map((r) => plateOf(r.vehicle).toUpperCase()).find(Boolean) ?? '';
@@ -271,7 +331,7 @@ export function historySummary(h: ServiceHistory) {
     owner: latest?.contact_name ?? '',
     email: h.repairs.map((r) => r.contact_email).find(Boolean) ?? null,
     phone: h.repairs.map((r) => r.contact_phone).find(Boolean) ?? null,
-    visits: h.repairs.length,
+    visits: h.repairs.length + h.imported.length,
     latestNumber: latest?.number ?? '',
   };
 }

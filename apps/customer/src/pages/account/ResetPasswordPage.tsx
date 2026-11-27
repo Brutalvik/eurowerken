@@ -4,6 +4,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { useCustomerAuth } from '@/auth/CustomerAuthContext';
 import { sitePath, useSite } from '@/site/SiteContext';
+import { PREVIEW_DISABLED_NOTE, isPreview } from '@/site/preview';
 import { AuthAlert, AuthField, AuthScreen, AuthShell, MIN_PASSWORD, PrimaryButton, authButtonClass, focusFirstError } from './AccountUI';
 
 type Errors = { password?: string; confirm?: string };
@@ -50,6 +51,10 @@ export function ResetPasswordPage() {
   async function onSubmit(ev: FormEvent) {
     ev.preventDefault();
     setFormError(null);
+    if (isPreview()) {
+      setFormError(PREVIEW_DISABLED_NOTE);
+      return;
+    }
     const found: Errors = {};
     if (password.length < MIN_PASSWORD) found.password = `Use at least ${MIN_PASSWORD} characters.`;
     else if (confirm !== password) found.confirm = 'The two passwords do not match.';

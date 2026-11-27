@@ -23,17 +23,22 @@ import {
   User,
   X,
 } from 'lucide-react';
-import { GST_RATE, conversationClosed, itemAmount, postMessage, repairTotals, respondToItems, useTrackedRepair, vehicleName } from '@/api/repairs';
+import { conversationClosed, itemAmount, postMessage, repairTotals, respondToItems, useTrackedRepair, vehicleName } from '@/api/repairs';
 import type { Decision, RepairItem, RepairMessage, TrackedRepair } from '@/api/repairs';
 import { invoiceForRepair } from '@/api/invoices';
 import type { InvoiceSummary } from '@/api/invoices';
 import { useCustomerAlerts } from '@/auth/CustomerAlerts';
 import { useCustomerAuth } from '@/auth/CustomerAuthContext';
+import { useWorkshopTaxes } from '@/api/taxes';
+import { taxOnAmount } from '@eurowerken/shared';
+import { PayInvoice } from '@/components/payments/PayInvoice';
+import { InspectionReport } from './InspectionReport';
 import { InvoiceButtons } from '@/components/InvoiceButtons';
 import { Photo } from '@/components/Photo';
 import { Breadcrumbs, DemoNotice, telHref } from '@/components/ui';
 import { formatMoney } from '@/lib/format';
 import { sitePath, useSite } from '@/site/SiteContext';
+import { PREVIEW_DISABLED_NOTE, isPreview } from '@/site/preview';
 import {
   ApprovalPill,
   ApprovalRecordNote,
@@ -199,7 +204,8 @@ function CaseDetails({ tracked, contact, stale, onRetry, onUpdate, headingRef }:
   const messageInputRef = useRef<HTMLTextAreaElement>(null);
   const { repair, items, events, media } = tracked;
   const tz = repairTimeZone(repair);
-  const totals = repairTotals(items);
+  const { components: taxComponents } = useWorkshopTaxes();
+  const totals = repairTotals(items, taxComponents);
   const name = vehicleName(repair.vehicle);
 
   // React Router does not scroll to #hash targets; do it once the page is drawn.
@@ -339,7 +345,16 @@ function CaseDetails({ tracked, contact, stale, onRetry, onUpdate, headingRef }:
         <div className="min-w-0 space-y-6">
           <WorkOrder tracked={tracked} contact={contact} onUpdate={onUpdate} />
 
-          <InvoiceCard tracked={tracked} />
+          <InspectionReport
+            slug={site.slug}
+            code={repair.tracking_code}
+            contact={contact}
+            timeZone={tz}
+            refreshKey={repair.updated_at}
+            workOrderHref="#work-order"
+          />
+
+          <InvoiceCard tracked={tracked} contact={contact} />
 
           <Card title="Technician Notes" Icon={NotebookPen}>
             <WorkshopUpdates events={events} timeZone={tz} />
@@ -369,7 +384,8 @@ function WorkOrder({ tracked, contact, onUpdate }: { tracked: TrackedRepair; con
   const returnLinks = useReturnLinks();
   const { repair, items } = tracked;
   const tz = repairTimeZone(repair);
-  const totals = repairTotals(items);
+  const { components: taxComponents } = useWorkshopTaxes();
+  const totals = repairTotals(items, taxComponents);
   const hasDecisions = items.some((i) => i.approval !== 'pending' && i.decision);
   const [confirming, setConfirming] = useState<{ id: string; decision: Decision } | null>(null);
   const [busy, setBusy] = useState(false);
@@ -406,6 +422,10 @@ function WorkOrder({ tracked, contact, onUpdate }: { tracked: TrackedRepair; con
   }
 
   async function submit(item: RepairItem, decision: Decision) {
+    if (isPreview()) {
+      setError({ id: item.id, message: PREVIEW_DISABLED_NOTE, signIn: false });
+      return;
+    }
     setBusy(true);
     setError(null);
     const res = await respondToItems(site.slug, repair.tracking_code, contact, [item.id], decision);
@@ -419,16 +439,16 @@ function WorkOrder({ tracked, contact, onUpdate }: { tracked: TrackedRepair; con
     onUpdate(res.data);
     focusResultFor.current = item.id;
     setDone((d) => ({ ...d, [item.id]: decision }));
-    const after = repairTotals(res.data.items);
+    const after = repairTotals(res.data.items, taxComponents);
     setAnnouncement(
       decision === 'approved'
-        ? `${item.description} approved. The total is now ${formatMoney(after.total)} including GST.`
+        ? `${item.description} approved. The total is now ${formatMoney(after.total)} including tax.`
         : `${item.description} declined. This work will not be done.`,
     );
   }
 
   return (
-    <section aria-labelledby="work-order-title" className="glass min-w-0 rounded-2xl p-5 sm:p-6">
+    <section id="work-order" aria-labelledby="work-order-title" className="glass min-w-0 scroll-mt-24 rounded-2xl p-5 sm:p-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
           <h2 id="work-order-title" className="flex items-center gap-2 font-display text-lg font-semibold text-fg">
@@ -440,7 +460,7 @@ function WorkOrder({ tracked, contact, onUpdate }: { tracked: TrackedRepair; con
           </p>
         </div>
         <div className="text-right">
-          <p className="text-xs text-fg3">Total with GST</p>
+          <p className="text-xs text-fg3">Total with tax</p>
           <p className="font-display text-2xl font-bold tabular-nums text-fg">{formatMoney(totals.total)}</p>
         </div>
       </div>
@@ -465,7 +485,7 @@ function WorkOrder({ tracked, contact, onUpdate }: { tracked: TrackedRepair; con
             const declined = item.approval === 'declined';
             const confirm = confirming?.id === item.id ? confirming : null;
             const decided = done[item.id];
-            const gst = Math.round(amount * GST_RATE * 100) / 100;
+            const gst = taxOnAmount(amount, taxComponents, item.taxable);
             return (
               <li
                 key={item.id}
@@ -537,7 +557,7 @@ function WorkOrder({ tracked, contact, onUpdate }: { tracked: TrackedRepair; con
                       {confirm.decision === 'approved' ? (
                         <>
                           Approve <span className="font-semibold">{item.description}</span> for <span className="font-semibold">{formatMoney(amount)}</span> plus{' '}
-                          {formatMoney(gst)} GST ({formatMoney(amount + gst)})? The workshop will go ahead with this work.
+                          {formatMoney(gst)} tax ({formatMoney(amount + gst)})? The workshop will go ahead with this work.
                         </>
                       ) : (
                         <>
@@ -626,7 +646,8 @@ function WorkOrder({ tracked, contact, onUpdate }: { tracked: TrackedRepair; con
  * The issued invoice for this repair, for its signed-in owner (RLS hides it from anyone else). Loaded once, and again
  * when the repair status changes. Guests on a finished repair see a note to sign in.
  */
-function InvoiceCard({ tracked }: { tracked: TrackedRepair }) {
+function InvoiceCard({ tracked, contact }: { tracked: TrackedRepair; contact: string }) {
+  const site = useSite();
   const { status: authStatus, account } = useCustomerAuth();
   const returnLinks = useReturnLinks();
   const { repair } = tracked;
@@ -667,6 +688,10 @@ function InvoiceCard({ tracked }: { tracked: TrackedRepair }) {
           <LogIn className="h-4 w-4" aria-hidden />
           Sign in to see your invoice
         </Link>
+        {/* Guests can still pay what is owed, checked by the tracking code and their contact details. */}
+        <span className="basis-full">
+          <PayInvoice source={{ kind: 'guest', slug: site.slug, code: repair.tracking_code, contact }} />
+        </span>
       </p>
     );
   }
@@ -690,7 +715,7 @@ function InvoiceCard({ tracked }: { tracked: TrackedRepair }) {
           <dd className="font-medium text-fg">{invoice.issued_at ? formatDay(invoice.issued_at, tz) : 'Not set'}</dd>
         </div>
         <div className="text-right">
-          <dt className="text-xs text-fg3">Total incl. GST</dt>
+          <dt className="text-xs text-fg3">Total incl. tax</dt>
           <dd className="font-display text-xl font-bold tabular-nums text-fg">{formatMoney(invoice.total)}</dd>
         </div>
       </dl>
@@ -751,6 +776,10 @@ function Messages({
     e?.preventDefault();
     const text = draft.trim();
     if (!text || sending) return;
+    if (isPreview()) {
+      setError(PREVIEW_DISABLED_NOTE);
+      return;
+    }
     setSending(true);
     setError(null);
     const res = await postMessage(site.slug, repair.tracking_code, contact, text);

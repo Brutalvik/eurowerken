@@ -135,9 +135,9 @@ interface GlassAuthCardProps {
 /** Rounded frosted card with a thin light rim, brighter at the top. */
 export function GlassAuthCard({ title, subtitle, icon, subtitleId, children, footer }: GlassAuthCardProps) {
   return (
-    <section className="relative rounded-[28px] border border-white/10 border-t-white/20 bg-white/[0.04] p-5 shadow-[0_40px_120px_-30px_rgb(0_0_0/0.9)] backdrop-blur-2xl sm:p-8">
+    <section className="relative rounded-[calc(28px*var(--site-radius,1))] border border-white/10 border-t-white/20 bg-white/[0.04] p-5 shadow-[0_40px_120px_-30px_rgb(0_0_0/0.9)] backdrop-blur-2xl sm:p-8">
       <span aria-hidden className="pointer-events-none absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-white/50 to-transparent" />
-      <span aria-hidden className="pointer-events-none absolute inset-0 rounded-[28px] bg-gradient-to-b from-white/[0.06] via-transparent to-transparent" />
+      <span aria-hidden className="pointer-events-none absolute inset-0 rounded-[calc(28px*var(--site-radius,1))] bg-gradient-to-b from-white/[0.06] via-transparent to-transparent" />
       <div className="relative">
         <div className="flex justify-center">{icon ?? <AppIconTile />}</div>
         <h1 className="mt-5 text-center font-display text-2xl font-semibold leading-tight tracking-tight text-fg sm:text-[28px]">{title}</h1>
