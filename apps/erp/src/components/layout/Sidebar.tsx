@@ -3,8 +3,7 @@ import type { FocusEvent, MouseEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { NavLink } from 'react-router-dom';
 import { useNotifications } from '@/notifications/NotificationsContext';
-import { LogOut, Moon, PanelLeftClose, PanelLeftOpen, Sun } from 'lucide-react';
-import { useTheme } from '@/theme/ThemeProvider';
+import { LogOut, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { BRAND } from '@/config/brand';
 import { useAuth, useCurrentUser } from '@/auth/AuthContext';
 import { LegalFooter } from '@/pages/legal/LegalPage';
@@ -61,7 +60,6 @@ interface Tip {
 
 export function Sidebar({ open, onNavigate }: SidebarProps) {
   const { signOut, isPlatformAdmin, acting } = useAuth();
-  const { mode, toggle: toggleTheme, highContrast } = useTheme();
   const user = useCurrentUser();
   const { unopened } = useNotifications();
   const [collapsed, toggleCollapsed] = useCollapsed();
@@ -189,22 +187,6 @@ export function Sidebar({ open, onNavigate }: SidebarProps) {
           <div className="truncate text-[15px] font-semibold">{user.name}</div>
           <div className="truncate text-sm text-fg2">{user.role ?? (isPlatformAdmin ? 'Platform admin' : user.suspended ? 'Workshop suspended' : 'Awaiting approval')}</div>
         </div>
-        <div className={`flex shrink-0 flex-col items-center gap-0.5 md:max-lg:flex-row ${lg('lg:flex-row')}`}>
-        {!highContrast && (
-          <button
-            type="button"
-            onClick={toggleTheme}
-            aria-label={mode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-            onMouseEnter={showTip(mode === 'dark' ? 'Light mode' : 'Dark mode')}
-            onMouseLeave={hideTip}
-            onFocus={showTip(mode === 'dark' ? 'Light mode' : 'Dark mode')}
-            onBlur={hideTip}
-            title={rail ? undefined : mode === 'dark' ? 'Light mode' : 'Dark mode'}
-            className="rounded-lg p-1 text-fg3 transition hover:bg-fg/10 hover:text-fg coarse:p-2.5"
-          >
-            {mode === 'dark' ? <Sun className="h-4 w-4" aria-hidden /> : <Moon className="h-4 w-4" aria-hidden />}
-          </button>
-        )}
         <button
           type="button"
           onClick={() => void signOut()}
@@ -218,7 +200,6 @@ export function Sidebar({ open, onNavigate }: SidebarProps) {
         >
           <LogOut className="h-4 w-4" aria-hidden />
         </button>
-        </div>
       </div>
       {/* Short screens: the legal links move to the bottom of Help, so every page fits. */}
       <LegalFooter className={`px-4 pb-3 md:max-lg:hidden [@media(max-height:860px)]:hidden ${lg('lg:hidden')}`} />

@@ -41,10 +41,21 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const openVoice = useCallback((opts?: { listen?: boolean }) => setOpen({ listen: Boolean(opts?.listen) && supported }), [supported]);
+  const openVoice = useCallback(
+    (opts?: { listen?: boolean }) => {
+      if (voiceEnabled) setOpen({ listen: Boolean(opts?.listen) && supported });
+    },
+    [voiceEnabled, supported],
+  );
 
-  // Cmd+K / Ctrl+K opens the command bar from anywhere (typing; the microphone only when voice is on).
+  // Voice turned off: close the bar if it was open.
   useEffect(() => {
+    if (!voiceEnabled) setOpen(null);
+  }, [voiceEnabled]);
+
+  // Cmd+K / Ctrl+K opens the command bar from anywhere, only while voice commands are on.
+  useEffect(() => {
+    if (!voiceEnabled) return;
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'k') {
         e.preventDefault();
@@ -53,7 +64,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, []);
+  }, [voiceEnabled]);
 
   const value = useMemo(
     () => ({ openVoice, supported, voiceEnabled, setVoiceEnabled, speechAvailable }),
@@ -62,7 +73,7 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
   return (
     <VoiceContext.Provider value={value}>
       {children}
-      {open && <VoiceOverlay startListening={open.listen} supported={supported} voiceEnabled={voiceEnabled} onClose={() => setOpen(null)} />}
+      {open && voiceEnabled && <VoiceOverlay startListening={open.listen} supported={supported} voiceEnabled={voiceEnabled} onClose={() => setOpen(null)} />}
     </VoiceContext.Provider>
   );
 }

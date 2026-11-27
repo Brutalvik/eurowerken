@@ -25,7 +25,7 @@ export function InventoryPage() {
   const { user, can } = useAuth();
   const workshopId = user?.workshop?.id ?? null;
   const canEdit = can('inventory', 'full');
-  const { openVoice, supported: voiceSupported } = useVoice();
+  const { openVoice, supported: voiceSupported, voiceEnabled } = useVoice();
   const canSeeCost = can('inventory', 'view');
 
   const [parts, setParts] = useState<PartRow[]>([]);
@@ -254,13 +254,15 @@ export function InventoryPage() {
                   <Plus className="h-3.5 w-3.5" aria-hidden />
                   Add part
                 </Button>
+                {voiceEnabled && (
                 <button
                   type="button"
                   onClick={() => openVoice({ listen: voiceSupported })}
                   className="text-sm text-fg2 underline-offset-4 transition hover:text-fg hover:underline"
                 >
-                  {voiceSupported ? 'Or say: Add brake pad to inventory' : 'Or type a command: Add brake pad to inventory'}
+                  {voiceSupported ? 'Or say: Add brake pad to inventory' : 'Or type: Add brake pad to inventory'}
                 </button>
+                )}
               </>
             )}
           </Card>

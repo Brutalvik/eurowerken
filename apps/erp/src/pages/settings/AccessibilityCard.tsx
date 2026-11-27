@@ -63,8 +63,8 @@ export function AccessibilityCard() {
           label="Voice commands"
           hint={
             voiceEnabled
-              ? 'On: the microphone buttons listen for commands such as "Open RO-0001" or "New appointment". The browser asks for microphone access the first time.'
-              : 'Off: no microphone is used. Commands can still be typed in the command bar (Cmd+K or Ctrl+K).'
+              ? 'On: a command bar with a microphone appears at the top (and in the middle of the bottom bar on phones). Say or type commands such as "Open RO-0001" or "New appointment". The browser asks for microphone access the first time.'
+              : 'Off: no command bar and no microphone anywhere in the app.'
           }
           checked={voiceEnabled}
           onChange={setVoiceEnabled}

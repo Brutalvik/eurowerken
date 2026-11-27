@@ -9,11 +9,11 @@ export const ACCESSIBILITY_SECTION: GuideSection = {
   steps: [
     {
       title: 'Voice commands are off at first',
-      body: 'In **Settings**, open **Accessibility** and turn on **Voice commands**. The microphone then appears in the command bar at the top and in the middle of the bottom bar on phones. The browser asks for microphone access the first time.',
-      callout: { kind: 'note', text: 'Voice works in Chrome, Edge and Safari. With voice off, nothing listens: commands can still be typed with Cmd+K (Ctrl+K on Windows).' },
+      body: 'In **Settings**, open **Accessibility** and turn on **Voice commands**. A command bar with a microphone then appears at the top, and in the middle of the bottom bar on phones. The browser asks for microphone access the first time. Cmd+K (Ctrl+K on Windows) opens it too.',
+      callout: { kind: 'note', text: 'Voice works in Chrome, Edge and Safari. With voice commands off, the command bar and the microphone are not shown at all.' },
     },
     {
-      title: 'What you can say or type',
+      title: 'What you can say or type (when on)',
       body: 'Go to a page ("Go to Appointments"), open a repair order ("Open RO-0001"), start a booking ("New appointment"), add a part ("Add part to inventory"), search service history ("Search BMW"), or switch high contrast or light and dark mode.',
     },
     {

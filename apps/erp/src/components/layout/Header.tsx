@@ -1,4 +1,4 @@
-import { Accessibility, Command, Mic } from 'lucide-react';
+import { Accessibility, Mic, Moon, Sun } from 'lucide-react';
 import { NotificationBell } from '@/notifications/NotificationBell';
 import { useLocation } from 'react-router-dom';
 import { MODULE_LABELS } from '@/auth/rbac';
@@ -9,8 +9,8 @@ import { useVoice } from '@/voice/VoiceProvider';
 
 /** safeTop: pad for the notch. Off when something above the header (the support session banner) already does. */
 export function Header({ safeTop = true }: { safeTop?: boolean }) {
-  const { highContrast, toggleContrast } = useTheme();
-  const { openVoice, supported } = useVoice();
+  const { mode, toggle: toggleTheme, highContrast, toggleContrast } = useTheme();
+  const { openVoice, supported, voiceEnabled } = useVoice();
   const { pathname } = useLocation();
   const segment = pathname.split('/')[1] ?? '';
   const title =
@@ -25,8 +25,9 @@ export function Header({ safeTop = true }: { safeTop?: boolean }) {
           {title}
         </h1>
 
-        {/* Command bar (tablets and up). Phones use the microphone in the bottom bar. */}
+        {/* Voice command bar (tablets and up), only when voice commands are on in Settings > Accessibility. */}
         <div className="hidden min-w-0 flex-1 justify-center md:flex">
+          {voiceEnabled && (
           <button
             type="button"
             onClick={() => openVoice({ listen: supported })}
@@ -34,9 +35,10 @@ export function Header({ safeTop = true }: { safeTop?: boolean }) {
             aria-keyshortcuts="Meta+K Control+K"
             className="glass flex h-12 w-full max-w-[16rem] items-center gap-3 rounded-2xl px-4 text-left text-[15px] text-fg2 transition hover:text-fg"
           >
-            {supported ? <Mic className="h-4 w-4 shrink-0 text-fg2" aria-hidden /> : <Command className="h-4 w-4 shrink-0 text-fg2" aria-hidden />}
+            <Mic className="h-4 w-4 shrink-0 text-fg2" aria-hidden />
             <span className="min-w-0 flex-1 truncate">{supported ? 'Say a command...' : 'Type a command...'}</span>
           </button>
+          )}
         </div>
 
         <div className="flex shrink-0 items-center gap-2 sm:gap-3 lg:basis-1/4 lg:justify-end">
@@ -61,6 +63,19 @@ export function Header({ safeTop = true }: { safeTop?: boolean }) {
           )}
 
           <NotificationBell />
+
+          {/* Light or dark, in the top-right corner (high contrast is always dark). */}
+          {!highContrast && (
+            <button
+              type="button"
+              onClick={toggleTheme}
+              aria-label={mode === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+              title={mode === 'dark' ? 'Light mode' : 'Dark mode'}
+              className={iconButton}
+            >
+              {mode === 'dark' ? <Sun className="h-5 w-5" aria-hidden /> : <Moon className="h-5 w-5" aria-hidden />}
+            </button>
+          )}
         </div>
       </div>
     </header>

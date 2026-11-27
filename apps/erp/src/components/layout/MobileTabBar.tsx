@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { Command, Menu, Mic } from 'lucide-react';
+import { Menu, Mic } from 'lucide-react';
 import { useNotifications } from '@/notifications/NotificationsContext';
 import { useVoice } from '@/voice/VoiceProvider';
 import { useNavItems } from './navItems';
@@ -32,7 +32,7 @@ function pick(items: NavItem[], order: string[], skip: Set<string>): NavItem | n
 /** Phones only: a floating frosted bar with the main pages, a centred microphone and More (the full menu). */
 export function MobileTabBar({ onMore, moreOpen }: { onMore: () => void; moreOpen: boolean }) {
   const items = useNavItems();
-  const { openVoice, supported } = useVoice();
+  const { openVoice, supported, voiceEnabled } = useVoice();
   const { unopened } = useNotifications();
 
   const used = new Set<string>();
@@ -44,7 +44,15 @@ export function MobileTabBar({ onMore, moreOpen }: { onMore: () => void; moreOpe
       used.add(item.key);
     }
   }
-  const right = pick(items, RIGHT, used);
+  const right: NavItem[] = [];
+  // With voice off there is no centre button, so one more page fits on the right.
+  for (let i = 0; i < (voiceEnabled ? 1 : 2); i++) {
+    const item = pick(items, RIGHT, used);
+    if (item) {
+      right.push(item);
+      used.add(item.key);
+    }
+  }
 
   const tab = (item: NavItem) => {
     const Icon = item.icon;
@@ -74,17 +82,19 @@ export function MobileTabBar({ onMore, moreOpen }: { onMore: () => void; moreOpe
     >
       <div className="glass-strong pointer-events-auto mx-auto flex max-w-md items-center gap-1 rounded-3xl px-2 py-1.5">
         {left.map(tab)}
+        {voiceEnabled && (
         <div className="flex w-16 shrink-0 justify-center">
           <button
             type="button"
             onClick={() => openVoice({ listen: supported })}
-            aria-label={supported ? 'Voice command' : 'Commands'}
+            aria-label={supported ? 'Voice command' : 'Type a command'}
             className="-mt-7 flex h-14 w-14 items-center justify-center rounded-full border border-white/25 bg-accent text-accent-fg shadow-[inset_0_1px_0_rgb(255_255_255/0.35),0_10px_28px_-8px_rgb(var(--accent)/0.85)] transition active:scale-95 [[data-contrast=high]_&]:border-2 [[data-contrast=high]_&]:border-fg [[data-contrast=high]_&]:shadow-none"
           >
-            {supported ? <Mic className="h-6 w-6" aria-hidden /> : <Command className="h-6 w-6" aria-hidden />}
+            <Mic className="h-6 w-6" aria-hidden />
           </button>
         </div>
-        {right && tab(right)}
+        )}
+        {right.map(tab)}
         <button
           type="button"
           onClick={onMore}
