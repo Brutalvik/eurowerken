@@ -9,10 +9,12 @@ import { supabase, supabaseConfigured } from '@/lib/supabase';
 export interface CustomerAccount extends CustomerAccountRow {
   notify_email: boolean;
   notify_sms: boolean;
+  /** Hide the phone and email on invoices the customer prints or downloads (migration 024). */
+  invoice_hide_contact: boolean;
 }
 
 /** The columns a customer may change (migration 006 grants update on these only). */
-export type AccountPatch = Partial<Pick<CustomerAccount, 'full_name' | 'phone' | 'avatar_url' | 'notify_email' | 'notify_sms'>>;
+export type AccountPatch = Partial<Pick<CustomerAccount, 'full_name' | 'phone' | 'avatar_url' | 'notify_email' | 'notify_sms' | 'invoice_hide_contact'>>;
 
 /**
  * loading: checking the stored session or loading the account
@@ -68,7 +70,29 @@ export interface SetupProgress {
 const NO_SETUP: SetupProgress = { account: false, linked: false };
 const SETUP_DONE: SetupProgress = { account: true, linked: true };
 
-const ACCOUNT_COLUMNS = 'id, email, full_name, phone, avatar_url, notify_email, notify_sms, created_at';
+const ACCOUNT_COLUMNS = 'id, email, full_name, phone, avatar_url, notify_email, notify_sms, invoice_hide_contact, created_at';
+/** Before migration 024 the invoice privacy column does not exist; the account still loads (hidden by default). */
+const LEGACY_ACCOUNT_COLUMNS = 'id, email, full_name, phone, avatar_url, notify_email, notify_sms, created_at';
+let accountColumns = ACCOUNT_COLUMNS;
+
+type AccountRead = { data: unknown; error: { message: string; code?: string } | null };
+
+/** Runs an account read with the current columns, falling back once to the older set when the new column is missing. */
+async function readAccount(run: (columns: string) => PromiseLike<AccountRead>): Promise<AccountRead> {
+  const first = await run(accountColumns);
+  if (first.error && accountColumns === ACCOUNT_COLUMNS && /invoice_hide_contact/.test(first.error.message)) {
+    accountColumns = LEGACY_ACCOUNT_COLUMNS;
+    return withDefaults(await run(accountColumns));
+  }
+  return withDefaults(first);
+}
+
+function withDefaults(res: AccountRead): AccountRead {
+  if (res.data && typeof res.data === 'object' && !('invoice_hide_contact' in res.data)) {
+    return { ...res, data: { ...(res.data as object), invoice_hide_contact: true } };
+  }
+  return res;
+}
 const LINKED_PREFIX = 'ew-customer-linked';
 
 const CustomerAuthContext = createContext<CustomerAuthValue | null>(null);
@@ -204,7 +228,7 @@ export function CustomerAuthProvider({ slug, children }: { slug: string; childre
       } else {
         setSetupProgress(SETUP_DONE);
       }
-      const { data, error } = await supabase.from('customer_accounts').select(ACCOUNT_COLUMNS).eq('id', userId).maybeSingle();
+      const { data, error } = await readAccount((cols) => supabase.from('customer_accounts').select(cols).eq('id', userId).maybeSingle());
       if (cancelled) return;
       if (error) {
         setAccount(null);
@@ -317,12 +341,7 @@ export function CustomerAuthProvider({ slug, children }: { slug: string; childre
     if (!before) return 'Sign in first.';
     const keys = Object.keys(patch) as (keyof AccountPatch)[];
     setAccount((cur) => (cur ? { ...cur, ...patch } : cur));
-    const { data, error } = await supabase
-      .from('customer_accounts')
-      .update(patch)
-      .eq('id', before.id)
-      .select(ACCOUNT_COLUMNS)
-      .single();
+    const { data, error } = await readAccount((cols) => supabase.from('customer_accounts').update(patch).eq('id', before.id).select(cols).single());
     if (error) {
       // Put back only the fields this call changed, so other saves are kept.
       setAccount((cur) => {

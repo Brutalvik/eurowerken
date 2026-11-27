@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import type { FormEvent, KeyboardEvent } from 'react';
-import { CheckCircle2, ClipboardCheck, Eye, EyeOff, MessageSquare, RefreshCw, StickyNote } from 'lucide-react';
+import { CheckCircle2, ClipboardCheck, Eye, EyeOff, Lock, MessageSquare, RefreshCw, StickyNote } from 'lucide-react';
 import { errorMessage, formatDateTime } from '@/api/appointments';
 import { addRepairNote, sendRepairMessage } from '@/api/repairOrders';
 import type { RepairEvent, RepairMessage, RepairOrder } from '@/api/repairOrders';
@@ -8,6 +9,8 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { CheckRow, ErrorNote, Labeled, inputClass } from '../inventory/PartForm';
 import { SectionTitle } from './common';
+import { useMessageMutes } from '@/api/messageMutes';
+import { MuteCustomerButton } from '@/components/MuteCustomerButton';
 
 const EVENT_ICON = {
   status: RefreshCw,
@@ -116,6 +119,14 @@ export function MessagesCard({ order, messages, tz, canEdit, onSent, announce }:
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const list = useRef<HTMLOListElement>(null);
+  const mutes = useMessageMutes();
+  const location = useLocation();
+  const sectionRef = useRef<HTMLElement>(null);
+
+  // Opened from a message notification (#messages): bring the thread into view.
+  useEffect(() => {
+    if (location.hash === '#messages') sectionRef.current?.scrollIntoView({ block: 'start' });
+  }, [location.hash, location.key]);
 
   useEffect(() => {
     const node = list.current;
@@ -146,12 +157,18 @@ export function MessagesCard({ order, messages, tz, canEdit, onSent, announce }:
     }
   }
 
-  const closed = order.status === 'cancelled';
+  // A completed or cancelled repair has a closed conversation (the database refuses new messages too).
+  const closed = order.status === 'cancelled' || order.status === 'completed';
 
   return (
     <Card className="p-4 md:p-5">
-      <section aria-labelledby={`${id}-title`} className="space-y-3">
-        <SectionTitle id={`${id}-title`} title="Messages" subtitle={`With ${order.contact_name}, on the tracking page`} />
+      <section ref={sectionRef} id="messages" aria-labelledby={`${id}-title`} className="scroll-mt-24 space-y-3">
+        <SectionTitle
+          id={`${id}-title`}
+          title="Messages"
+          subtitle={`With ${order.contact_name}, on the tracking page`}
+          action={<MuteCustomerButton email={order.contact_email} name={order.contact_name} mutes={mutes} />}
+        />
         {messages.length === 0 ? (
           <p className="flex items-center gap-2 rounded-lg border border-dashed border-line px-3 py-5 text-xs text-fg2">
             <MessageSquare className="h-4 w-4 shrink-0 text-fg3" aria-hidden />
@@ -175,6 +192,12 @@ export function MessagesCard({ order, messages, tz, canEdit, onSent, announce }:
           </ol>
         )}
 
+        {closed && (
+          <p className="flex items-center gap-2 rounded-lg border border-line bg-surface2 px-3 py-2 text-[11px] text-fg2">
+            <Lock className="h-3.5 w-3.5 shrink-0 text-fg3" aria-hidden />
+            This repair is {order.status === 'cancelled' ? 'cancelled' : 'completed'}, so the conversation is closed.
+          </p>
+        )}
         {canEdit && !closed && (
           <form onSubmit={(e) => void send(e)} className="space-y-2">
             <Labeled id={`${id}-body`} label="Message to the customer" hint="Ctrl or Cmd + Enter sends.">

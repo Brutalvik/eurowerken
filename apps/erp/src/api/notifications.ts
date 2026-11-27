@@ -37,7 +37,8 @@ export async function listNotifications(userId: string, limit = 30): Promise<Sta
 
 /** Where a notification leads: its repair order page, or its booking. */
 export function notificationPath(n: Pick<StaffNotification, 'kind' | 'appointment_id' | 'repair_order_id'>): string {
-  if ((n.kind === 'repair_message' || n.kind === 'repair_approval') && n.repair_order_id) return `/repair-orders/${n.repair_order_id}`;
+  if (n.kind === 'repair_message' && n.repair_order_id) return `/repair-orders/${n.repair_order_id}#messages`;
+  if (n.kind === 'repair_approval' && n.repair_order_id) return `/repair-orders/${n.repair_order_id}`;
   if (n.kind === 'repair_message' || n.kind === 'repair_approval') return '/repair-orders';
   return n.appointment_id ? `/appointments?open=${n.appointment_id}` : '/appointments';
 }

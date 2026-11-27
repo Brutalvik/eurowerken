@@ -1311,6 +1311,12 @@ export interface StaffBookingDraft {
   technician_id: string;
   notes: string;
   status: 'confirmed' | 'requested';
+  /** The customer's account, when the booking was matched to one by email or phone. */
+  customer_id: string | null;
+  /** The car from their garage, while its details are used unchanged. */
+  vehicle_id: string | null;
+  /** The VIN of a car picked from the customer's cars (not typed in this form). */
+  vin: string;
 }
 
 export interface StaffBookingInput {
@@ -1326,6 +1332,8 @@ export interface StaffBookingInput {
   technician_id: string | null;
   notes: string | null;
   status: 'confirmed' | 'requested';
+  customer_id: string | null;
+  vehicle_id: string | null;
 }
 
 /** The length a booking gets from its services, as online bookings do. */
@@ -1350,6 +1358,9 @@ export function newBookingDraft(day: string, slotMinutes: number, time = '09:00'
     technician_id: '',
     notes: '',
     status: 'confirmed',
+    customer_id: null,
+    vehicle_id: null,
+    vin: '',
   };
 }
 
@@ -1405,13 +1416,15 @@ export function validateStaffBooking(
       contact_name,
       contact_email,
       contact_phone: contact_phone || null,
-      vehicle: { make, model, year: yearText || null, vin: null, plate: plate || null },
+      vehicle: { make, model, year: yearText || null, vin: d.vin.trim() || null, plate: plate || null },
       services: chosen,
       estimate_low: low > 0 ? Math.round(low * 100) / 100 : null,
       estimate_high: low > 0 ? Math.round(low * 150) / 100 : null,
       technician_id: d.technician_id || null,
       notes: notes || null,
       status: d.status,
+      customer_id: d.customer_id,
+      vehicle_id: d.customer_id ? d.vehicle_id : null,
     },
   };
 }
@@ -1447,6 +1460,8 @@ export async function createStaffBooking(workshopId: string, userId: string, inp
     deposit_requested: false,
     source: 'staff',
     created_by: userId,
+    customer_id: input.customer_id,
+    vehicle_id: input.vehicle_id,
     // The trigger sets confirmed_at only on an update, so a booking created as confirmed sets it here.
     confirmed_at: input.status === 'confirmed' ? new Date().toISOString() : null,
   };
@@ -1464,3 +1479,64 @@ export async function createStaffBooking(workshopId: string, userId: string, inp
 }
 
 export { message as errorMessage };
+
+// Customer lookup (migration 027) -----------------------------------------------------------------------
+
+export interface KnownCar {
+  vehicle_id: string | null;
+  make: string | null;
+  model: string | null;
+  year: string | null;
+  plate: string | null;
+  vin: string | null;
+  nickname: string | null;
+  /** In the customer's garage on the website (else seen on a past booking or repair here). */
+  from_garage: boolean;
+  last_seen: string | null;
+}
+
+export interface KnownCustomer {
+  customer_id: string | null;
+  name: string | null;
+  email: string | null;
+  phone: string | null;
+  has_account: boolean;
+  vehicles: KnownCar[];
+}
+
+/** "2011 BMW 550i" (or the nickname first when there is one). */
+export function knownCarLabel(c: Pick<KnownCar, 'year' | 'make' | 'model' | 'nickname'>): string {
+  const base = [c.year, c.make, c.model].filter(Boolean).join(' ') || 'Car';
+  return c.nickname ? `${c.nickname} (${base})` : base;
+}
+
+/** The workshop's customer with this email or phone, and every car known for them; null when nobody matches. */
+export async function findCustomer(email: string, phone: string): Promise<KnownCustomer | null> {
+  const { data, error } = await supabase.rpc('staff_find_customer', { p_email: email || null, p_phone: phone || null });
+  if (error) {
+    if (/staff_find_customer/i.test(error.message)) throw new Error('Customer lookup needs migration 027 (npm run db:migrate).');
+    fail(error);
+  }
+  if (!data || typeof data !== 'object') return null;
+  const d = data as Record<string, unknown>;
+  const cars = Array.isArray(d.vehicles) ? (d.vehicles as Record<string, unknown>[]) : [];
+  const str = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null);
+  return {
+    customer_id: str(d.customer_id),
+    name: str(d.name),
+    email: str(d.email),
+    phone: str(d.phone),
+    has_account: d.has_account === true,
+    vehicles: cars.map((c) => ({
+      vehicle_id: str(c.vehicle_id),
+      make: str(c.make),
+      model: str(c.model),
+      year: c.year === null || c.year === undefined ? null : String(c.year),
+      plate: str(c.plate),
+      vin: str(c.vin),
+      nickname: str(c.nickname),
+      from_garage: c.from_garage === true,
+      last_seen: str(c.last_seen),
+    })),
+  };
+}

@@ -1,4 +1,4 @@
-import { CalendarDays, LifeBuoy } from 'lucide-react';
+import { CalendarDays, History, LifeBuoy } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { ModuleId } from '@/auth/rbac';
 
@@ -17,6 +17,7 @@ export interface ExtraPage {
 
 export const EXTRA_PAGES: ExtraPage[] = [
   { path: 'appointments', label: 'Appointments', icon: CalendarDays, module: 'repair-orders', after: 'dashboard' },
+  { path: 'service-history', label: 'Service history', icon: History, module: 'repair-orders', after: 'repair-orders' },
 ];
 
 export function extraPage(path: string): ExtraPage | undefined {

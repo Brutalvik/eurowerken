@@ -511,3 +511,47 @@ export function useTrackedRepair(code: string | null, contact: string | null): T
 
   return { data, loading, error, stale, refresh, replace };
 }
+
+// Service history ------------------------------------------------------------------------------------
+
+/** One past or current repair of the customer's car, as the history shows it (customer-visible parts only). */
+export interface HistoryRepair {
+  id: string;
+  number: string;
+  tracking_code: string;
+  status: RepairStatus;
+  vehicle: RepairVehicle;
+  created_at: string;
+  completed_at: string | null;
+  customer_notes: string | null;
+  technician: string | null;
+  items: RepairItem[];
+  events: RepairEvent[];
+  media: RepairMedia[];
+  messages: RepairMessage[];
+}
+
+/** A closed repair (completed or cancelled) has a closed conversation: nobody can add messages. */
+export function conversationClosed(status: RepairStatus): boolean {
+  return status === 'completed' || status === 'cancelled';
+}
+
+/** Every repair of one of the signed-in customer's cars at this workshop, newest first (migration 022). */
+export async function myServiceHistory(slug: string, vehicleId: string): Promise<Result<HistoryRepair[]>> {
+  const { data, error } = await supabase.rpc('my_service_history', { p_slug: slug, p_vehicle: vehicleId });
+  if (error) {
+    if (/my_service_history|schema cache/i.test(error.message)) return { data: null, error: 'Service history is not available yet. Please try again later.' };
+    return { data: null, error: friendlyError(error.message) };
+  }
+  return {
+    data: arr<HistoryRepair>(data).map((r) => ({
+      ...r,
+      vehicle: r.vehicle && typeof r.vehicle === 'object' ? r.vehicle : {},
+      items: arr<RepairItem>(r.items).map((i) => ({ ...i, quantity: Number(i.quantity) || 0, unit_price: Number(i.unit_price) || 0, decision: null })),
+      events: arr<RepairEvent>(r.events),
+      media: arr<RepairMedia>(r.media),
+      messages: arr<RepairMessage>(r.messages),
+    })),
+    error: null,
+  };
+}

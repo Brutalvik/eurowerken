@@ -13,7 +13,9 @@ import {
   Hash,
   Loader2,
   Lock,
+  LogIn,
   MessageSquare,
+  Receipt,
   NotebookPen,
   Phone,
   Send,
@@ -21,10 +23,13 @@ import {
   User,
   X,
 } from 'lucide-react';
-import { GST_RATE, itemAmount, postMessage, repairTotals, respondToItems, useTrackedRepair, vehicleName } from '@/api/repairs';
+import { GST_RATE, conversationClosed, itemAmount, postMessage, repairTotals, respondToItems, useTrackedRepair, vehicleName } from '@/api/repairs';
 import type { Decision, RepairItem, RepairMessage, TrackedRepair } from '@/api/repairs';
+import { invoiceForRepair } from '@/api/invoices';
+import type { InvoiceSummary } from '@/api/invoices';
 import { useCustomerAlerts } from '@/auth/CustomerAlerts';
 import { useCustomerAuth } from '@/auth/CustomerAuthContext';
+import { InvoiceButtons } from '@/components/InvoiceButtons';
 import { Photo } from '@/components/Photo';
 import { Breadcrumbs, DemoNotice, telHref } from '@/components/ui';
 import { formatMoney } from '@/lib/format';
@@ -334,6 +339,8 @@ function CaseDetails({ tracked, contact, stale, onRetry, onUpdate, headingRef }:
         <div className="min-w-0 space-y-6">
           <WorkOrder tracked={tracked} contact={contact} onUpdate={onUpdate} />
 
+          <InvoiceCard tracked={tracked} />
+
           <Card title="Technician Notes" Icon={NotebookPen}>
             <WorkshopUpdates events={events} timeZone={tz} />
           </Card>
@@ -613,6 +620,87 @@ function WorkOrder({ tracked, contact, onUpdate }: { tracked: TrackedRepair; con
   );
 }
 
+// Invoice ------------------------------------------------------------------------------------------------
+
+/**
+ * The issued invoice for this repair, for its signed-in owner (RLS hides it from anyone else). Loaded once, and again
+ * when the repair status changes. Guests on a finished repair see a note to sign in.
+ */
+function InvoiceCard({ tracked }: { tracked: TrackedRepair }) {
+  const { status: authStatus, account } = useCustomerAuth();
+  const returnLinks = useReturnLinks();
+  const { repair } = tracked;
+  const tz = repairTimeZone(repair);
+  const signedIn = authStatus === 'signed-in' && !!account;
+  const accountId = account?.id ?? null;
+  const [invoice, setInvoice] = useState<InvoiceSummary | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!signedIn) {
+      setInvoice(null);
+      setError(null);
+      return;
+    }
+    let cancelled = false;
+    void invoiceForRepair(repair.id).then((res) => {
+      if (cancelled) return;
+      if (res.error !== null) {
+        setError(res.error);
+        return;
+      }
+      setError(null);
+      setInvoice(res.data);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [signedIn, accountId, repair.id, repair.status]);
+
+  const finished = repair.status === 'ready' || repair.status === 'completed';
+
+  if (authStatus === 'signed-out' && finished) {
+    return (
+      <p className="glass flex flex-wrap items-center gap-2 rounded-2xl px-5 py-4 text-sm text-fg2">
+        <Receipt className="h-4 w-4 shrink-0 text-accent" aria-hidden />
+        <Link to={returnLinks.login} className="inline-flex min-h-11 items-center gap-1.5 font-semibold text-accent hover:underline">
+          <LogIn className="h-4 w-4" aria-hidden />
+          Sign in to see your invoice
+        </Link>
+      </p>
+    );
+  }
+
+  if (!signedIn) return null;
+
+  if (!invoice) {
+    if (!error) return null;
+    return (
+      <p role="alert" className="glass rounded-2xl border-l-4 border-l-bad px-5 py-4 text-sm text-fg2">
+        We could not check for an invoice. {error}
+      </p>
+    );
+  }
+
+  return (
+    <Card title={`Invoice ${invoice.number}`} Icon={Receipt} id="invoice">
+      <dl className="grid grid-cols-2 gap-3 text-sm">
+        <div>
+          <dt className="text-xs text-fg3">Issued</dt>
+          <dd className="font-medium text-fg">{invoice.issued_at ? formatDay(invoice.issued_at, tz) : 'Not set'}</dd>
+        </div>
+        <div className="text-right">
+          <dt className="text-xs text-fg3">Total incl. GST</dt>
+          <dd className="font-display text-xl font-bold tabular-nums text-fg">{formatMoney(invoice.total)}</dd>
+        </div>
+      </dl>
+      <div className="mt-4 border-t border-line pt-4">
+        <InvoiceButtons invoice={invoice} />
+      </div>
+    </Card>
+  );
+}
+
 // Messages -----------------------------------------------------------------------------------------------
 
 function Messages({
@@ -712,6 +800,13 @@ function Messages({
         </ol>
       )}
 
+      {conversationClosed(repair.status) ? (
+        <p className="flex items-center gap-2 border-t border-line px-5 py-4 text-sm text-fg2 sm:px-6">
+          <Lock className="h-4 w-4 shrink-0 text-fg3" aria-hidden />
+          This repair is {repair.status === 'cancelled' ? 'cancelled' : 'completed'}, so its conversation is closed.
+          {site.phone ? ` For questions, call ${site.display_name} on ${site.phone}.` : ''}
+        </p>
+      ) : (
       <form onSubmit={(e) => void send(e)} className="border-t border-line p-3 sm:p-4">
         <label htmlFor="message-input" className="sr-only">
           Message to {workshop === site.display_name ? site.display_name : `${workshop} at ${site.display_name}`}
@@ -749,6 +844,7 @@ function Messages({
           Enter sends, Shift and Enter adds a line. {draft.length > 1800 ? `${2000 - draft.length} characters left.` : ''}
         </p>
       </form>
+      )}
     </section>
   );
 }

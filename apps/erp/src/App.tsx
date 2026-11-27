@@ -28,6 +28,7 @@ const NotFoundPage = lazy(() => import('@/pages/NotFoundPage').then((m) => ({ de
 const ReportsPage = lazy(() => import('@/pages/ReportsPage').then((m) => ({ default: m.ReportsPage })));
 const RepairOrdersPage = lazy(() => import('@/pages/RepairOrdersPage').then((m) => ({ default: m.RepairOrdersPage })));
 const RepairOrderDetail = lazy(() => import('@/pages/repair-orders/RepairOrderDetail').then((m) => ({ default: m.RepairOrderDetail })));
+const ServiceHistoryPage = lazy(() => import('@/pages/ServiceHistoryPage').then((m) => ({ default: m.ServiceHistoryPage })));
 const SalesPage = lazy(() => import('@/pages/SalesPage').then((m) => ({ default: m.SalesPage })));
 const SettingsPage = lazy(() => import('@/pages/SettingsPage').then((m) => ({ default: m.SettingsPage })));
 const UsersPage = lazy(() => import('@/pages/UsersPage').then((m) => ({ default: m.UsersPage })));
@@ -81,6 +82,8 @@ export default function App() {
         <Route path="inventory" element={guarded('inventory', <InventoryPage />)} />
         <Route path="repair-orders" element={guarded('repair-orders', <RepairOrdersPage />)} />
         <Route path="repair-orders/:id" element={guarded('repair-orders', <RepairOrderDetail />)} />
+        {/* Not a module of its own: Service history follows repair-orders access (src/config/nav.ts). */}
+        <Route path="service-history" element={guarded('repair-orders', <ServiceHistoryPage />)} />
         <Route path="customers" element={guarded('customers', <CustomersPage />)} />
         <Route path="sales" element={guarded('sales', <SalesPage />)} />
         <Route path="invoices" element={guarded('invoices', <InvoicesPage />)} />

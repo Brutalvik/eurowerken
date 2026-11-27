@@ -5,11 +5,13 @@ import { Button } from '@/components/ui/Button';
 import { Card, CardHeader } from '@/components/ui/Card';
 import { PillTabs } from '@/components/ui/PillTabs';
 import { BookingCard } from './settings/BookingCard';
+import { DocumentsCard } from './settings/DocumentsCard';
+import { NotificationsCard } from './settings/NotificationsCard';
 import { ServicesCard } from './settings/ServicesCard';
 import { TeamCard } from './settings/TeamCard';
 import { WebsiteCard } from './settings/WebsiteCard';
 
-const TABS = ['Website', 'Services', 'Team', 'Booking', 'Workshop'] as const;
+const TABS = ['Website', 'Services', 'Team', 'Booking', 'Notifications', 'Documents', 'Workshop'] as const;
 type Tab = (typeof TABS)[number];
 
 interface FieldProps {
@@ -55,6 +57,12 @@ export function SettingsPage() {
         {tab === 'Services' && <ServicesCard />}
         {tab === 'Team' && <TeamCard />}
         {tab === 'Booking' && <BookingCard />}
+        {tab === 'Notifications' && <NotificationsCard />}
+        {tab === 'Documents' && (
+          <div className="max-w-3xl">
+            <DocumentsCard />
+          </div>
+        )}
         {tab === 'Workshop' && <WorkshopSettings />}
       </div>
     </div>

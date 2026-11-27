@@ -9,6 +9,8 @@ import { DataTable } from '@/components/ui/DataTable';
 import type { Column } from '@/components/ui/DataTable';
 import { SearchInput } from '@/components/ui/SearchInput';
 import { Dialog, ErrorNote } from './inventory/PartForm';
+import { useMessageMutes } from '@/api/messageMutes';
+import { MuteCustomerButton } from '@/components/MuteCustomerButton';
 
 const dateFormat = new Intl.DateTimeFormat('en-CA', { year: 'numeric', month: 'short', day: 'numeric' });
 
@@ -216,6 +218,7 @@ export function CustomersPage() {
 }
 
 function CustomerDialog({ customer, onClose }: { customer: Customer | null; onClose: () => void }) {
+  const mutes = useMessageMutes();
   return (
     <Dialog
       open={customer !== null}
@@ -231,9 +234,12 @@ function CustomerDialog({ customer, onClose }: { customer: Customer | null; onCl
       {customer && (
         <div className="space-y-5 text-xs">
           <section aria-labelledby="customer-contact" className="space-y-2">
-            <h3 id="customer-contact" className="text-[10px] font-medium uppercase tracking-wider text-fg3">
-              Contact
-            </h3>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h3 id="customer-contact" className="text-[10px] font-medium uppercase tracking-wider text-fg3">
+                Contact
+              </h3>
+              <MuteCustomerButton email={customer.email} name={customerName(customer)} mutes={mutes} />
+            </div>
             <dl className="grid gap-3 sm:grid-cols-2">
               <div className="min-w-0">
                 <dt className="text-fg3">Email</dt>

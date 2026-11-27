@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Bell, BellRing, CalendarCheck, CalendarClock, CalendarX, Car, FileText, ImageOff, MessageSquare, Pencil, Plus, RotateCcw, Settings, Trash2, User, Wrench } from 'lucide-react';
+import { Bell, BellRing, CalendarCheck, CalendarClock, CalendarX, Car, FileText, History, ImageOff, MessageSquare, Pencil, Plus, RotateCcw, Settings, Trash2, User, Wrench } from 'lucide-react';
 import type { CustomerVehicleRow } from '@eurowerken/shared';
 import { cancelMyAppointment, formatZonedDateTime, listMyAppointments, useBookingSettings } from '@/api/booking';
 import type { Appointment, AppointmentStatus } from '@/api/booking';
@@ -259,6 +259,7 @@ function VehicleCard({
   /** A new photo, or null to remove it. */
   onPhoto: (file: File | null) => Promise<string | null>;
 }) {
+  const site = useSite();
   const [photoBusy, setPhotoBusy] = useState(false);
   const [photoError, setPhotoError] = useState<string | null>(null);
   const [photoBroken, setPhotoBroken] = useState(false);
@@ -361,6 +362,13 @@ function VehicleCard({
           </div>
         ) : (
           <div className="flex flex-wrap gap-2">
+            <Link
+              to={sitePath(site, `garage/vehicles/${v.id}`)}
+              className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-accent px-3 py-2 text-xs font-semibold text-accent-fg transition hover:opacity-90 coarse:min-h-11"
+            >
+              <History className="h-3.5 w-3.5" aria-hidden />
+              Service history
+            </Link>
             <button type="button" onClick={onEdit} className={smallBtn} aria-label={`Edit ${name}`}>
               <Pencil className="h-3.5 w-3.5" aria-hidden />
               Edit

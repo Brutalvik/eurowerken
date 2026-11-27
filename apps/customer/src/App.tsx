@@ -12,6 +12,7 @@ const CartPage = lazy(() => import('@/pages/CartPage').then((m) => ({ default: m
 import { ComingSoonPage } from '@/pages/ComingSoonPage';
 const ExpertsPage = lazy(() => import('@/pages/ExpertsPage').then((m) => ({ default: m.ExpertsPage })));
 const GaragePage = lazy(() => import('@/pages/GaragePage').then((m) => ({ default: m.GaragePage })));
+const VehicleHistoryPage = lazy(() => import('@/pages/garage/VehicleHistoryPage').then((m) => ({ default: m.VehicleHistoryPage })));
 import { HomePage } from '@/pages/HomePage';
 import { LegalPage } from '@/pages/LegalPage';
 const PartDetailsPage = lazy(() => import('@/pages/parts/PartDetailsPage').then((m) => ({ default: m.PartDetailsPage })));
@@ -47,6 +48,14 @@ export default function App() {
           element={
             <RequireCustomer>
               <GaragePage />
+            </RequireCustomer>
+          }
+        />
+        <Route
+          path="garage/vehicles/:vehicleId"
+          element={
+            <RequireCustomer>
+              <VehicleHistoryPage />
             </RequireCustomer>
           }
         />

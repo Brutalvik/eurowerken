@@ -1,4 +1,5 @@
-import { useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
+import { Car, ListChecks } from 'lucide-react';
 import type { FormEvent } from 'react';
 import type { ServiceRow } from '@eurowerken/shared';
 import {
@@ -10,11 +11,13 @@ import {
   suggestedDuration,
   validateStaffBooking,
 } from '@/api/appointments';
-import type { Appointment, BookingContext, SiteSlug, StaffBookingDraft, Technician } from '@/api/appointments';
+import { knownCarLabel } from '@/api/appointments';
+import type { Appointment, BookingContext, KnownCar, KnownCustomer, SiteSlug, StaffBookingDraft, Technician } from '@/api/appointments';
 import { Button } from '@/components/ui/Button';
 import { formatCurrency } from '@/lib/format';
 import { Dialog, ErrorNote, Labeled, inputClass } from '../inventory/PartForm';
 import { TimeFields } from './TimeFields';
+import { CarPicker, LookupNote, carKey, useCustomerLookup } from './CustomerLookup';
 
 interface NewAppointmentDialogProps {
   open: boolean;
@@ -51,6 +54,77 @@ function BookingForm({ workshopId, userId, ctx, site, services, technicians, day
 
   const active = services.filter((s) => s.active);
   const set = (patch: Partial<StaffBookingDraft>) => setDraft((d) => ({ ...d, ...patch }));
+
+  // Customer lookup: typing an email or phone fills in the rest, and offers the customer's cars.
+  const lookup = useCustomerLookup(draft.contact_email, draft.contact_phone);
+  /** The last customer found; kept while a follow-up lookup for the same person runs. */
+  const [known, setKnown] = useState<KnownCustomer | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  /** The car from file now in the form, and whether staff changed it since. */
+  const [carFrom, setCarFrom] = useState<{ key: string; label: string; edited: boolean } | null>(null);
+  const handled = useRef<{ ident: string; cars: number } | null>(null);
+  const draftRef = useRef(draft);
+  draftRef.current = draft;
+  const carFromRef = useRef(carFrom);
+  carFromRef.current = carFrom;
+  const makeRef = useRef<HTMLInputElement>(null);
+
+  function applyCar(car: KnownCar) {
+    set({ make: car.make ?? '', model: car.model ?? '', year: car.year ?? '', plate: (car.plate ?? '').toUpperCase(), vin: car.vin ?? '', vehicle_id: car.vehicle_id });
+    setCarFrom({ key: carKey(car), label: knownCarLabel(car), edited: false });
+    setPickerOpen(false);
+  }
+
+  function newCar() {
+    set({ make: '', model: '', year: '', plate: '', vin: '', vehicle_id: null });
+    setCarFrom(null);
+    setPickerOpen(false);
+    // After the pop-up has closed and given focus back, move it to Make.
+    window.setTimeout(() => makeRef.current?.focus(), 60);
+  }
+
+  /** A car field typed by hand: the details no longer match the car on file. */
+  function setCar(patch: Partial<StaffBookingDraft>) {
+    set({ ...patch, vehicle_id: null, ...(patch.plate !== undefined || patch.make !== undefined || patch.model !== undefined ? { vin: '' } : {}) });
+    setCarFrom((c) => (c ? { ...c, edited: true } : c));
+  }
+
+  useEffect(() => {
+    if (lookup.status === 'idle' || lookup.status === 'none') {
+      handled.current = null;
+      setKnown(null);
+      setPickerOpen(false);
+      setDraft((d) => (d.customer_id || d.vehicle_id ? { ...d, customer_id: null, vehicle_id: null } : d));
+      return;
+    }
+    if (lookup.status !== 'found') return;
+    const c = lookup.customer;
+    setKnown(c);
+    // Once per customer: filling in the email or phone starts another lookup for the same person.
+    const ident = c.customer_id ?? `${c.email ?? ''}|${c.name ?? ''}`;
+    const before = handled.current;
+    handled.current = { ident, cars: c.vehicles.length };
+    if (before && before.ident === ident) {
+      // The same person, found again with more cars (the other field matched more visits): offer the choice,
+      // unless staff already changed the car by hand.
+      if (c.vehicles.length > before.cars && c.vehicles.length > 1 && !carFromRef.current?.edited) setPickerOpen(true);
+      return;
+    }
+    const cur = draftRef.current;
+    const carEmpty = !cur.make.trim() && !cur.model.trim() && !cur.plate.trim() && !cur.year.trim();
+    setDraft((d) => {
+      return {
+        ...d,
+        contact_name: d.contact_name.trim() ? d.contact_name : (c.name ?? ''),
+        contact_email: d.contact_email.trim() ? d.contact_email : (c.email ?? ''),
+        contact_phone: d.contact_phone.trim() ? d.contact_phone : (c.phone ?? ''),
+        customer_id: c.customer_id,
+      };
+    });
+    if (c.vehicles.length === 1 && carEmpty) applyCar(c.vehicles[0]);
+    else if (c.vehicles.length > 1) setPickerOpen(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lookup]);
 
   function toggleService(serviceId: string, on: boolean) {
     setDraft((d) => {
@@ -116,24 +190,48 @@ function BookingForm({ workshopId, userId, ctx, site, services, technicians, day
               <input id={`${id}-phone`} type="tel" value={draft.contact_phone} maxLength={40} autoComplete="off" onChange={(e) => set({ contact_phone: e.target.value })} className={inputClass} />
             </Labeled>
           </div>
+          <LookupNote state={lookup} />
         </fieldset>
 
         <fieldset className="space-y-3">
           <legend className="mb-2 text-[10px] font-medium uppercase tracking-wider text-fg3">Car</legend>
+          {known && known.vehicles.length > 0 && (
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-line bg-surface2 px-3 py-2">
+              <p className="flex min-w-0 items-center gap-1.5 text-[11px] text-fg2">
+                <Car className="h-3.5 w-3.5 shrink-0 text-accent" aria-hidden />
+                {carFrom ? (
+                  <span>
+                    {carFrom.edited ? 'Changed by hand from ' : 'Filled from file: '}
+                    <strong className="text-fg">{carFrom.label}</strong>
+                    {carFrom.edited ? '' : '. You can still change any detail.'}
+                  </span>
+                ) : (
+                  <span>
+                    {known.vehicles.length} {known.vehicles.length === 1 ? 'car' : 'cars'} on file for this customer.
+                  </span>
+                )}
+              </p>
+              <Button variant="ghost" size="sm" onClick={() => setPickerOpen(true)}>
+                <ListChecks className="h-3.5 w-3.5" aria-hidden />
+                {known.vehicles.length === 1 && !carFrom ? 'Use the car on file' : 'Choose a car'}
+              </Button>
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <Labeled id={`${id}-make`} label="Make">
-              <input id={`${id}-make`} value={draft.make} maxLength={40} onChange={(e) => set({ make: e.target.value })} className={inputClass} placeholder="BMW" />
+              <input ref={makeRef} id={`${id}-make`} value={draft.make} maxLength={40} onChange={(e) => setCar({ make: e.target.value })} className={inputClass} placeholder="BMW" />
             </Labeled>
             <Labeled id={`${id}-model`} label="Model">
-              <input id={`${id}-model`} value={draft.model} maxLength={60} onChange={(e) => set({ model: e.target.value })} className={inputClass} placeholder="330i" />
+              <input id={`${id}-model`} value={draft.model} maxLength={60} onChange={(e) => setCar({ model: e.target.value })} className={inputClass} placeholder="330i" />
             </Labeled>
             <Labeled id={`${id}-year`} label="Year">
-              <input id={`${id}-year`} inputMode="numeric" value={draft.year} maxLength={4} onChange={(e) => set({ year: e.target.value })} className={inputClass} />
+              <input id={`${id}-year`} inputMode="numeric" value={draft.year} maxLength={4} onChange={(e) => setCar({ year: e.target.value })} className={inputClass} />
             </Labeled>
             <Labeled id={`${id}-plate`} label="Plate">
-              <input id={`${id}-plate`} value={draft.plate} maxLength={20} onChange={(e) => set({ plate: e.target.value.toUpperCase() })} className={inputClass} />
+              <input id={`${id}-plate`} value={draft.plate} maxLength={20} onChange={(e) => setCar({ plate: e.target.value.toUpperCase() })} className={inputClass} />
             </Labeled>
           </div>
+          {draft.vin && <p className="text-[11px] text-fg3">VIN {draft.vin} (from file)</p>}
         </fieldset>
 
         <fieldset className="space-y-2">
@@ -212,6 +310,16 @@ function BookingForm({ workshopId, userId, ctx, site, services, technicians, day
           <textarea id={`${id}-notes`} rows={3} maxLength={2000} value={draft.notes} onChange={(e) => set({ notes: e.target.value })} className={inputClass} />
         </Labeled>
       </form>
+      {known && known.vehicles.length > 0 && (
+        <CarPicker
+          open={pickerOpen}
+          customer={known}
+          selected={carFrom && !carFrom.edited ? carFrom.key : null}
+          onPick={applyCar}
+          onNewCar={newCar}
+          onManual={() => setPickerOpen(false)}
+        />
+      )}
     </Dialog>
   );
 }

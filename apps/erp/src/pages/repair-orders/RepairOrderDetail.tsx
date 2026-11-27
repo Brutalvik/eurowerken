@@ -46,6 +46,7 @@ import { Card } from '@/components/ui/Card';
 import { ErrorNote, Labeled, inputClass } from '../inventory/PartForm';
 import { Confirm, SectionTitle, iconButton, textLink } from './common';
 import { ApprovalHistoryCard, PhoneApprovalDialog } from './RepairApprovals';
+import { RepairInvoiceCard } from './RepairInvoiceCard';
 import { RepairItemsCard } from './RepairItemsCard';
 import { MediaCard } from './RepairMediaCard';
 import { MessagesCard, TimelineCard } from './RepairThreadCards';
@@ -249,6 +250,7 @@ export function RepairOrderDetail() {
         </div>
         <div className="min-w-0 space-y-4">
           <JobCard key={order.id} order={order} tz={tz} technicians={technicians} canEdit={canEdit} onOrder={setOrder} announce={announce} />
+          <RepairInvoiceCard repairOrderId={order.id} status={order.status} tz={tz} announce={announce} />
           <MessagesCard
             order={order}
             messages={detail.messages}

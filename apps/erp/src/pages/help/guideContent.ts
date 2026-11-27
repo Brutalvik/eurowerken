@@ -15,6 +15,7 @@ import {
   CalendarDays,
   Contact,
   HelpCircle,
+  History,
   LayoutDashboard,
   Route,
   Settings,
@@ -636,6 +637,70 @@ export const GUIDE: GuideChapter[] = [
     ],
   },
 
+  // 4b. Service history -------------------------------------------------------------------------------
+  {
+    id: 'service-history',
+    title: 'Service history',
+    summary: 'Every repair a vehicle has had at your workshop, found by VIN, plate, phone, name or email, and saved or printed as a PDF.',
+    icon: History,
+    sections: [
+      {
+        id: 'service-history-search',
+        title: 'Find a vehicle',
+        summary: 'Staff who can see Repair Orders can use Service history.',
+        page: { to: '/service-history', label: 'Open Service history' },
+        steps: [
+          {
+            title: 'Search',
+            body: 'Type at least 2 characters in **Search by VIN, plate, phone, name or email**. The results update as you type; Enter searches straight away.',
+          },
+          {
+            title: 'Read the results',
+            body: 'Each vehicle shows its VIN and plate, the latest owner, how many visits it has had and the first and last visit. **N open** means repairs that are not completed or cancelled yet.',
+            callout: { kind: 'tip', text: 'Part of a VIN, a plate or the last digits of a phone number is enough.' },
+          },
+        ],
+      },
+      {
+        id: 'service-history-vehicle',
+        title: 'A vehicle\'s history',
+        steps: [
+          {
+            title: 'Open a vehicle',
+            body: 'Click a vehicle to see every repair, newest first: the RO number (click it to open the repair order), status, dates, technician, the work done, approvals, photos, the timeline and the messages. **Back to results** returns to your search.',
+          },
+          {
+            title: 'Done, Not done and Waiting',
+            body: 'Approved items show **Done**, declined items **Not done** (struck through) and items still waiting for the customer **Waiting**. The total counts approved work only, plus GST.',
+          },
+          {
+            title: 'Team only',
+            body: 'Timeline notes, photos and videos the customer cannot see are marked **Team only**. Staff notes show in **Team notes**.',
+          },
+        ],
+      },
+      {
+        id: 'service-history-pdf',
+        title: 'Download or print',
+        steps: [
+          {
+            title: 'Download PDF or Print',
+            body: 'Press **Download PDF** to save the history, or **Print** to open the print dialog. Your logo from **Settings**, **Documents** heads the first page.',
+          },
+          {
+            title: 'Very long histories',
+            body: 'When the PDF is more than 50 pages, you are asked first. Press **Continue** to go ahead or **Cancel** to stop.',
+          },
+          {
+            title: 'What the PDF leaves out',
+            body: 'The PDF is the record of the work: each repair with its work, approvals and the timeline the customer can see. It leaves out photos and conversations, and everything marked Team only: staff notes, team-only timeline entries and the notes on phone approvals.',
+            callout: { kind: 'note', text: 'Photos and messages stay on the screen version of the history and on each repair order.' },
+          },
+        ],
+      },
+    ],
+  },
+
   // 5. Customers ---------------------------------------------------------------------------------------
   {
     id: 'customers',
@@ -888,8 +953,28 @@ export const GUIDE: GuideChapter[] = [
         page: { to: '/settings', label: 'Open Settings' },
         steps: [
           {
-            title: 'Five tabs',
-            body: 'Settings has the tabs **Website**, **Services**, **Team**, **Booking** and **Workshop**. The open tab is part of the page address, so you can bookmark it.',
+            title: 'Seven tabs',
+            body: 'Settings has the tabs **Website**, **Services**, **Team**, **Booking**, **Notifications**, **Documents** and **Workshop**. The open tab is part of the page address, so you can bookmark it.',
+          },
+        ],
+      },
+      {
+        id: 'settings-documents',
+        title: 'Documents: your logo on PDFs',
+        page: { to: '/settings?tab=documents', label: 'Open Documents' },
+        steps: [
+          {
+            title: 'Upload your logo',
+            body: 'In **Settings**, **Documents**, press **Upload logo** and pick a PNG, JPEG, WebP or SVG. It is saved as a PNG and shows at the top of invoices and the service history PDF (and quotes, when they are added).',
+          },
+          {
+            title: 'Check it',
+            body: 'Press **Preview an invoice** to open a sample invoice with your logo. **Replace logo** swaps it; **Remove** goes back to your website logo, if you have one.',
+          },
+          {
+            title: 'Turn it off',
+            body: 'Untick **Show the logo on invoices and other PDFs** to show only your shop name.',
+            callout: { kind: 'note', text: 'Only staff with full access to Settings can change the logo.' },
           },
         ],
       },
@@ -1122,7 +1207,50 @@ export const GUIDE: GuideChapter[] = [
           },
           {
             title: 'Repairs',
-            body: 'A message from a customer, and a customer approving or declining work.',
+            body: 'A message from a customer, and a customer approving or declining work. A message notification opens the repair order at its Messages card.',
+          },
+        ],
+      },
+      {
+        id: 'notifications-mute',
+        title: 'Muting customer messages',
+        steps: [
+          {
+            title: 'Mute one customer',
+            body: 'On a repair order, the **Messages** card has a **Notify me** button. Press it to mute that customer: it changes to **Muted**. You can do the same from the customer\'s details in **Customers**. Press it again to turn notifications back on.',
+          },
+          {
+            title: 'Mute all customers',
+            body: 'In **Settings**, **Notifications**, untick **Notify the team when a customer sends a message**. The same page lists every muted customer, with **Unmute**.',
+          },
+          {
+            title: 'What muting does',
+            body: 'Muting is for the whole shop, and it only stops the notification. The messages still arrive on the repair order. Approvals and bookings always notify.',
+            callout: { kind: 'tip', text: 'Muting one customer needs full access to Repair Orders or Customers. Muting everyone needs full access to Settings.' },
+          },
+        ],
+      },
+      {
+        id: 'notifications-customer-emails',
+        title: 'Emails to customers',
+        page: { to: '/settings?tab=notifications', label: 'Open Settings' },
+        steps: [
+          {
+            title: 'Progress emails',
+            body: 'With **Email customers at every progress step** on, the customer gets an email each time their repair moves to a new step. Customers with an account who turned emails off get none.',
+          },
+          {
+            title: 'Invoice email',
+            body: 'With **Email the invoice as a PDF when a repair is ready for pickup** on, the invoice is emailed when the repair is marked Ready for pickup.',
+          },
+          {
+            title: 'Invoice privacy',
+            body: 'With **Hide customer phone and email on invoices** on (the default), invoices show the phone as 403 471 xxxx and the email as vixxx0@gmail.com. This is the starting choice when printing and in the emailed copy; staff can still choose each time they print.',
+          },
+          {
+            title: 'See what was sent',
+            body: 'The **Customer emails** card on a repair order lists every email for that repair, newest first, with its state and any error.',
+            callout: { kind: 'note', text: 'Changing these needs full access to Settings. Emails go out from the shop\'s email account set up in Supabase. Text messages (SMS) are coming later.' },
           },
         ],
       },
@@ -1147,21 +1275,67 @@ export const GUIDE: GuideChapter[] = [
   {
     id: 'sales-invoices',
     title: 'Sales, invoices and reports',
-    summary: 'Real reports from repair orders; sales and invoices come with payments.',
+    summary: 'Automatic invoices from repair orders, real reports; sales come with payments.',
     icon: BadgeDollarSign,
     sections: [
       {
+        id: 'sales-invoices-automatic',
+        title: 'Automatic invoices',
+        page: { to: '/invoices', label: 'Open Invoices' },
+        steps: [
+          {
+            title: 'Created at Ready for pickup',
+            body: 'When a repair order is marked **Ready for pickup**, its invoice is created by itself from the approved items, with GST, and numbered INV-0001, INV-0002 and so on. Marking the same repair ready again updates that invoice and sends it again.',
+          },
+          {
+            title: 'Emailed as a PDF',
+            body: 'The ERP makes the invoice PDF as soon as the invoice shows on the repair order or in **Invoices**, stores it, and then the invoice is emailed with the PDF attached, when invoice emails are on in **Settings**, **Notifications**. It is created and kept in **Invoices** either way. Until the PDF is stored, the email shows **Preparing the PDF**.',
+            callout: { kind: 'note', text: 'The PDF is made by someone with full access to Invoices or Repair Orders who has the invoice open. If it could not be stored, the card says so; press **Try again**.' },
+          },
+          {
+            title: 'What the invoice shows',
+            body: 'The shop\'s name, logo, address and contact details at the top; the customer, the vehicle and the job (repair number, check-in and completion dates, technician); the work grouped under **Services**, **Labour**, **Parts** and **Fees**; the subtotal, GST and total; the technician\'s notes the customer may see; and any work the customer declined, listed as recommendations without a charge. A void invoice is marked **VOID**.',
+          },
+          {
+            title: 'The Invoices tab',
+            body: 'Press **Invoices** in the sidebar. The cards show **Invoiced this month**, **Invoices this month** and **Void**. The list shows each invoice with its customer, vehicle, total, status (**Issued** or **Void**), the state of its email and its repair order. Search by number, customer or plate.',
+          },
+          {
+            title: 'Download or print',
+            body: 'Press **Download PDF** to save the invoice, or **Print** to open the print dialog. The PDF is made fresh each time, so it always matches the repair order; the button shows **Preparing...** meanwhile. Void invoices can be downloaded and printed too.',
+          },
+          {
+            title: 'Customer phone and email',
+            body: 'Tick **Show customer phone and email** to print them in full; untick it to show them partly hidden (403 471 xxxx, vixxx0@gmail.com). It starts from the shop\'s setting **Hide customer phone and email on invoices** in **Settings**, **Notifications**, which also decides the emailed copy. In **Invoices** one checkbox above the list applies to every invoice.',
+            callout: { kind: 'tip', text: 'Anyone who can see invoices can download and print them.' },
+          },
+          {
+            title: 'Send again',
+            body: 'Press **Send again** to email the invoice to the customer again: a fresh PDF is made and stored at once, then the email is queued. The email column shows **Preparing the PDF**, **Waiting to send**, **Sent**, **Failed** with the error, or **Not sent** with the reason.',
+            callout: { kind: 'tip', text: 'Send again needs full access to Invoices or Repair Orders.' },
+          },
+          {
+            title: 'On the repair order',
+            body: 'The **Invoice** card on a repair order shows its invoice, totals, **Download PDF**, **Print**, the phone and email checkbox, and **Send again**. Before Ready for pickup it says the invoice will be created then.',
+          },
+          {
+            title: 'Cancelled repairs',
+            body: 'Cancelling a repair order makes its invoice **Void**. Void invoices stay in the list but do not count in this month\'s totals and cannot be sent again.',
+          },
+        ],
+      },
+      {
         id: 'sales-invoices-status',
-        title: 'What these pages show today',
+        title: 'Reports and sales',
         steps: [
           {
             title: 'Reports',
             body: '**Reports & Analytics** is built from your completed repair orders: **Completed work by month** (last six months, before tax), **Top parts fitted** this month, and **Technician performance** (orders completed, average time in the workshop, value of completed work).',
           },
           {
-            title: 'Sales and invoices',
-            body: '**Sales** and **Invoices** show zero until payments and invoicing are set up. Until then, the approved total of each job is on its repair order.',
-            callout: { kind: 'note', text: 'Invoices from repair orders and payments (online and in store) are coming soon.' },
+            title: 'Sales and payments',
+            body: '**Sales** shows zero until payments are set up. Invoices do not show Paid or Overdue yet for the same reason.',
+            callout: { kind: 'note', text: 'Payments (online and in store) are coming soon.' },
           },
         ],
       },

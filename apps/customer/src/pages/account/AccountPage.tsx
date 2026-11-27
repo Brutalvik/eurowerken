@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Bell, KeyRound, LogOut, Mail, MessageSquare, RotateCcw, UserRound } from 'lucide-react';
+import { Bell, KeyRound, LogOut, Mail, MessageSquare, Receipt, RotateCcw, ShieldCheck, UserRound } from 'lucide-react';
 import { useCustomerAuth } from '@/auth/CustomerAuthContext';
 import type { CustomerAccount } from '@/auth/CustomerAuthContext';
 import { Switch } from '@/components/ui';
+import { invoiceMaskedEmail, invoiceMaskedPhone } from '@/lib/format';
 import { sitePath, useSite } from '@/site/SiteContext';
 import { Field, FormAlert, FormSuccess, MIN_PASSWORD, SubmitButton, focusFirstError } from './AccountUI';
 import { ProfilePhotoEditor } from '@/components/PhotoPicker';
@@ -40,6 +41,7 @@ export function AccountPage() {
           <>
             <ProfileCard account={account} />
             <NotificationsCard account={account} />
+            <PrivacyCard account={account} />
             <PasswordCard />
           </>
         ) : (
@@ -194,6 +196,43 @@ export function NotificationsCard({ account, compact = false }: { account: Custo
     <Card icon={Bell} title="Notifications" titleId="notifications-title">
       <p className="mb-2 text-sm text-fg2">How {site.display_name} may remind you about services and update you on repairs.</p>
       {body}
+    </Card>
+  );
+}
+
+function PrivacyCard({ account }: { account: CustomerAccount }) {
+  const { updateAccount } = useCustomerAuth();
+  const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState('');
+  const phone = invoiceMaskedPhone(account.phone);
+  const email = invoiceMaskedEmail(account.email);
+  const shows = [phone && `your phone shows as ${phone}`, email && `your email as ${email}`].filter(Boolean).join(' and ');
+
+  async function toggle(value: boolean) {
+    setError(null);
+    setSaved('');
+    const err = await updateAccount({ invoice_hide_contact: value });
+    if (err) setError(`Your choice was not saved. ${err}`);
+    else setSaved(value ? 'Saved. Your phone and email will be hidden on invoices.' : 'Saved. Your full phone and email will show on invoices.');
+  }
+
+  return (
+    <Card icon={ShieldCheck} title="Privacy" titleId="privacy-title">
+      <Switch
+        label="Hide my phone and email on invoices I print or download"
+        icon={Receipt}
+        description={`${shows ? `When hidden, ${shows}. ` : ''}You can still choose each time.`}
+        checked={account.invoice_hide_contact}
+        onChange={(v) => void toggle(v)}
+      />
+      <p className="sr-only" aria-live="polite">
+        {saved}
+      </p>
+      {error && (
+        <p role="alert" className="mt-2 text-xs font-medium text-bad">
+          {error}
+        </p>
+      )}
     </Card>
   );
 }

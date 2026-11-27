@@ -3,12 +3,13 @@
 -- It cannot be undone.
 --
 -- Deletes: appointments, repair orders (items, approval records, timeline, photos and videos records, messages),
---          staff notifications and their read state, customer alerts; resets repair order numbering to RO-0001.
+--          staff notifications and their read state, customer alerts, invoices and the customer email queue;
+--          resets repair order and invoice numbering (RO-0001, INV-0001).
 -- Keeps:   workshops, staff accounts and roles, customer accounts and vehicles, website settings,
 --          booking settings, business hours, closures and holidays, services, team, parts.
 --
 -- Photo and video FILES are not removed by SQL (Supabase does not allow deleting storage objects this way).
--- To remove them too: Supabase dashboard > Storage > repair-media > select all > Delete.
+-- To remove them too: Supabase dashboard > Storage > repair-media (and invoices) > select all > Delete.
 
 begin;
 
@@ -17,6 +18,8 @@ set local eurowerken.allow_approval_delete = 'on';
 
 delete from public.notification_reads;
 delete from public.notifications;
+delete from public.customer_outbox;
+delete from public.invoices;
 delete from public.customer_notifications;
 delete from public.repair_order_messages;
 delete from public.repair_order_media;
@@ -25,7 +28,7 @@ delete from public.repair_order_events;
 delete from public.repair_order_items;
 delete from public.repair_orders;
 delete from public.appointments;
-update public.workshop_counters set last_ro = 0;
+update public.workshop_counters set last_ro = 0, last_invoice = 0;
 
 commit;
 
