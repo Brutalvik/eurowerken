@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { Menu, Mic } from 'lucide-react';
+import { Command, Menu, Mic } from 'lucide-react';
 import { useNotifications } from '@/notifications/NotificationsContext';
 import { useVoice } from '@/voice/VoiceProvider';
 import { useNavItems } from './navItems';
@@ -78,10 +78,10 @@ export function MobileTabBar({ onMore, moreOpen }: { onMore: () => void; moreOpe
           <button
             type="button"
             onClick={() => openVoice({ listen: supported })}
-            aria-label={supported ? 'Voice command' : 'Type a command'}
+            aria-label={supported ? 'Voice command' : 'Commands'}
             className="-mt-7 flex h-14 w-14 items-center justify-center rounded-full border border-white/25 bg-accent text-accent-fg shadow-[inset_0_1px_0_rgb(255_255_255/0.35),0_10px_28px_-8px_rgb(var(--accent)/0.85)] transition active:scale-95 [[data-contrast=high]_&]:border-2 [[data-contrast=high]_&]:border-fg [[data-contrast=high]_&]:shadow-none"
           >
-            <Mic className="h-6 w-6" aria-hidden />
+            {supported ? <Mic className="h-6 w-6" aria-hidden /> : <Command className="h-6 w-6" aria-hidden />}
           </button>
         </div>
         {right && tab(right)}

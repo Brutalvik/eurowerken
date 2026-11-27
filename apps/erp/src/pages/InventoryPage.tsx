@@ -259,7 +259,7 @@ export function InventoryPage() {
                   onClick={() => openVoice({ listen: voiceSupported })}
                   className="text-sm text-fg2 underline-offset-4 transition hover:text-fg hover:underline"
                 >
-                  Or say: Add brake pad to inventory
+                  {voiceSupported ? 'Or say: Add brake pad to inventory' : 'Or type a command: Add brake pad to inventory'}
                 </button>
               </>
             )}

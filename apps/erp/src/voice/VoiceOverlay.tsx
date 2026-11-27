@@ -24,7 +24,18 @@ const ERRORS: Record<SpeechError, string> = {
 };
 
 /** The frosted command overlay: live transcript, listening state, one-tap suggestions and a typed fallback. */
-export function VoiceOverlay({ startListening, supported, onClose }: { startListening: boolean; supported: boolean; onClose: () => void }) {
+export function VoiceOverlay({
+  startListening,
+  supported,
+  voiceEnabled,
+  onClose,
+}: {
+  startListening: boolean;
+  supported: boolean;
+  /** Off in Settings: no microphone, typing only. */
+  voiceEnabled: boolean;
+  onClose: () => void;
+}) {
   const navigate = useNavigate();
   const { toggleContrast, setContrast, highContrast, setMode, toggle: toggleTheme } = useTheme();
   const items = useNavItems();
@@ -181,7 +192,9 @@ export function VoiceOverlay({ startListening, supported, onClose }: { startList
       ? 'Working on it...'
       : supported
         ? 'Press the microphone and say a command, or type it.'
-        : 'Voice is not available in this browser. Type a command.';
+        : voiceEnabled
+          ? 'Voice is not available in this browser. Type a command.'
+          : 'Type a command and press Enter.';
 
   return createPortal(
     <div
@@ -214,8 +227,9 @@ export function VoiceOverlay({ startListening, supported, onClose }: { startList
           </button>
         </div>
 
-        {/* The orb: tap to listen or stop. */}
+        {/* The orb: tap to listen or stop (only when voice is on in Settings). */}
         <div className="mt-5 flex flex-col items-center gap-3">
+          {voiceEnabled && (
           <div className="relative flex h-28 w-28 items-center justify-center">
             {listening && (
               <>
@@ -244,6 +258,7 @@ export function VoiceOverlay({ startListening, supported, onClose }: { startList
               )}
             </button>
           </div>
+          )}
           <p id={statusId} role="status" aria-live="polite" className="text-center text-xs text-fg2">
             {listening && <span className="mr-1 inline-block h-2 w-2 rounded-full bg-bad align-middle" aria-hidden />}
             {status}

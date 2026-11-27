@@ -1,4 +1,4 @@
-import { Accessibility, Mic } from 'lucide-react';
+import { Accessibility, Command, Mic } from 'lucide-react';
 import { NotificationBell } from '@/notifications/NotificationBell';
 import { useLocation } from 'react-router-dom';
 import { MODULE_LABELS } from '@/auth/rbac';
@@ -34,7 +34,7 @@ export function Header({ safeTop = true }: { safeTop?: boolean }) {
             aria-keyshortcuts="Meta+K Control+K"
             className="glass flex h-12 w-full max-w-[16rem] items-center gap-3 rounded-2xl px-4 text-left text-[15px] text-fg2 transition hover:text-fg"
           >
-            <Mic className="h-4 w-4 shrink-0 text-fg2" aria-hidden />
+            {supported ? <Mic className="h-4 w-4 shrink-0 text-fg2" aria-hidden /> : <Command className="h-4 w-4 shrink-0 text-fg2" aria-hidden />}
             <span className="min-w-0 flex-1 truncate">{supported ? 'Say a command...' : 'Type a command...'}</span>
           </button>
         </div>

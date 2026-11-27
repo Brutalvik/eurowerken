@@ -30,6 +30,7 @@ import { paymentsSection } from './sections/payments';
 import { purchasingSection } from './sections/purchasing';
 import { inspectionsSection } from './sections/inspections';
 import { DATA_SECTION } from './sections/data';
+import { ACCESSIBILITY_SECTION } from './sections/accessibility';
 
 export type CalloutKind = 'tip' | 'warning' | 'note';
 
@@ -962,7 +963,7 @@ export const GUIDE: GuideChapter[] = [
         steps: [
           {
             title: 'The tabs',
-            body: 'Settings has the tabs **Website**, **Services**, **Team**, **Booking**, **Taxes**, **Payments**, **Inspections**, **Notifications**, **Documents** and **Data**. The open tab is part of the page address, so you can bookmark it.',
+            body: 'Settings has the tabs **Website**, **Services**, **Team**, **Booking**, **Taxes**, **Payments**, **Inspections**, **Notifications**, **Documents**, **Data** and **Accessibility**. The open tab is part of the page address, so you can bookmark it.',
           },
         ],
       },
@@ -1204,6 +1205,7 @@ export const GUIDE: GuideChapter[] = [
       },
       taxesSection,
       DATA_SECTION,
+      ACCESSIBILITY_SECTION,
     ],
   },
 

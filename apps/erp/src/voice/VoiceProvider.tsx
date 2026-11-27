@@ -4,21 +4,46 @@ import { VoiceOverlay } from './VoiceOverlay';
 import { speechSupported } from './speech';
 
 interface VoiceContextValue {
-  /** Opens the command overlay. listen: start the microphone straight away (the mic buttons); otherwise type. */
+  /** Opens the command overlay. listen: start the microphone straight away (only when voice is on). */
   openVoice: (opts?: { listen?: boolean }) => void;
-  /** The browser can listen (Web Speech API). Typing works everywhere. */
+  /** Voice can be used right now: turned on in Settings and the browser can listen. Typing always works. */
   supported: boolean;
+  /** The Settings choice on this device (off by default). */
+  voiceEnabled: boolean;
+  setVoiceEnabled: (on: boolean) => void;
+  /** The browser has speech recognition at all (Web Speech API). */
+  speechAvailable: boolean;
 }
 
 const VoiceContext = createContext<VoiceContextValue | null>(null);
+const VOICE_KEY = 'ew-erp-voice';
+
+function readEnabled(): boolean {
+  try {
+    return localStorage.getItem(VOICE_KEY) === 'on';
+  } catch {
+    return false;
+  }
+}
 
 export function VoiceProvider({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState<{ listen: boolean } | null>(null);
-  const supported = useMemo(() => speechSupported(), []);
+  const speechAvailable = useMemo(() => speechSupported(), []);
+  const [voiceEnabled, setEnabledState] = useState(readEnabled);
+  const supported = voiceEnabled && speechAvailable;
+
+  const setVoiceEnabled = useCallback((on: boolean) => {
+    setEnabledState(on);
+    try {
+      localStorage.setItem(VOICE_KEY, on ? 'on' : 'off');
+    } catch {
+      // Not saved; the choice lasts until reload.
+    }
+  }, []);
 
   const openVoice = useCallback((opts?: { listen?: boolean }) => setOpen({ listen: Boolean(opts?.listen) && supported }), [supported]);
 
-  // Cmd+K / Ctrl+K opens the command bar from anywhere (typing; press the mic to talk).
+  // Cmd+K / Ctrl+K opens the command bar from anywhere (typing; the microphone only when voice is on).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'k') {
@@ -30,11 +55,14 @@ export function VoiceProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
-  const value = useMemo(() => ({ openVoice, supported }), [openVoice, supported]);
+  const value = useMemo(
+    () => ({ openVoice, supported, voiceEnabled, setVoiceEnabled, speechAvailable }),
+    [openVoice, supported, voiceEnabled, setVoiceEnabled, speechAvailable],
+  );
   return (
     <VoiceContext.Provider value={value}>
       {children}
-      {open && <VoiceOverlay startListening={open.listen} supported={supported} onClose={() => setOpen(null)} />}
+      {open && <VoiceOverlay startListening={open.listen} supported={supported} voiceEnabled={voiceEnabled} onClose={() => setOpen(null)} />}
     </VoiceContext.Provider>
   );
 }

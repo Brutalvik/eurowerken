@@ -1,5 +1,6 @@
 import { useSearchParams } from 'react-router-dom';
 import { PillTabs } from '@/components/ui/PillTabs';
+import { AccessibilityCard } from './settings/AccessibilityCard';
 import { BookingCard } from './settings/BookingCard';
 import { DataCard } from './settings/data/DataCard';
 import { InspectionTemplatesCard } from './settings/InspectionTemplatesCard';
@@ -11,7 +12,7 @@ import { ServicesCard } from './settings/ServicesCard';
 import { TeamCard } from './settings/TeamCard';
 import { WebsiteTab } from './settings/WebsiteTab';
 
-const TABS = ['Website', 'Services', 'Team', 'Booking', 'Taxes', 'Payments', 'Inspections', 'Notifications', 'Documents', 'Data'] as const;
+const TABS = ['Website', 'Services', 'Team', 'Booking', 'Taxes', 'Payments', 'Inspections', 'Notifications', 'Documents', 'Data', 'Accessibility'] as const;
 type Tab = (typeof TABS)[number];
 
 export function SettingsPage() {
@@ -44,6 +45,7 @@ export function SettingsPage() {
         )}
         {tab === 'Inspections' && <InspectionTemplatesCard />}
         {tab === 'Data' && <DataCard />}
+        {tab === 'Accessibility' && <AccessibilityCard />}
         {tab === 'Notifications' && <NotificationsCard />}
         {tab === 'Documents' && (
           <div className="max-w-3xl">
