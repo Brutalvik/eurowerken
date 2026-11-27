@@ -5,6 +5,7 @@ import { supabase, supabaseConfigured } from '@/lib/supabase';
 import type { ProfileRow, WorkshopRow } from '@/lib/supabase';
 import { ACCESS, MODULE_ORDER, ROLES } from './rbac';
 import type { Access, ModuleId, PermissionMatrix, Role } from './rbac';
+import { appUrl } from '@/lib/appUrl';
 
 export interface AuthUser {
   id: string;
@@ -324,7 +325,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       password,
       options: {
         data: metadata,
-        emailRedirectTo: `${window.location.origin}${returnTo ?? '/dashboard'}`,
+        emailRedirectTo: appUrl(returnTo ?? '/dashboard'),
       },
     });
     if (error) return { error: friendly(error.message), needsConfirmation: false };
@@ -339,7 +340,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signInWithGoogle = useCallback(async () => {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: `${window.location.origin}/dashboard` },
+      options: { redirectTo: appUrl('/dashboard') },
     });
     // On success the browser leaves for Google, so only errors come back here.
     return error ? friendly(error.message) : null;
@@ -351,7 +352,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const sendPasswordReset = useCallback(async (email: string) => {
     const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-      redirectTo: `${window.location.origin}/reset-password`,
+      redirectTo: appUrl('/reset-password'),
     });
     return error ? friendly(error.message) : null;
   }, []);
@@ -372,7 +373,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { error } = await supabase.auth.resend({
       type: 'signup',
       email: email.trim(),
-      options: { emailRedirectTo: `${window.location.origin}${returnTo ?? '/dashboard'}` },
+      options: { emailRedirectTo: appUrl(returnTo ?? '/dashboard') },
     });
     return error ? friendly(error.message) : null;
   }, []);

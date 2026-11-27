@@ -1,3 +1,4 @@
+import { appUrl } from '@/lib/appUrl';
 import { supabase } from './supabase';
 import type { Role } from '@/auth/rbac';
 
@@ -17,5 +18,5 @@ export async function fetchInvitePreview(token: string): Promise<InvitePreview |
 }
 
 export function inviteUrl(token: string): string {
-  return `${window.location.origin}/invite/${token}`;
+  return appUrl(`/invite/${token}`);
 }

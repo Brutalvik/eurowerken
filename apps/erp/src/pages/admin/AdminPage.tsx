@@ -13,10 +13,8 @@ import { PillTabs } from '@/components/ui/PillTabs';
 import { SearchInput } from '@/components/ui/SearchInput';
 import { Dialog, ErrorNote, Labeled, inputClass } from '@/pages/inventory/PartForm';
 import { NotFoundPage } from '@/pages/NotFoundPage';
+import { CUSTOMER_SITE_URL } from '@/config/customerSite';
 
-const CUSTOMER_SITE_URL = (
-  (import.meta.env.VITE_CUSTOMER_SITE_URL as string | undefined) ?? 'http://localhost:5175'
-).replace(/\/+$/, '');
 
 const TABS = ['Workshops', 'Platform settings', 'Audit log'] as const;
 type Tab = (typeof TABS)[number];

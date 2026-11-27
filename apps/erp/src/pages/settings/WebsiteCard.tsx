@@ -8,8 +8,8 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card, CardHeader } from '@/components/ui/Card';
 import { supabase } from '@/lib/supabase';
+import { CUSTOMER_SITE_URL } from '@/config/customerSite';
 
-const CUSTOMER_SITE_URL = (import.meta.env.VITE_CUSTOMER_SITE_URL as string | undefined) ?? 'http://localhost:5175';
 
 const inputClass =
   'w-full rounded-lg border border-line bg-surface2 px-3 py-2 text-xs text-fg outline-none placeholder:text-fg3 focus:border-accent coarse:min-h-11';

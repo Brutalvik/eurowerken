@@ -16,6 +16,8 @@ export default defineConfig(({ mode }) => ({
     },
   },
   envDir,
+  // '/' locally; '/erp/' or '/site/' when both apps are served from one address (scripts/build-vercel.sh).
+  base: process.env.APP_BASE || '/',
   server: {
     port: 5175,
   },

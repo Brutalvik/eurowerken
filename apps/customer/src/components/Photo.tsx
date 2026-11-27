@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import { ImageIcon } from 'lucide-react';
+import { publicFile } from '@/lib/appUrl';
 
 interface PhotoProps {
   /** Full image URL (for example a workshop upload). Tried first when given. */
@@ -25,7 +26,7 @@ export function Photo({ src, name, alt, className = '', icon: Icon = ImageIcon, 
   // .png first for cut-outs with a transparent background, then .jpg, then .webp.
   const sources = [
     ...(src ? [src] : []),
-    ...(name ? [`/images/${name}.png`, `/images/${name}.jpg`, `/images/${name}.webp`] : []),
+    ...(name ? [publicFile(`images/${name}.png`), publicFile(`images/${name}.jpg`), publicFile(`images/${name}.webp`)] : []),
   ];
   const [index, setIndex] = useState(0);
   // A different picture in the same slot starts again from its first source.

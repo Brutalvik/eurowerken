@@ -4,6 +4,7 @@ import type { Session } from '@supabase/supabase-js';
 import type { CustomerAccountRow } from '@eurowerken/shared';
 import { friendlyError } from '@/lib/errors';
 import { supabase, supabaseConfigured } from '@/lib/supabase';
+import { appUrl } from '@/lib/appUrl';
 
 /** customer_accounts row, with the notification preferences added in migration 006. */
 export interface CustomerAccount extends CustomerAccountRow {
@@ -266,7 +267,7 @@ export function CustomerAuthProvider({ slug, children }: { slug: string; childre
         options: {
           // handle_new_user reads account_type to create a customer account (no staff profile).
           data: { account_type: 'customer', full_name: fullName.trim(), phone: phone?.trim() ?? '' },
-          emailRedirectTo: `${window.location.origin}/${slug}/garage`,
+          emailRedirectTo: appUrl(`/${slug}/garage`),
         },
       });
       if (error) return { error: friendlyError(error.message), needsConfirmation: false };
@@ -283,7 +284,7 @@ export function CustomerAuthProvider({ slug, children }: { slug: string; childre
     async (next?: string) => {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
-        options: { redirectTo: `${window.location.origin}${safeNext(next, slug)}` },
+        options: { redirectTo: appUrl(safeNext(next, slug)) },
       });
       // On success the browser leaves for Google, so only errors come back here.
       return error ? friendlyError(error.message) : null;
@@ -298,7 +299,7 @@ export function CustomerAuthProvider({ slug, children }: { slug: string; childre
   const sendPasswordReset = useCallback(
     async (email: string) => {
       const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-        redirectTo: `${window.location.origin}/${slug}/reset-password`,
+        redirectTo: appUrl(`/${slug}/reset-password`),
       });
       return error ? friendlyError(error.message) : null;
     },
@@ -322,7 +323,7 @@ export function CustomerAuthProvider({ slug, children }: { slug: string; childre
       const { error } = await supabase.auth.resend({
         type: 'signup',
         email: email.trim(),
-        options: { emailRedirectTo: `${window.location.origin}/${slug}/garage` },
+        options: { emailRedirectTo: appUrl(`/${slug}/garage`) },
       });
       return error ? friendlyError(error.message) : null;
     },

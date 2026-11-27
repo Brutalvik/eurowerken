@@ -2,13 +2,13 @@
   "name": "EuroWerken ERP",
   "short_name": "EuroWerken",
   "description": "Workshop operations console",
-  "start_url": "/dashboard",
-  "scope": "/",
+  "start_url": "./dashboard",
+  "scope": "./",
   "display": "standalone",
   "orientation": "any",
   "background_color": "#070c18",
   "theme_color": "#0a1628",
   "icons": [
-    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
   ]
 }

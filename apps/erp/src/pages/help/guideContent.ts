@@ -1,3 +1,4 @@
+import { publicFile } from '@/lib/appUrl';
 /**
  * The in-app usage guide (/help): chapters, sections and numbered steps.
  *
@@ -62,7 +63,7 @@ export interface GuideChapter {
   sections: GuideSection[];
 }
 
-const shot = (name: string, alt: string, caption: string): GuideShot => ({ src: `/guide/${name}.png`, alt, caption });
+const shot = (name: string, alt: string, caption: string): GuideShot => ({ src: publicFile(`guide/${name}.png`), alt, caption });
 
 export const GUIDE: GuideChapter[] = [
   // 1. Getting started ---------------------------------------------------------------------------------

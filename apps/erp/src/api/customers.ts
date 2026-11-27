@@ -9,6 +9,7 @@
 import type { CustomerAccountRow, CustomerVehicleRow } from '@eurowerken/shared';
 import { supabase } from '@/lib/supabase';
 import { friendlyError } from './catalogue';
+import { CUSTOMER_SITE_URL } from '@/config/customerSite';
 
 export type CustomerVehicle = Pick<CustomerVehicleRow, 'id' | 'make' | 'model' | 'year' | 'vin' | 'plate' | 'nickname'>;
 
@@ -77,8 +78,7 @@ export async function getCustomer(workshopId: string, customerId: string): Promi
 
 /** The workshop's customer website address, or null when it has no site row. */
 export async function getCustomerSiteUrl(workshopId: string): Promise<string | null> {
-  const base = (import.meta.env.VITE_CUSTOMER_SITE_URL as string | undefined) ?? 'http://localhost:5175';
   const { data, error } = await supabase.from('workshop_sites').select('slug').eq('workshop_id', workshopId).maybeSingle();
   if (error || !data) return null;
-  return `${base.replace(/\/+$/, '')}/${(data as { slug: string }).slug}`;
+  return `${CUSTOMER_SITE_URL}/${(data as { slug: string }).slug}`;
 }

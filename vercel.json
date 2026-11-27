@@ -1,7 +1,14 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "framework": "vite",
-  "buildCommand": "npm run build -w @eurowerken/erp",
-  "outputDirectory": "apps/erp/dist",
-  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+  "framework": null,
+  "installCommand": "npm install",
+  "buildCommand": "bash scripts/build-vercel.sh",
+  "outputDirectory": "dist-vercel",
+  "redirects": [{ "source": "/", "destination": "/erp/", "permanent": false }],
+  "rewrites": [
+    { "source": "/erp", "destination": "/erp/index.html" },
+    { "source": "/erp/:path*", "destination": "/erp/index.html" },
+    { "source": "/site", "destination": "/site/index.html" },
+    { "source": "/site/:path*", "destination": "/site/index.html" }
+  ]
 }

@@ -8,6 +8,7 @@ import type { Tone } from '@/components/ui/Badge';
 import { supabase } from '@/lib/supabase';
 import { friendlyError } from './catalogue';
 import type { AppointmentVehicle, Urgency } from './appointments';
+import { CUSTOMER_SITE_URL } from '@/config/customerSite';
 
 // Types ------------------------------------------------------------------------------------------
 
@@ -309,8 +310,7 @@ export function canCancel(status: RepairStatus): boolean {
 /** The customer's tracking page for a repair, or null without a site slug. */
 export function trackingLink(slug: string | null | undefined, code: string): string | null {
   if (!slug) return null;
-  const base = ((import.meta.env.VITE_CUSTOMER_SITE_URL as string | undefined) ?? 'http://localhost:5175').replace(/\/+$/, '');
-  return `${base}/${slug}/track?id=${encodeURIComponent(code)}`;
+  return `${CUSTOMER_SITE_URL}/${slug}/track?id=${encodeURIComponent(code)}`;
 }
 
 export function mediaUrl(path: string): string {
